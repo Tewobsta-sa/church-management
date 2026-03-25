@@ -8,45 +8,71 @@ export const useAuth = () => useContext(AuthContext);
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isInitialized, setIsInitialized] = useState(true);
+  const [isInitialized, setIsInitialized] = useState(null); // null until API returns
 
-  // Check system status on first load
+  // Fetch user from localStorage only if token exists
+  const fetchUser = async () => {
+    const token = localStorage.getItem("token");
+    const storedUser = localStorage.getItem("user");
+
+    if (token && storedUser) {
+      setUser(JSON.parse(storedUser));
+    } else {
+      // Clear stale data
+      localStorage.removeItem("token");
+      localStorage.removeItem("refresh_token");
+      localStorage.removeItem("user");
+      setUser(null);
+    }
+  };
+
+  // Check system status
   const checkSystemStatus = async () => {
     try {
       const res = await api.get("/system/status");
-      setIsInitialized(res.data.initialized);
+      setIsInitialized(!res.data.needs_initialization);
     } catch (e) {
-      console.error(e);
+      console.error("Failed to check system status", e);
+      setIsInitialized(false); // assume not initialized if API fails
     }
   };
 
-  // Get current user
-  const fetchUser = async () => {
-    try {
-      const res = await api.get("/whoami");
-      setUser(res.data);
-    } catch (e) {
-      localStorage.removeItem("token");
-    }
-  };
-
+  // Initialize auth context on app load
   useEffect(() => {
-    checkSystemStatus();
-    const token = localStorage.getItem("token");
-    if (token) fetchUser();
-    setLoading(false);
+    const init = async () => {
+      try {
+        await checkSystemStatus();
+        await fetchUser();
+      } catch (e) {
+        console.error("Auth initialization failed", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    init();
   }, []);
 
-  const login = async (email, password) => {
-    const res = await api.post("/login", { email, password });
-    localStorage.setItem("token", res.data.token); // adjust if your login returns different key
-    await fetchUser();
+  // Login
+  const login = async (username, password) => {
+    const res = await api.post("/login", { username, password });
+
+    // store tokens and user
+    localStorage.setItem("token", res.data.access_token);
+    localStorage.setItem("refresh_token", res.data.refresh_token);
+    localStorage.setItem("user", JSON.stringify(res.data.user));
+    setUser(res.data.user);
+
+    // refresh system status
+    await checkSystemStatus();
+
     return res.data;
   };
 
-  const logout = async () => {
-    await api.post("/logout");
+  // Logout
+  const logout = () => {
     localStorage.removeItem("token");
+    localStorage.removeItem("refresh_token");
+    localStorage.removeItem("user");
     setUser(null);
     window.location.href = "/login";
   };

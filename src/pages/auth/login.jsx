@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { LogIn } from "lucide-react";
 
 export default function Login() {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const { login } = useAuth();
@@ -13,8 +13,13 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await login(email, password);
-      navigate("/");
+      const data = await login(username, password);
+
+      if (data?.access_token) {
+        navigate("/dashboard");
+      } else {
+        setError("Invalid login response");
+      }
     } catch (err) {
       setError(err.response?.data?.message || "Login failed");
     }
@@ -38,13 +43,14 @@ export default function Login() {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium mb-1">Email</label>
+            <label className="block text-sm font-medium mb-1">Username</label>
             <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="text" // Changed from "string" to "text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:border-blue-500"
               required
+              autoComplete="username" // Better for accessibility
             />
           </div>
 
@@ -56,6 +62,7 @@ export default function Login() {
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:border-blue-500"
               required
+              autoComplete="current-password"
             />
           </div>
 
