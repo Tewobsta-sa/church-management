@@ -1,5 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import "@fontsource/inter";
 import "./index.css"; // Let's test the CSS first
 import { AuthProvider } from "./context/AuthContext.jsx"; // Keep this commented for now
 import App from "./App.jsx"; // Keep this commented for now
