@@ -38,6 +38,7 @@ const navItems = [
     icon: Award,
     roles: [
       "gngnunet_office_admin",
+      "tmhrt_office_admin",
       "super_admin"
     ],
   },

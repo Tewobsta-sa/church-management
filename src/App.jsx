@@ -21,6 +21,29 @@ import MezmurMinistry from "./pages/mezmur/MezmurMinistry";
 import AppLayout from "./components/layout/AppLayout";
 import SectionsManagement from "./pages/sections/SectionsManagement";
 
+const getPrimaryRole = (user) => user?.roles?.[0]?.name || null;
+
+const getDefaultRouteForRole = (role) => {
+  const roleRedirects = {
+    super_admin: "/users",
+    gngnunet_office_admin: "/students",
+    young_gngnunet_admin: "/students",
+    mezmur_office_admin: "/mezmur",
+    tmhrt_office_admin: "/assignments",
+    teacher: "/assignments",
+    distance_admin: "/dashboard",
+    young_tmhrt_admin: "/dashboard",
+  };
+
+  return roleRedirects[role] || "/dashboard";
+};
+
+const hasAnyAllowedRole = (user, allowedRoles) => {
+  if (!user) return false;
+  if (user?.roles?.some((r) => r.name === "super_admin")) return true;
+  return user?.roles?.some((r) => allowedRoles.includes(r.name));
+};
+
 // Public Route (Login)
 function PublicRoute({ children }) {
   const { user, loading, isInitialized } = useAuth();
@@ -32,15 +55,7 @@ function PublicRoute({ children }) {
   }
 
   if (user) {
-    const role = user?.roles?.[0]?.name;
-
-    console.log("Role:", role);
-    if (role === "super_admin") {
-      return <Navigate to="/users" replace />;
-    }
-    else if (role === "gngnunet_office_admin") {
-      return <Navigate to="/students" replace />;
-    }
+    return <Navigate to={getDefaultRouteForRole(getPrimaryRole(user))} replace />;
   }
 
   return children;
@@ -58,6 +73,27 @@ function ProtectedRoute({ children }) {
 
   if (!user) {
     return <Navigate to="/" replace />;
+  }
+
+  return children;
+}
+
+// Role-Specific Route
+function RoleRoute({ children, allowedRoles }) {
+  const { user, loading, isInitialized } = useAuth();
+
+  if (loading) return <p>Loading...</p>;
+
+  if (isInitialized === false) {
+    return <Navigate to="/setup" replace />;
+  }
+
+  if (!user) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (!hasAnyAllowedRole(user, allowedRoles)) {
+    return <Navigate to={getDefaultRouteForRole(getPrimaryRole(user))} replace />;
   }
 
   return children;
@@ -110,16 +146,105 @@ function App() {
             }
           >
             {/* All protected pages go here */}
-            <Route path="/users" element={<UsersManagement />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/students" element={<StudentsList />} />
-            <Route path="/promotions" element={<StudentPromotion />} />
-            <Route path="/sections" element={<SectionsManagement />} />
-            <Route path="/courses" element={<CoursesManagement />} />
-            <Route path="/assignments" element={<AssignmentsTasks />} />
-            <Route path="/attendance" element={<LiveAttendance />} />
-            <Route path="/grades" element={<Grades />} />
-            <Route path="/mezmur" element={<MezmurMinistry />} />
+            <Route
+              path="/users"
+              element={
+                <RoleRoute allowedRoles={["super_admin"]}>
+                  <UsersManagement />
+                </RoleRoute>
+              }
+            />
+            <Route
+              path="/dashboard"
+              element={
+                <RoleRoute
+                  allowedRoles={[
+                    "super_admin",
+                    "gngnunet_office_admin",
+                    "young_gngnunet_admin",
+                    "mezmur_office_admin",
+                    "tmhrt_office_admin",
+                    "teacher",
+                    "distance_admin",
+                    "young_tmhrt_admin",
+                  ]}
+                >
+                  <Dashboard />
+                </RoleRoute>
+              }
+            />
+            <Route
+              path="/students"
+              element={
+                <RoleRoute
+                  allowedRoles={[
+                    "gngnunet_office_admin",
+                    "young_gngnunet_admin",
+                    "mezmur_office_admin",
+                    "tmhrt_office_admin",
+                    "distance_admin",
+                  ]}
+                >
+                  <StudentsList />
+                </RoleRoute>
+              }
+            />
+            <Route
+              path="/promotions"
+              element={
+                <RoleRoute allowedRoles={["gngnunet_office_admin", "tmhrt_office_admin"]}>
+                  <StudentPromotion />
+                </RoleRoute>
+              }
+            />
+            <Route
+              path="/sections"
+              element={
+                <RoleRoute allowedRoles={["tmhrt_office_admin", "distance_admin"]}>
+                  <SectionsManagement />
+                </RoleRoute>
+              }
+            />
+            <Route
+              path="/courses"
+              element={
+                <RoleRoute allowedRoles={["tmhrt_office_admin", "distance_admin"]}>
+                  <CoursesManagement />
+                </RoleRoute>
+              }
+            />
+            <Route
+              path="/assignments"
+              element={
+                <RoleRoute allowedRoles={["tmhrt_office_admin", "mezmur_office_admin", "teacher", "distance_admin"]}>
+                  <AssignmentsTasks />
+                </RoleRoute>
+              }
+            />
+            <Route
+              path="/attendance"
+              element={
+                <RoleRoute allowedRoles={["tmhrt_office_admin", "mezmur_office_admin", "teacher", "distance_admin"]}>
+                  <LiveAttendance />
+                </RoleRoute>
+              }
+            />
+            <Route
+              path="/grades"
+              element={
+                <RoleRoute allowedRoles={["teacher", "tmhrt_office_admin", "distance_admin"]}>
+                  <Grades />
+                </RoleRoute>
+              }
+            />
+            <Route
+              path="/mezmur"
+              element={
+                <RoleRoute allowedRoles={["mezmur_office_admin"]}>
+                  <MezmurMinistry />
+                </RoleRoute>
+              }
+            />
           </Route>
 
           {/* Catch-all */}
