@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 
 import Login from "./pages/auth/login";
 import Setup from "./pages/auth/setup";
+import ForgotPassword from "./pages/auth/ForgotPassword";
 import Dashboard from "./pages/dashboard/Dashboard";
 import StudentsList from "./pages/students/StudentsList";
 import StudentPromotion from "./pages/students/StudentPromotion";
@@ -27,9 +28,12 @@ const getDefaultRouteForRole = (role) => {
   const roleRedirects = {
     super_admin: "/dashboard",
     gngnunet_office_admin: "/students",
+    young_gngnunet_admin: "/students",
     mezmur_office_admin: "/mezmur",
     tmhrt_office_admin: "/assignments",
     teacher: "/assignments",
+    distance_admin: "/students",
+    young_tmhrt_admin: "/assignments",
   };
 
   return roleRedirects[role] || "/dashboard";
@@ -133,6 +137,14 @@ function App() {
               </SetupRoute>
             }
           />
+          <Route
+            path="/forgot-password"
+            element={
+              <PublicRoute>
+                <ForgotPassword />
+              </PublicRoute>
+            }
+          />
 
           {/* Protected Layout */}
           <Route
@@ -158,9 +170,12 @@ function App() {
                   allowedRoles={[
                     "super_admin",
                     "gngnunet_office_admin",
+                    "young_gngnunet_admin",
                     "mezmur_office_admin",
                     "tmhrt_office_admin",
                     "teacher",
+                    "distance_admin",
+                    "young_tmhrt_admin",
                   ]}
                 >
                   <Dashboard />
@@ -174,8 +189,10 @@ function App() {
                   allowedRoles={[
                     "super_admin",
                     "gngnunet_office_admin",
+                    "young_gngnunet_admin",
                     "mezmur_office_admin",
                     "tmhrt_office_admin",
+                    "distance_admin",
                   ]}
                 >
                   <StudentsList />
@@ -193,7 +210,7 @@ function App() {
             <Route
               path="/sections"
               element={
-                <RoleRoute allowedRoles={["super_admin", "tmhrt_office_admin"]}>
+                <RoleRoute allowedRoles={["super_admin", "tmhrt_office_admin", "distance_admin"]}>
                   <SectionsManagement />
                 </RoleRoute>
               }
@@ -201,7 +218,7 @@ function App() {
             <Route
               path="/courses"
               element={
-                <RoleRoute allowedRoles={["super_admin", "tmhrt_office_admin"]}>
+                <RoleRoute allowedRoles={["super_admin", "tmhrt_office_admin", "distance_admin"]}>
                   <CoursesManagement />
                 </RoleRoute>
               }
@@ -209,7 +226,7 @@ function App() {
             <Route
               path="/assignments"
               element={
-                <RoleRoute allowedRoles={["super_admin", "tmhrt_office_admin", "mezmur_office_admin", "teacher"]}>
+                <RoleRoute allowedRoles={["super_admin", "tmhrt_office_admin", "mezmur_office_admin", "teacher", "distance_admin", "young_tmhrt_admin"]}>
                   <AssignmentsTasks />
                 </RoleRoute>
               }
@@ -217,7 +234,7 @@ function App() {
             <Route
               path="/attendance"
               element={
-                <RoleRoute allowedRoles={["super_admin", "tmhrt_office_admin", "mezmur_office_admin", "teacher"]}>
+                <RoleRoute allowedRoles={["tmhrt_office_admin", "mezmur_office_admin", "teacher", "distance_admin", "young_tmhrt_admin"]}>
                   <LiveAttendance />
                 </RoleRoute>
               }
@@ -225,7 +242,7 @@ function App() {
             <Route
               path="/grades"
               element={
-                <RoleRoute allowedRoles={["super_admin", "teacher", "tmhrt_office_admin"]}>
+                <RoleRoute allowedRoles={["super_admin", "teacher", "tmhrt_office_admin", "distance_admin", "young_tmhrt_admin"]}>
                   <Grades />
                 </RoleRoute>
               }

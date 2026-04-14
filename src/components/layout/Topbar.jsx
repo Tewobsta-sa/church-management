@@ -1,11 +1,11 @@
-import { Menu, LogOut, Bell, UserCircle, Globe } from "lucide-react";
+import { Menu, Bell, UserCircle, Globe } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import ProfileModal from "./ProfileModal";
 
 export default function Topbar() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { t, i18n } = useTranslation();
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
@@ -31,7 +31,7 @@ export default function Topbar() {
               {t('Dashboard')}
             </p>
             <h2 className="text-xl font-bold tracking-tight text-slate-800">
-              Welcome back, {user?.name?.split(' ')[0] || 'Admin'}
+              {t("Welcome back")}, {user?.name?.split(' ')[0] || 'Admin'}
             </h2>
           </div>
         </div>
@@ -43,7 +43,7 @@ export default function Topbar() {
             className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-lg transition-colors border border-brand-200"
           >
             <Globe className="h-4 w-4" />
-            {i18n.language === 'en' ? 'አማርኛ' : 'English'}
+            {i18n.language === 'en' ? t("Amharic") : t("English")}
           </button>
           
           <button className="relative p-2 text-slate-400 hover:text-brand-600 transition-colors rounded-full hover:bg-brand-50">

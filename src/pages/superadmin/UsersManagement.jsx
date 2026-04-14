@@ -107,7 +107,7 @@ export default function UsersManagement() {
           <StatCard title="Total Accounts" value={stats.total_users || 0} icon={Users} color="brand" />
           <StatCard title="Super Admins" value={stats.super_admin_count || 0} icon={Shield} color="indigo" />
           <StatCard title="Office Admins" value={stats.other_admin_count || 0} icon={Settings} color="purple" />
-          <StatCard title="Regular Users" value={stats.regular_user_count || 0} icon={Activity} color="green" />
+          <StatCard title="Staff Users" value={(stats.total_users || 0) - (stats.super_admin_count || 0)} icon={Activity} color="green" />
         </div>
       )}
 

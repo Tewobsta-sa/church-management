@@ -27,8 +27,10 @@ const navItems = [
     icon: Users,
     roles: [
       "gngnunet_office_admin",
+      "young_gngnunet_admin",
       "mezmur_office_admin",
       "tmhrt_office_admin",
+      "distance_admin",
       "super_admin"
     ],
   },
@@ -46,7 +48,7 @@ const navItems = [
     path: "/courses",
     label: "Courses",
     icon: BookOpen,
-    roles: ["tmhrt_office_admin", "super_admin"],
+    roles: ["tmhrt_office_admin", "distance_admin", "super_admin"],
   },
   {
     path: "/assignments",
@@ -56,6 +58,8 @@ const navItems = [
       "tmhrt_office_admin",
       "mezmur_office_admin",
       "teacher",
+      "distance_admin",
+      "young_tmhrt_admin",
       "super_admin"
     ],
   },
@@ -67,14 +71,15 @@ const navItems = [
       "teacher",
       "tmhrt_office_admin",
       "mezmur_office_admin",
-      "super_admin"
+      "distance_admin",
+      "young_tmhrt_admin",
     ],
   },
   {
     path: "/grades",
     label: "Results",
     icon: Award,
-    roles: ["teacher", "tmhrt_office_admin", "super_admin"],
+    roles: ["teacher", "tmhrt_office_admin", "distance_admin", "young_tmhrt_admin", "super_admin"],
   },
   {
     path: "/mezmur",
@@ -90,7 +95,7 @@ export default function Sidebar() {
 
   const visibleItems = navItems.filter(
     (item) =>
-      item.roles.includes("*") || item.roles.some((role) => hasRole(role)) || hasRole("super_admin"),
+      item.roles.includes("*") || item.roles.some((role) => hasRole(role)),
   );
 
   return (

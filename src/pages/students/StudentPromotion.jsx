@@ -7,7 +7,6 @@ import { studentService } from "../../services/studentService";
 export default function StudentPromotion() {
   const { hasRole } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("young"); // 'young' | 'regular'
   
   const [candidates, setCandidates] = useState([]);
 
@@ -15,10 +14,7 @@ export default function StudentPromotion() {
 
   const fetchCandidates = async () => {
      try {
-        // Fetching young/regular students to promote
-        const res = activeTab === 'young' 
-            ? await studentService.getYoungStudents(1, "", { per_page: 100 })
-            : await studentService.getRegularStudents(1, "", { per_page: 100 });
+        const res = await studentService.getYoungStudents(1, "", { per_page: 100 });
         
         setCandidates(res.data || []);
      } catch (err) {
@@ -28,7 +24,7 @@ export default function StudentPromotion() {
 
   useEffect(() => {
      fetchCandidates();
-  }, [activeTab]);
+  }, []);
 
   const handleVerify = async (id) => {
     try {
@@ -50,12 +46,8 @@ export default function StudentPromotion() {
     if(confirm(`Execute promotion for ${verifiedCandidateIds.length} verified students?`)) {
        setLoading(true);
        try {
-         if (activeTab === 'young') {
-            await academicService.promoteYoung(verifiedCandidateIds);
-         } else {
-            await academicService.promoteRegular(verifiedCandidateIds);
-         }
-         alert("Promotion executed successfully! Students moved to new track.");
+         await academicService.promoteYoung(verifiedCandidateIds);
+         alert("Promotion executed successfully.");
          fetchCandidates();
        } catch (err) {
          alert(err.response?.data?.message || "Promotion failed.");
@@ -64,8 +56,6 @@ export default function StudentPromotion() {
        }
     }
   };
-
-  const filteredCandidates = candidates.filter(c => c.current_section.startsWith(activeTab === 'young' ? 'Y' : 'R'));
 
   return (
     <div className="space-y-6">
@@ -100,7 +90,7 @@ export default function StudentPromotion() {
             <div>
                <h4 className="font-bold text-brand-900 text-sm">Rules</h4>
                <p className="text-xs text-brand-700 mt-1 font-medium leading-relaxed">
-                 Young (Y6) completes track to enter Regular. Regular (R6) advances to Graduate. Manual verification flag required.
+                 Young candidates must be manually verified before promotion.
                </p>
             </div>
          </div>
@@ -108,8 +98,7 @@ export default function StudentPromotion() {
 
       <div className="glass-panel overflow-hidden">
         <div className="bg-slate-50/50 p-4 border-b border-slate-100 flex gap-2">
-            <button onClick={() => setActiveTab('young')} className={`px-4 py-2 text-sm font-bold rounded-lg transition-colors ${activeTab === 'young' ? 'bg-white text-brand-600 shadow-sm' : 'text-slate-500 hover:bg-slate-200/50'}`}>Young Track (Y6)</button>
-            <button onClick={() => setActiveTab('regular')} className={`px-4 py-2 text-sm font-bold rounded-lg transition-colors ${activeTab === 'regular' ? 'bg-white text-brand-600 shadow-sm' : 'text-slate-500 hover:bg-slate-200/50'}`}>Regular Track (R6)</button>
+            <span className="px-4 py-2 text-sm font-bold rounded-lg bg-white text-brand-600 shadow-sm">Young Track</span>
         </div>
         
         <table className="w-full text-left border-collapse">

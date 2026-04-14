@@ -12,7 +12,7 @@ export default function StudentsList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const [activeTab, setActiveTab] = useState("young"); // young | regular | distance
+  const activeTab = "young";
   const [currentPage, setCurrentPage] = useState(1);
   const [search, setSearch] = useState("");
   const [totalPages, setTotalPages] = useState(1);
@@ -24,9 +24,8 @@ export default function StudentsList() {
   const [modalMode, setModalMode] = useState("view");
 
   const canCreate =
-    (hasRole("young_gngnunet_admin") && activeTab === "young") ||
-    hasRole("gngnunet_office_admin") ||
-    (hasRole("distance_admin") && activeTab === "distance");
+    hasRole("young_gngnunet_admin") ||
+    hasRole("gngnunet_office_admin");
   const canEdit = canCreate;
   const canDelete = canCreate;
 
@@ -34,14 +33,7 @@ export default function StudentsList() {
     try {
       setLoading(true);
       setError(null);
-      let data;
-      if (activeTab === "young") {
-        data = await studentService.getYoungStudents(currentPage, search);
-      } else if (activeTab === "regular") {
-        data = await studentService.getRegularStudents(currentPage, search);
-      } else if (activeTab === "distance") {
-        data = await studentService.getDistanceStudents(currentPage, search);
-      }
+      const data = await studentService.getYoungStudents(currentPage, search);
       setStudents(data?.data || []);
       setCurrentPage(data?.current_page || 1);
       setTotalPages(data?.last_page || 1);
@@ -54,15 +46,9 @@ export default function StudentsList() {
     }
   };
 
-  // Re-fetch when tab or page or search changes
   useEffect(() => {
     fetchStudents();
-  }, [activeTab, currentPage, search]);
-
-  const handleTabChange = (tab) => {
-    setActiveTab(tab);
-    setCurrentPage(1);
-  };
+  }, [currentPage, search]);
 
   const openModal = (student = null, mode = "view") => {
     setSelectedStudent(student);
@@ -86,7 +72,7 @@ export default function StudentsList() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Students Explorer</h1>
-          <p className="text-slate-500 font-medium mt-1">Manage enrollments across all academic tracks</p>
+          <p className="text-slate-500 font-medium mt-1">Manage enrollments for young program</p>
         </div>
         {canCreate && (
           <button

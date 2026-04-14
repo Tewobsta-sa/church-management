@@ -1,6 +1,6 @@
 import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { useNavigate } from "react-router-dom";
 import { Crown, KeyRound, UserCircle2, ArrowRight } from "lucide-react";
 
 export default function Login() {
@@ -81,6 +81,9 @@ export default function Login() {
             <div className="space-y-2">
               <label className="flex justify-between text-sm font-semibold tracking-wide text-slate-700">
                 <span>Passcode</span>
+                <Link to="/forgot-password" className="text-brand-600 hover:text-brand-700">
+                  Forgot password?
+                </Link>
               </label>
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-brand-600 transition-colors">

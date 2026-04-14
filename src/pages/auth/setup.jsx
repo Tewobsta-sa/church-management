@@ -10,6 +10,7 @@ export default function Setup() {
     tmhrt_office_admin: "TMHRT Office Administrator",
     distance_admin: "Distance Learning Administrator",
     gngnunet_office_admin: "Gngnunet Office Administrator",
+    young_gngnunet_admin: "Young Gngnunet Administrator",
     young_tmhrt_admin: "Young TMHRT Administrator",
   };
 

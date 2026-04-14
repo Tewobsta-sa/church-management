@@ -1,23 +1,28 @@
-import { useState } from 'react';
-import { Award, Search, Save, Filter, BookOpen } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Award, Search, Filter, BookOpen } from 'lucide-react';
+import { academicService } from '../../services/academicService';
 
 export default function Grades() {
-  const [courses, setCourses] = useState([
-    { id: 1, name: "Intro to Theology", term: "Term 1 - 2024" },
-    { id: 2, name: "Advanced History", term: "Term 1 - 2024" }
-  ]);
-  const [selectedCourse, setSelectedCourse] = useState(courses[0].id);
-  
-  const [students, setStudents] = useState([
-     { id: 1, name: "Abebe Kebede", student_id: "YNG/001/16", mid: 25, final: 45, assignment: 15 },
-     { id: 2, name: "Helen Girma", student_id: "YNG/002/16", mid: 28, final: 48, assignment: 20 },
-     { id: 3, name: "Dawit Solomon", student_id: "REG/120/15", mid: 20, final: 35, assignment: 10 },
-  ]);
+  const [courses, setCourses] = useState([]);
+  const [selectedCourse, setSelectedCourse] = useState("");
+  const [grades, setGrades] = useState([]);
+  const [search, setSearch] = useState("");
+  const [selectedStudent, setSelectedStudent] = useState(null);
 
-  const handleGradeChange = (id, field, value) => {
-     const numVal = value === '' ? '' : Number(value);
-     setStudents(prev => prev.map(s => s.id === id ? { ...s, [field]: numVal } : s));
-  };
+  useEffect(() => {
+    const fetchData = async () => {
+      const [courseRes, gradeRes] = await Promise.all([
+        academicService.getCourses({ per_page: 100 }),
+        academicService.getGrades({ per_page: 500 }),
+      ]);
+      const courseRows = Array.isArray(courseRes?.data) ? courseRes.data : (Array.isArray(courseRes) ? courseRes : []);
+      const gradeRows = Array.isArray(gradeRes?.data) ? gradeRes.data : (Array.isArray(gradeRes) ? gradeRes : []);
+      setCourses(courseRows);
+      setGrades(gradeRows);
+      if (courseRows[0]) setSelectedCourse(String(courseRows[0].id));
+    };
+    fetchData();
+  }, []);
 
   const getLetterGrade = (total) => {
      if (total >= 90) return 'A+';
@@ -39,17 +44,36 @@ export default function Grades() {
      return 'text-red-600 bg-red-50 border-red-200';
   };
 
+  const studentRows = useMemo(() => {
+    const byStudent = {};
+    grades.forEach((g) => {
+      if (selectedCourse && String(g.course_id) !== selectedCourse) return;
+      const sid = g.student_id;
+      if (!byStudent[sid]) {
+        byStudent[sid] = {
+          student_id: sid,
+          name: g.student?.name || `Student ${sid}`,
+          identifier: g.student?.student_id || sid,
+          courses: [],
+        };
+      }
+      byStudent[sid].courses.push(g);
+    });
+
+    return Object.values(byStudent).map((s) => {
+      const total = s.courses.reduce((acc, c) => acc + Number(c.total_score || c.score || 0), 0);
+      const avg = s.courses.length ? total / s.courses.length : 0;
+      return { ...s, overallAverage: avg, grade: getLetterGrade(avg) };
+    }).filter((s) => s.name.toLowerCase().includes(search.toLowerCase()));
+  }, [grades, selectedCourse, search]);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Academic Results</h1>
-          <p className="text-slate-500 font-medium mt-1">Manage grading sheets and compute final scores</p>
+          <p className="text-slate-500 font-medium mt-1">View student scores per course and overall averages</p>
         </div>
-        <button className="flex items-center gap-2 bg-gradient-to-r from-brand-600 to-brand-500 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-brand-500/30 hover:-translate-y-0.5 transition-all">
-          <Save className="w-5 h-5" />
-          Publish Grades
-        </button>
       </div>
 
       <div className="glass-panel p-4 flex flex-wrap sm:flex-nowrap gap-4 items-center border-b-[3px] border-b-brand-500">
@@ -59,14 +83,14 @@ export default function Grades() {
             </div>
             <div>
                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">Active Course</label>
-               <select className="bg-transparent border-none outline-none font-black text-xl text-slate-800 p-0 cursor-pointer hover:text-brand-600 transition-colors" value={selectedCourse} onChange={(e) => setSelectedCourse(Number(e.target.value))}>
+               <select className="bg-transparent border-none outline-none font-black text-xl text-slate-800 p-0 cursor-pointer hover:text-brand-600 transition-colors" value={selectedCourse} onChange={(e) => setSelectedCourse(e.target.value)}>
                   {courses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                </select>
             </div>
          </div>
          <div className="relative w-full sm:w-64">
            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-           <input type="text" placeholder="Search student..." className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm font-medium bg-white outline-none focus:border-brand-500" />
+           <input type="text" placeholder="Search student..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm font-medium bg-white outline-none focus:border-brand-500" />
          </div>
          <button className="p-2 border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50 bg-white">
            <Filter className="w-4 h-4" />
@@ -82,43 +106,31 @@ export default function Grades() {
               <th className="px-6 py-4 w-32">Mid Exam <span className="text-slate-400 normal-case tracking-normal ml-1">(30%)</span></th>
               <th className="px-6 py-4 w-32">Assignment <span className="text-slate-400 normal-case tracking-normal ml-1">(20%)</span></th>
               <th className="px-6 py-4 w-32">Final Exam <span className="text-slate-400 normal-case tracking-normal ml-1">(50%)</span></th>
-              <th className="px-6 py-4 w-32 text-center">Total Score</th>
+              <th className="px-6 py-4 w-32 text-center">Overall Average</th>
               <th className="px-6 py-4 w-24 text-center">Grade</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {students.map(s => {
-               const total = (Number(s.mid)||0) + (Number(s.assignment)||0) + (Number(s.final)||0);
-               const letter = getLetterGrade(total);
+            {studentRows.map(s => {
+               const letter = getLetterGrade(s.overallAverage);
+               const latest = s.courses[0] || {};
                return (
-                 <tr key={s.id} className="hover:bg-slate-50/50 transition-colors group">
+                 <tr key={s.student_id} onClick={() => setSelectedStudent(s)} className="hover:bg-slate-50/50 transition-colors group cursor-pointer">
                     <td className="px-6 py-4">
                        <p className="font-bold text-slate-800">{s.name}</p>
-                       <p className="text-xs font-semibold text-slate-500">{s.student_id}</p>
+                       <p className="text-xs font-semibold text-slate-500">{s.identifier}</p>
                     </td>
                     <td className="px-6 py-4">
-                       <input 
-                         type="number" max="30" min="0" value={s.mid} 
-                         onChange={(e) => handleGradeChange(s.id, 'mid', e.target.value)}
-                         className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-center font-bold text-slate-700 outline-none focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-500/20 transition-all" 
-                       />
+                      <span className="font-semibold">{latest.mid_exam ?? "-"}</span>
                     </td>
                     <td className="px-6 py-4">
-                       <input 
-                         type="number" max="20" min="0" value={s.assignment} 
-                         onChange={(e) => handleGradeChange(s.id, 'assignment', e.target.value)}
-                         className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-center font-bold text-slate-700 outline-none focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-500/20 transition-all" 
-                       />
+                      <span className="font-semibold">{latest.assignment ?? "-"}</span>
                     </td>
                     <td className="px-6 py-4">
-                       <input 
-                         type="number" max="50" min="0" value={s.final} 
-                         onChange={(e) => handleGradeChange(s.id, 'final', e.target.value)}
-                         className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-center font-bold text-slate-700 outline-none focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-500/20 transition-all" 
-                       />
+                      <span className="font-semibold">{latest.final_exam ?? "-"}</span>
                     </td>
                     <td className="px-6 py-4 text-center">
-                       <span className="text-xl font-black text-slate-800">{total}</span>
+                       <span className="text-xl font-black text-slate-800">{s.overallAverage.toFixed(1)}</span>
                        <span className="text-xs font-bold text-slate-400">/100</span>
                     </td>
                     <td className="px-6 py-4 text-center">
@@ -133,6 +145,19 @@ export default function Grades() {
         </table>
         </div>
       </div>
+      {selectedStudent && (
+        <div className="glass-panel p-5">
+          <h3 className="text-lg font-bold mb-3">Student Assessment Detail - {selectedStudent.name}</h3>
+          <div className="space-y-2">
+            {selectedStudent.courses.map((c) => (
+              <div key={c.id} className="flex justify-between p-3 rounded-lg bg-slate-50 text-sm">
+                <span>{c.course?.name || c.course?.title || `Course ${c.course_id}`}</span>
+                <span className="font-semibold">{Number(c.total_score || c.score || 0).toFixed(1)}/100</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

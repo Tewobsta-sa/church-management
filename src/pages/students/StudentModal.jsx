@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { X, Save, Trash2, QrCode } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { studentService } from "../../services/studentService";
+import { useAuth } from "../../context/AuthContext";
 
 export default function StudentModal({
   isOpen,
@@ -13,6 +14,8 @@ export default function StudentModal({
   canEdit = false,
   canDelete = false,
 }) {
+  const { hasRole } = useAuth();
+  const [studentDetails, setStudentDetails] = useState(student);
   const [formData, setFormData] = useState({
     name: "",
     christian_name: "",
@@ -35,20 +38,21 @@ export default function StudentModal({
   const isEdit = mode === "edit" || isCreate;
 
   useEffect(() => {
+    setStudentDetails(student);
     if (student) {
       setFormData({
         name: student.name || "",
         christian_name: student.christian_name || "",
         age: student.age || "",
         educational_level: student.educational_level || "",
-        subcity: student.subcity || "",
-        district: student.district || "",
-        special_place: student.special_place || "",
-        house_number: student.house_number || "",
-        parent_name: student.parent_name || "",
+        subcity: student.address?.subcity || student.subcity || "",
+        district: student.address?.district || student.district || "",
+        special_place: student.address?.special_place || student.special_place || "",
+        house_number: student.address?.house_number || student.house_number || "",
+        parent_name: student.contacts?.[0]?.name || student.parent_name || "",
         phone_number: student.phone_number || "",
-        parent_phone_number: student.parent_phone_number || "",
-        section_name: student.section_name || "",
+        parent_phone_number: student.contacts?.[0]?.phone_number || student.parent_phone_number || "",
+        section_name: student.section?.name || student.section_name || "",
       });
     } else {
       setFormData({
@@ -58,6 +62,19 @@ export default function StudentModal({
       });
     }
   }, [student, isOpen]);
+
+  useEffect(() => {
+    const fetchDetails = async () => {
+      if (!isOpen || !student?.id || mode !== "view") return;
+      try {
+        const details = await studentService.getYoungStudentById(student.id);
+        setStudentDetails(details);
+      } catch {
+        setStudentDetails(student);
+      }
+    };
+    fetchDetails();
+  }, [isOpen, student?.id, mode]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -99,7 +116,8 @@ export default function StudentModal({
 
   if (!isOpen) return null;
 
-  const qrData = student ? JSON.stringify({ sid: student.student_id, id: student.id, t: track }) : "";
+  const current = studentDetails || student;
+  const qrData = current ? JSON.stringify({ sid: current.student_id, id: current.id, t: track }) : "";
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-[fade-in_0.2s_ease-out]">
@@ -123,7 +141,7 @@ export default function StudentModal({
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-8 py-6 custom-scrollbar relative">
           
-          {mode === "view" && student && (
+          {mode === "view" && current && (
              <div className="mb-8 flex flex-col md:flex-row gap-6 items-start bg-slate-50 p-6 rounded-2xl border border-slate-100">
                {/* QR Section */}
                <div className="flex flex-col items-center gap-3 bg-white p-4 rounded-xl shadow-sm border border-slate-200 w-full md:w-auto shrink-0">
@@ -134,41 +152,41 @@ export default function StudentModal({
                </div>
                {/* Name Info */}
                <div className="flex-1">
-                 <h3 className="text-3xl font-black tracking-tight text-slate-800 mb-1">{student.name}</h3>
-                 <p className="text-sm text-slate-500 font-medium">Baptismal Name: <span className="text-slate-800">{student.christian_name || "N/A"}</span></p>
+                 <h3 className="text-3xl font-black tracking-tight text-slate-800 mb-1">{current.name}</h3>
+                 <p className="text-sm text-slate-500 font-medium">Baptismal Name: <span className="text-slate-800">{current.christian_name || "N/A"}</span></p>
                  <div className="mt-4 inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-brand-100 text-brand-700">
-                    ID: {student.student_id}
+                   ID: {current.student_id}
                  </div>
                </div>
              </div>
           )}
 
-          {mode === "view" && student ? (
+          {mode === "view" && current ? (
              <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-6 gap-x-8">
-               <ViewData label="Age" value={student.age} />
-               <ViewData label="Gender" value={student.sex} />
-               <ViewData label="Phone Number" value={student.phone_number} />
-               <ViewData label="Educational Level" value={student.educational_level} />
-               {student.course_attendance_avg !== undefined && (
-                 <ViewData label="Course Attendance Avg" value={`${student.course_attendance_avg}%`} />
+               <ViewData label="Age" value={current.age} />
+               <ViewData label="Gender" value={current.sex} />
+               <ViewData label="Phone Number" value={current.phone_number} />
+               <ViewData label="Educational Level" value={current.educational_level} />
+               {current.course_attendance_avg !== undefined && (
+                 <ViewData label="Course Attendance Avg" value={`${current.course_attendance_avg}%`} />
                )}
-               {student.mezmur_attendance_avg !== undefined && (
-                 <ViewData label="Mezmur Attendance Avg" value={`${student.mezmur_attendance_avg}%`} />
+               {current.mezmur_attendance_avg !== undefined && (
+                 <ViewData label="Mezmur Attendance Avg" value={`${current.mezmur_attendance_avg}%`} />
                )}
                
                {/* Show full details only if not mezmur_office_admin or if they are super_admin */}
                {(!hasRole("mezmur_office_admin") || hasRole("super_admin")) && (
                  <>
-                   <ViewData label="Parent Name" value={student.parent_name} />
-                   <ViewData label="Parent Phone" value={student.parent_phone_number} />
+                   <ViewData label="Parent Name" value={current.contacts?.[0]?.name || current.parent_name} />
+                   <ViewData label="Parent Phone" value={current.contacts?.[0]?.phone_number || current.parent_phone_number} />
                    
                    <div className="sm:col-span-2 mt-4 pt-4 border-t border-slate-100">
                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Address Details</h4>
                      <div className="grid grid-cols-2 gap-4">
-                       <ViewData label="Subcity" value={student.subcity} />
-                       <ViewData label="District (Woreda)" value={student.district} />
-                       <ViewData label="Special Place" value={student.special_place} />
-                       <ViewData label="House Number" value={student.house_number} />
+                      <ViewData label="Subcity" value={current.address?.subcity || current.subcity} />
+                      <ViewData label="District (Woreda)" value={current.address?.district || current.district} />
+                      <ViewData label="Special Place" value={current.address?.special_place || current.special_place} />
+                      <ViewData label="House Number" value={current.address?.house_number || current.house_number} />
                      </div>
                    </div>
                  </>
@@ -181,14 +199,14 @@ export default function StudentModal({
                      <label className="flex items-center gap-3 p-4 border border-brand-200 bg-brand-50 rounded-xl cursor-pointer hover:bg-brand-100 transition-colors">
                         <input 
                            type="checkbox" 
-                           checked={student.is_mezmur} 
+                           checked={Boolean(current.is_mezmur || current.is_mezmur_member)} 
                            onChange={async (e) => {
                              const checked = e.target.checked;
                              try {
                                if (checked) {
-                                  await studentService.assignMezmur([student.id]);
+                                 await studentService.assignMezmur([current.id]);
                                } else {
-                                  await studentService.unassignMezmur([student.id]);
+                                 await studentService.unassignMezmur([current.id]);
                                }
                                onSuccess?.();
                              } catch(err) {
