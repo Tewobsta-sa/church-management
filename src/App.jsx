@@ -25,14 +25,11 @@ const getPrimaryRole = (user) => user?.roles?.[0]?.name || null;
 
 const getDefaultRouteForRole = (role) => {
   const roleRedirects = {
-    super_admin: "/users",
+    super_admin: "/dashboard",
     gngnunet_office_admin: "/students",
-    young_gngnunet_admin: "/students",
     mezmur_office_admin: "/mezmur",
     tmhrt_office_admin: "/assignments",
     teacher: "/assignments",
-    distance_admin: "/dashboard",
-    young_tmhrt_admin: "/dashboard",
   };
 
   return roleRedirects[role] || "/dashboard";
@@ -161,12 +158,9 @@ function App() {
                   allowedRoles={[
                     "super_admin",
                     "gngnunet_office_admin",
-                    "young_gngnunet_admin",
                     "mezmur_office_admin",
                     "tmhrt_office_admin",
                     "teacher",
-                    "distance_admin",
-                    "young_tmhrt_admin",
                   ]}
                 >
                   <Dashboard />
@@ -178,11 +172,10 @@ function App() {
               element={
                 <RoleRoute
                   allowedRoles={[
+                    "super_admin",
                     "gngnunet_office_admin",
-                    "young_gngnunet_admin",
                     "mezmur_office_admin",
                     "tmhrt_office_admin",
-                    "distance_admin",
                   ]}
                 >
                   <StudentsList />
@@ -192,7 +185,7 @@ function App() {
             <Route
               path="/promotions"
               element={
-                <RoleRoute allowedRoles={["gngnunet_office_admin", "tmhrt_office_admin"]}>
+                <RoleRoute allowedRoles={["super_admin", "gngnunet_office_admin", "tmhrt_office_admin"]}>
                   <StudentPromotion />
                 </RoleRoute>
               }
@@ -200,7 +193,7 @@ function App() {
             <Route
               path="/sections"
               element={
-                <RoleRoute allowedRoles={["tmhrt_office_admin", "distance_admin"]}>
+                <RoleRoute allowedRoles={["super_admin", "tmhrt_office_admin"]}>
                   <SectionsManagement />
                 </RoleRoute>
               }
@@ -208,7 +201,7 @@ function App() {
             <Route
               path="/courses"
               element={
-                <RoleRoute allowedRoles={["tmhrt_office_admin", "distance_admin"]}>
+                <RoleRoute allowedRoles={["super_admin", "tmhrt_office_admin"]}>
                   <CoursesManagement />
                 </RoleRoute>
               }
@@ -216,7 +209,7 @@ function App() {
             <Route
               path="/assignments"
               element={
-                <RoleRoute allowedRoles={["tmhrt_office_admin", "mezmur_office_admin", "teacher", "distance_admin"]}>
+                <RoleRoute allowedRoles={["super_admin", "tmhrt_office_admin", "mezmur_office_admin", "teacher"]}>
                   <AssignmentsTasks />
                 </RoleRoute>
               }
@@ -224,7 +217,7 @@ function App() {
             <Route
               path="/attendance"
               element={
-                <RoleRoute allowedRoles={["tmhrt_office_admin", "mezmur_office_admin", "teacher", "distance_admin"]}>
+                <RoleRoute allowedRoles={["super_admin", "tmhrt_office_admin", "mezmur_office_admin", "teacher"]}>
                   <LiveAttendance />
                 </RoleRoute>
               }
@@ -232,7 +225,7 @@ function App() {
             <Route
               path="/grades"
               element={
-                <RoleRoute allowedRoles={["teacher", "tmhrt_office_admin", "distance_admin"]}>
+                <RoleRoute allowedRoles={["super_admin", "teacher", "tmhrt_office_admin"]}>
                   <Grades />
                 </RoleRoute>
               }
@@ -240,7 +233,7 @@ function App() {
             <Route
               path="/mezmur"
               element={
-                <RoleRoute allowedRoles={["mezmur_office_admin"]}>
+                <RoleRoute allowedRoles={["super_admin", "mezmur_office_admin"]}>
                   <MezmurMinistry />
                 </RoleRoute>
               }

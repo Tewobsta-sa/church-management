@@ -149,18 +149,61 @@ export default function StudentModal({
                <ViewData label="Gender" value={student.sex} />
                <ViewData label="Phone Number" value={student.phone_number} />
                <ViewData label="Educational Level" value={student.educational_level} />
-               <ViewData label="Parent Name" value={student.parent_name} />
-               <ViewData label="Parent Phone" value={student.parent_phone_number} />
+               {student.course_attendance_avg !== undefined && (
+                 <ViewData label="Course Attendance Avg" value={`${student.course_attendance_avg}%`} />
+               )}
+               {student.mezmur_attendance_avg !== undefined && (
+                 <ViewData label="Mezmur Attendance Avg" value={`${student.mezmur_attendance_avg}%`} />
+               )}
                
-               <div className="sm:col-span-2 mt-4 pt-4 border-t border-slate-100">
-                 <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Address Details</h4>
-                 <div className="grid grid-cols-2 gap-4">
-                   <ViewData label="Subcity" value={student.subcity} />
-                   <ViewData label="District (Woreda)" value={student.district} />
-                   <ViewData label="Special Place" value={student.special_place} />
-                   <ViewData label="House Number" value={student.house_number} />
-                 </div>
-               </div>
+               {/* Show full details only if not mezmur_office_admin or if they are super_admin */}
+               {(!hasRole("mezmur_office_admin") || hasRole("super_admin")) && (
+                 <>
+                   <ViewData label="Parent Name" value={student.parent_name} />
+                   <ViewData label="Parent Phone" value={student.parent_phone_number} />
+                   
+                   <div className="sm:col-span-2 mt-4 pt-4 border-t border-slate-100">
+                     <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Address Details</h4>
+                     <div className="grid grid-cols-2 gap-4">
+                       <ViewData label="Subcity" value={student.subcity} />
+                       <ViewData label="District (Woreda)" value={student.district} />
+                       <ViewData label="Special Place" value={student.special_place} />
+                       <ViewData label="House Number" value={student.house_number} />
+                     </div>
+                   </div>
+                 </>
+               )}
+
+               {/* Mezmur Admin Toggle Section */}
+               {(hasRole("mezmur_office_admin") || hasRole("super_admin")) && (
+                  <div className="sm:col-span-2 mt-4 pt-4 border-t border-slate-100">
+                     <h4 className="text-xs font-bold text-brand-600 uppercase tracking-widest mb-4">Mezmur Ministry</h4>
+                     <label className="flex items-center gap-3 p-4 border border-brand-200 bg-brand-50 rounded-xl cursor-pointer hover:bg-brand-100 transition-colors">
+                        <input 
+                           type="checkbox" 
+                           checked={student.is_mezmur} 
+                           onChange={async (e) => {
+                             const checked = e.target.checked;
+                             try {
+                               if (checked) {
+                                  await studentService.assignMezmur([student.id]);
+                               } else {
+                                  await studentService.unassignMezmur([student.id]);
+                               }
+                               onSuccess?.();
+                             } catch(err) {
+                               alert("Failed to toggle Mezmur membership");
+                             }
+                           }}
+                           className="w-5 h-5 text-brand-600 rounded focus:ring-brand-500 border-brand-300"
+                        />
+                        <div className="flex flex-col">
+                           <span className="font-bold text-slate-800">Assign to Mezmur Ministry</span>
+                           <span className="text-xs text-slate-500 font-medium">Includes this student in the Mezmur training and choir activities.</span>
+                        </div>
+                     </label>
+                  </div>
+               )}
              </div>
           ) : (
             <form id="student-form" onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">

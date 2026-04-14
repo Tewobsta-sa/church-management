@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { adminService } from "../../services/adminService";
 import { Plus, Trash2, Users, Search, Shield, Settings, Activity } from "lucide-react";
 import UserModal from "./UserModal";
+import SystemLogsViewer from "./SystemLogsViewer";
 import { useAuth } from "../../context/AuthContext";
 
 export default function UsersManagement() {
@@ -12,6 +13,7 @@ export default function UsersManagement() {
   const [currentPage, setCurrentPage] = useState(1);
   const [search, setSearch] = useState("");
   const [totalPages, setTotalPages] = useState(1);
+  const [activeTab, setActiveTab] = useState("users");
 
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
@@ -125,67 +127,88 @@ export default function UsersManagement() {
         </div>
       </div>
 
-      <div className="glass-panel overflow-hidden">
-        <div className="overflow-x-auto">
-        <table className="w-full text-left">
-          <thead>
-            <tr className="bg-slate-50/50 border-b border-slate-200/60 text-slate-500 text-sm tracking-wide">
-              <th className="px-6 py-4 font-semibold">User Details</th>
-              <th className="px-6 py-4 font-semibold">System Privileges</th>
-              <th className="px-6 py-4 font-semibold text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {users.map((user) => (
-              <tr key={user.id} className="hover:bg-slate-50/50 transition-colors group">
-                <td className="px-6 py-4">
-                  <p className="font-extrabold text-slate-800 flex items-center gap-2">
-                     {user.name} 
-                     {getUserRole(user) === 'super_admin' && <Shield className="w-4 h-4 text-amber-500" />}
-                  </p>
-                  <p className="text-xs font-semibold text-slate-500 mt-0.5">@{user.username}</p>
-                </td>
-                <td className="px-6 py-4">
-                  <span className={`inline-flex px-3 py-1 rounded-full text-[10px] uppercase font-black tracking-widest border
-                      ${getUserRole(user) === 'super_admin' ? 'bg-amber-50 text-amber-700 border-amber-200' : 
-                        getUserRole(user)?.includes('admin') ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 
-                        'bg-slate-100 text-slate-600 border-slate-200'}`}>
-                    {getUserRole(user)?.replaceAll("_", " ")}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-right">
-                  <div className="flex gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                    {isSuperAdmin && (
-                       <>
-                         <button onClick={() => alert('Pending Update action')} className="p-2 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-colors tooltip" title="Edit Admin">
-                            <Settings className="w-4 h-4" />
-                         </button>
-                         <button onClick={() => handleDelete(user.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors tooltip" title="Delete User">
-                            <Trash2 className="w-4 h-4" />
-                         </button>
-                       </>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {users.length === 0 && (
-               <tr><td colSpan="3" className="text-center py-10 text-slate-500 font-bold">No users constructed.</td></tr>
-            )}
-          </tbody>
-        </table>
+        <div className="flex gap-4 border-b border-slate-200/60 pb-4 mb-4 mt-6">
+          <button 
+            onClick={() => setActiveTab('users')}
+            className={`px-4 py-2 font-bold rounded-lg transition-all ${activeTab === 'users' ? 'bg-brand-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}
+          >
+            User Accounts
+          </button>
+          {isSuperAdmin && (
+            <button 
+              onClick={() => setActiveTab('logs')}
+              className={`px-4 py-2 font-bold rounded-lg transition-all ${activeTab === 'logs' ? 'bg-brand-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}
+            >
+              System Activity Logs
+            </button>
+          )}
         </div>
 
-        {totalPages > 1 && (
-          <div className="bg-slate-50/50 px-6 py-4 border-t border-slate-200/60 flex justify-between items-center text-sm font-medium text-slate-500">
-            <span>Viewing page <span className="text-brand-600 font-bold">{currentPage}</span> of {totalPages}</span>
-            <div className="flex gap-2">
-               <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-4 py-2 border bg-white rounded-lg disabled:opacity-40 hover:bg-slate-50 transition-colors font-bold">Prev</button>
-               <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="px-4 py-2 border bg-white rounded-lg disabled:opacity-40 hover:bg-slate-50 transition-colors font-bold">Next</button>
-            </div>
+      {activeTab === 'users' ? (
+        <div className="glass-panel overflow-hidden">
+          <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="bg-slate-50/50 border-b border-slate-200/60 text-slate-500 text-sm tracking-wide">
+                <th className="px-6 py-4 font-semibold">User Details</th>
+                <th className="px-6 py-4 font-semibold">System Privileges</th>
+                <th className="px-6 py-4 font-semibold text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {users.map((user) => (
+                <tr key={user.id} className="hover:bg-slate-50/50 transition-colors group">
+                  <td className="px-6 py-4">
+                    <p className="font-extrabold text-slate-800 flex items-center gap-2">
+                       {user.name} 
+                       {getUserRole(user) === 'super_admin' && <Shield className="w-4 h-4 text-amber-500" />}
+                    </p>
+                    <p className="text-xs font-semibold text-slate-500 mt-0.5">@{user.username}</p>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`inline-flex px-3 py-1 rounded-full text-[10px] uppercase font-black tracking-widest border
+                        ${getUserRole(user) === 'super_admin' ? 'bg-amber-50 text-amber-700 border-amber-200' : 
+                          getUserRole(user)?.includes('admin') ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 
+                          'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                      {getUserRole(user)?.replaceAll("_", " ")}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                      {isSuperAdmin && (
+                         <>
+                           <button onClick={() => openModal(user, "edit")} className="p-2 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-colors tooltip" title="Edit Admin">
+                              <Settings className="w-4 h-4" />
+                           </button>
+                           <button onClick={() => handleDelete(user.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors tooltip" title="Delete User">
+                              <Trash2 className="w-4 h-4" />
+                           </button>
+                         </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {users.length === 0 && (
+                 <tr><td colSpan="3" className="text-center py-10 text-slate-500 font-bold">No users constructed.</td></tr>
+              )}
+            </tbody>
+          </table>
           </div>
-        )}
-      </div>
+
+          {totalPages > 1 && (
+            <div className="bg-slate-50/50 px-6 py-4 border-t border-slate-200/60 flex justify-between items-center text-sm font-medium text-slate-500">
+              <span>Viewing page <span className="text-brand-600 font-bold">{currentPage}</span> of {totalPages}</span>
+              <div className="flex gap-2">
+                 <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-4 py-2 border bg-white rounded-lg disabled:opacity-40 hover:bg-slate-50 transition-colors font-bold">Prev</button>
+                 <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="px-4 py-2 border bg-white rounded-lg disabled:opacity-40 hover:bg-slate-50 transition-colors font-bold">Next</button>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <SystemLogsViewer />
+      )}
 
       <UserModal isOpen={modalOpen} onClose={() => setModalOpen(false)} user={selectedUser} mode={modalMode} onSave={handleSave} />
     </div>

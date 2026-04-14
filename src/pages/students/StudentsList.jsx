@@ -100,28 +100,6 @@ export default function StudentsList() {
       </div>
 
       <div className="glass-panel p-2 flex flex-wrap sm:flex-nowrap gap-2 items-center justify-between">
-        {/* Tabs */}
-        <div className="flex bg-slate-100/50 p-1 rounded-xl w-full sm:w-auto">
-          {[
-            { id: "young", label: "Young Track" },
-            { id: "regular", label: "Regular Track" },
-            { id: "distance", label: "Distance Track" },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => handleTabChange(tab.id)}
-              className={clsx(
-                "flex-1 justify-center sm:flex-none px-6 py-2 rounded-lg text-sm font-bold transition-all",
-                activeTab === tab.id
-                  ? "bg-white text-brand-600 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
-              )}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
         {/* Search */}
         <div className="relative w-full sm:w-72">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">

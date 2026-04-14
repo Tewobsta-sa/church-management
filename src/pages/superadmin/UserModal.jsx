@@ -4,11 +4,10 @@ import { X, Save } from "lucide-react";
 // ✅ Match EXACT backend roles
 const availableRoles = [
   { value: "super_admin", label: "Super Admin" },
-  { value: "mezmur_office_admin", label: "Mezmur Office Admin" },
-  { value: "tmhrt_office_admin", label: "Tmhrt Office Admin" },
-  { value: "distance_admin", label: "Distance Admin" },
+  { value: "teacher", label: "Teacher" },
   { value: "gngnunet_office_admin", label: "Gngnunet Office Admin" },
-  { value: "young_tmhrt_admin", label: "Young Tmhrt Admin" },
+  { value: "tmhrt_office_admin", label: "Tmhrt Office Admin" },
+  { value: "mezmur_office_admin", label: "Mezmur Office Admin" }
 ];
 
 export default function UserModal({
@@ -186,34 +185,37 @@ export default function UserModal({
           </div>
 
           {/* Security Question */}
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Security Question <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              name="security_question"
-              value={formData.security_question}
-              onChange={handleChange}
-              required
-              className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:border-blue-500"
-            />
-          </div>
+          {!isEdit && (
+            <>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Security Question <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="security_question"
+                  value={formData.security_question}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:border-blue-500"
+                />
+              </div>
 
-          {/* Security Answer */}
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Security Answer <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              name="security_answer"
-              value={formData.security_answer}
-              onChange={handleChange}
-              required
-              className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:border-blue-500"
-            />
-          </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Security Answer <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="security_answer"
+                  value={formData.security_answer}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:border-blue-500"
+                />
+              </div>
+            </>
+          )}
         </form>
 
         {/* Footer */}

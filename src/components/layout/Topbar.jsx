@@ -1,10 +1,21 @@
-import { Menu, LogOut, Bell, UserCircle } from "lucide-react";
+import { Menu, LogOut, Bell, UserCircle, Globe } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { useTranslation } from "react-i18next";
+import { useState } from "react";
+import ProfileModal from "./ProfileModal";
 
 export default function Topbar() {
   const { user, logout } = useAuth();
+  const { t, i18n } = useTranslation();
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+
+  const toggleLanguage = () => {
+    const newLang = i18n.language === 'en' ? 'am' : 'en';
+    i18n.changeLanguage(newLang);
+  };
 
   return (
+    <>
     <header className="sticky top-4 z-40 mx-4 lg:mx-8 mb-6">
       <div className="glass-panel px-6 py-4 flex justify-between items-center animate-[slide-up_0.4s_ease-out]">
         
@@ -17,7 +28,7 @@ export default function Topbar() {
           </div>
           <div className="hidden lg:block">
             <p className="text-sm font-medium text-slate-400 uppercase tracking-widest">
-              Overview
+              {t('Dashboard')}
             </p>
             <h2 className="text-xl font-bold tracking-tight text-slate-800">
               Welcome back, {user?.name?.split(' ')[0] || 'Admin'}
@@ -27,6 +38,14 @@ export default function Topbar() {
 
         {/* Right side: Actions & User Info */}
         <div className="flex items-center gap-5">
+          <button 
+            onClick={toggleLanguage}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-lg transition-colors border border-brand-200"
+          >
+            <Globe className="h-4 w-4" />
+            {i18n.language === 'en' ? 'አማርኛ' : 'English'}
+          </button>
+          
           <button className="relative p-2 text-slate-400 hover:text-brand-600 transition-colors rounded-full hover:bg-brand-50">
             <Bell className="h-5 w-5" />
             <span className="absolute top-1.5 right-2 h-2 w-2 rounded-full bg-red-500 border-2 border-white"></span>
@@ -34,13 +53,16 @@ export default function Topbar() {
           
           <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
           
-          <div className="flex items-center gap-3">
+          <div 
+             onClick={() => setIsProfileModalOpen(true)}
+             className="flex items-center gap-3 cursor-pointer hover:bg-surface-50 p-1.5 rounded-xl transition-colors"
+          >
             <div className="hidden md:block text-right">
               <p className="text-sm font-semibold text-slate-800">
                 {user?.name || "Welcome"}
               </p>
-              <p className="text-xs text-brand-600 font-medium">
-                {user?.roles?.map((r) => r.name).join(", ") || ""}
+              <p className="text-xs text-brand-600 font-medium capitalize">
+                {user?.roles?.map((r) => r.name.replace(/_/g, ' ')).join(", ") || ""}
               </p>
             </div>
             
@@ -51,5 +73,7 @@ export default function Topbar() {
         </div>
       </div>
     </header>
+    <ProfileModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} />
+    </>
   );
 }

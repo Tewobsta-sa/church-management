@@ -1,4 +1,5 @@
 import { useAuth } from "../../context/AuthContext";
+import { useTranslation } from "react-i18next";
 import {
   LogOut,
   LayoutDashboard,
@@ -8,6 +9,7 @@ import {
   CheckSquare,
   Award,
   Music,
+  Settings,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import clsx from "clsx";
@@ -15,26 +17,24 @@ import clsx from "clsx";
 const navItems = [
   {
     path: "/users",
-    label: "System & Users",
-    icon: Users,
+    label: "Admin",
+    icon: Settings,
     roles: ["super_admin"],
   },
   {
     path: "/students",
-    label: "Students Explorer",
+    label: "Students",
     icon: Users,
     roles: [
       "gngnunet_office_admin",
-      "young_gngnunet_admin",
       "mezmur_office_admin",
       "tmhrt_office_admin",
-      "distance_admin",
       "super_admin"
     ],
   },
   {
     path: "/promotions",
-    label: "Academic Promotions",
+    label: "Promotions",
     icon: Award,
     roles: [
       "gngnunet_office_admin",
@@ -44,16 +44,15 @@ const navItems = [
   },
   {
     path: "/courses",
-    label: "Courses Dashboard",
+    label: "Courses",
     icon: BookOpen,
-    roles: ["distance_admin", "tmhrt_office_admin", "super_admin"],
+    roles: ["tmhrt_office_admin", "super_admin"],
   },
   {
     path: "/assignments",
-    label: "Schedule & Tasks",
+    label: "Schedules",
     icon: Calendar,
     roles: [
-      "distance_admin",
       "tmhrt_office_admin",
       "mezmur_office_admin",
       "teacher",
@@ -62,11 +61,10 @@ const navItems = [
   },
   {
     path: "/attendance",
-    label: "Live Attendance",
+    label: "Attendance",
     icon: CheckSquare,
     roles: [
       "teacher",
-      "distance_admin",
       "tmhrt_office_admin",
       "mezmur_office_admin",
       "super_admin"
@@ -74,9 +72,9 @@ const navItems = [
   },
   {
     path: "/grades",
-    label: "Academic Results",
+    label: "Results",
     icon: Award,
-    roles: ["teacher", "distance_admin", "tmhrt_office_admin", "super_admin"],
+    roles: ["teacher", "tmhrt_office_admin", "super_admin"],
   },
   {
     path: "/mezmur",
@@ -88,6 +86,7 @@ const navItems = [
 
 export default function Sidebar() {
   const { user, logout, hasRole } = useAuth();
+  const { t } = useTranslation();
 
   const visibleItems = navItems.filter(
     (item) =>
@@ -129,7 +128,7 @@ export default function Sidebar() {
                 <>
                   <div className={clsx("absolute inset-y-0 left-0 w-1 rounded-r-full transition-all duration-300", isActive ? "bg-brand-400 scale-y-100 opacity-100" : "scale-y-0 opacity-0 group-hover:scale-y-50 group-hover:opacity-50 bg-brand-500")} />
                   <item.icon className={clsx("w-5 h-5 mr-3 transition-colors", isActive ? "text-brand-300" : "text-brand-400/50 group-hover:text-brand-300")} />
-                  <span className="tracking-wide text-sm">{item.label}</span>
+                  <span className="tracking-wide text-sm">{t(item.label)}</span>
                 </>
               )}
             </NavLink>

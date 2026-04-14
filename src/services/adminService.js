@@ -26,5 +26,10 @@ export const adminService = {
   getStats: async () => {
     const response = await api.get("/admin/stats");
     return response.data;
+  },
+
+  getLogs: async (page = 1) => {
+    const response = await api.get("/admin/logs", { params: { page } });
+    return response.data;
   }
 };
