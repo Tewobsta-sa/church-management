@@ -6,14 +6,18 @@ export const academicService = {
     return response.data;
   },
 
-  promoteYoung: async (studentIds) => {
-     // Assuming the backend takes an array of student IDs
-     const response = await api.post(`/promote/young`, { student_ids: studentIds });
+  promoteYoung: async () => {
+     const response = await api.post(`/promote/young`);
      return response.data;
   },
 
-  promoteRegular: async (studentIds) => {
-     const response = await api.post(`/promote/regular`, { student_ids: studentIds });
+  promoteRegular: async () => {
+     const response = await api.post(`/promote/regular`);
+     return response.data;
+  },
+
+  bulkVerify: async (studentIds) => {
+     const response = await api.post(`/students/bulk-verify`, { student_ids: studentIds });
      return response.data;
   },
   

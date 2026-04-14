@@ -7,8 +7,8 @@ import {
 
 import { AuthProvider, useAuth } from "./context/AuthContext";
 
-import Login from "./pages/auth/login";
-import Setup from "./pages/auth/setup";
+import Login from "./pages/auth/Login";
+import Setup from "./pages/auth/Setup";
 import Dashboard from "./pages/dashboard/Dashboard";
 import StudentsList from "./pages/students/StudentsList";
 import StudentPromotion from "./pages/students/StudentPromotion";
@@ -17,9 +17,13 @@ import CoursesManagement from "./pages/courses/CoursesManagement";
 import AssignmentsTasks from "./pages/academic/AssignmentsTasks";
 import LiveAttendance from "./pages/academic/LiveAttendance";
 import Grades from "./pages/academic/Grades";
+import ResultsDashboard from "./pages/academic/ResultsDashboard";
+import ReportsHub from "./pages/academic/ReportsHub";
 import MezmurMinistry from "./pages/mezmur/MezmurMinistry";
 import AppLayout from "./components/layout/AppLayout";
 import SectionsManagement from "./pages/sections/SectionsManagement";
+import SecuritySettings from "./pages/admin/SecuritySettings";
+import ForgotPassword from "./pages/auth/ForgotPassword";
 
 const getPrimaryRole = (user) => user?.roles?.[0]?.name || null;
 
@@ -120,6 +124,14 @@ function App() {
             element={
               <PublicRoute>
                 <Login />
+              </PublicRoute>
+            }
+          />
+          <Route
+            path="/forgot-password"
+            element={
+              <PublicRoute>
+                <ForgotPassword />
               </PublicRoute>
             }
           />
@@ -231,10 +243,34 @@ function App() {
               }
             />
             <Route
+              path="/results"
+              element={
+                <RoleRoute allowedRoles={["super_admin", "tmhrt_office_admin"]}>
+                  <ResultsDashboard />
+                </RoleRoute>
+              }
+            />
+            <Route
               path="/mezmur"
               element={
                 <RoleRoute allowedRoles={["super_admin", "mezmur_office_admin"]}>
                   <MezmurMinistry />
+                </RoleRoute>
+              }
+            />
+            <Route
+              path="/security"
+              element={
+                <ProtectedRoute>
+                  <SecuritySettings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/reports"
+              element={
+                <RoleRoute allowedRoles={["super_admin", "tmhrt_office_admin", "gngnunet_office_admin"]}>
+                  <ReportsHub />
                 </RoleRoute>
               }
             />

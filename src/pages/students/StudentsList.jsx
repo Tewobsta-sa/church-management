@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { studentService } from "../../services/studentService";
-import { Edit2, Trash2, Eye, Plus, Search, UserCheck } from "lucide-react";
+import { Edit2, Trash2, Eye, Plus, Search, UserCheck, Music, Check, Clock } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import StudentModal from "./StudentModal";
 import clsx from "clsx";
@@ -161,12 +161,30 @@ export default function StudentsList() {
                       {student.christian_name && <p className="text-xs text-slate-500 font-medium">Baptismal: {student.christian_name}</p>}
                     </td>
                     <td className="px-6 py-4">
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-700/10 uppercase tracking-wider">
-                        {activeTab}
-                      </span>
+                      <div className="flex flex-col gap-1">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-indigo-50 text-indigo-700 border border-indigo-100">
+                          {activeTab}
+                        </span>
+                        {student.is_verified ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-green-600 uppercase">
+                            <UserCheck className="w-3 h-3" /> Verified
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-500 uppercase">
+                            <Clock className="w-3 h-3" /> Pending
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-slate-600 font-medium">
-                      {student.section_name || "Unassigned"}
+                      <div className="flex flex-col">
+                        <span>{student.section_name || "Unassigned"}</span>
+                        {student.is_mezmur && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-brand-600 uppercase">
+                            <Music className="w-3 h-3" /> Mezmur Ministry
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex gap-2 justify-end opacity-70 group-hover:opacity-100 transition-opacity">
@@ -177,6 +195,50 @@ export default function StudentsList() {
                         >
                           <Eye className="w-5 h-5" />
                         </button>
+                        
+                        {/* Verify Button */}
+                        {(hasRole("super_admin") || hasRole("tmhrt_office_admin")) && !student.is_verified && (
+                          <button
+                            onClick={async () => {
+                              if(confirm("Verify this student?")) {
+                                try {
+                                  await studentService.verifyStudent(student.id);
+                                  fetchStudents();
+                                } catch(err) { alert("Verification failed"); }
+                              }
+                            }}
+                            className="p-2 hover:bg-green-100 hover:text-green-700 rounded-lg text-slate-400 transition-colors tooltip"
+                            title="Verify Student"
+                          >
+                            <Check className="w-5 h-5" />
+                          </button>
+                        )}
+
+                        {/* Mezmur Toggle */}
+                        {(hasRole("super_admin") || hasRole("mezmur_office_admin")) && (
+                          <button
+                             onClick={async () => {
+                               try {
+                                 if (student.is_mezmur) {
+                                   await studentService.unassignMezmur([student.id]);
+                                 } else {
+                                   await studentService.assignMezmur([student.id]);
+                                 }
+                                 fetchStudents();
+                               } catch(err) { alert("Mezmur toggle failed"); }
+                             }}
+                             className={clsx(
+                               "p-2 rounded-lg transition-colors tooltip",
+                               student.is_mezmur 
+                                ? "bg-brand-100 text-brand-700 hover:bg-brand-200" 
+                                : "text-slate-400 hover:bg-brand-50 hover:text-brand-600"
+                             )}
+                             title={student.is_mezmur ? "Remove from Mezmur" : "Assign to Mezmur"}
+                          >
+                            <Music className="w-5 h-5" />
+                          </button>
+                        )}
+
                         {canEdit && (
                           <button
                             onClick={() => openModal(student, "edit")}

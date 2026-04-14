@@ -33,5 +33,20 @@ export const studentService = {
   deleteStudent: async (id, track) => {
     const response = await api.delete(`/students/${track}/${id}`);
     return response.data;
+  },
+
+  verifyStudent: async (id) => {
+    const response = await api.post(`/students/${id}/verify`);
+    return response.data;
+  },
+
+  assignMezmur: async (studentIds) => {
+    const response = await api.post("/students/mezmur/assign", { student_ids: studentIds });
+    return response.data;
+  },
+
+  unassignMezmur: async (studentIds) => {
+    const response = await api.post("/students/mezmur/unassign", { student_ids: studentIds });
+    return response.data;
   }
 };

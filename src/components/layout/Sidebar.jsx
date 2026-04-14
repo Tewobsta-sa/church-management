@@ -10,6 +10,8 @@ import {
   Award,
   Music,
   Settings,
+  FileDown,
+  ShieldCheck,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import clsx from "clsx";
@@ -72,15 +74,33 @@ const navItems = [
   },
   {
     path: "/grades",
+    label: "Grading",
+    icon: CheckSquare,
+    roles: ["teacher", "tmhrt_office_admin", "super_admin"],
+  },
+  {
+    path: "/results",
     label: "Results",
     icon: Award,
-    roles: ["teacher", "tmhrt_office_admin", "super_admin"],
+    roles: ["tmhrt_office_admin", "super_admin"],
   },
   {
     path: "/mezmur",
     label: "Mezmur Ministry",
     icon: Music,
     roles: ["mezmur_office_admin", "super_admin"],
+  },
+  {
+    path: "/reports",
+    label: "Reports",
+    icon: FileDown,
+    roles: ["super_admin", "tmhrt_office_admin", "gngnunet_office_admin"],
+  },
+  {
+    path: "/security",
+    label: "Security",
+    icon: ShieldCheck,
+    roles: ["*"],
   },
 ];
 

@@ -26,4 +26,14 @@ export const userService = {
     const res = await api.get('/admin/stats');
     return res.data.stats;
   },
+
+  updateProfile: async (userData) => {
+    const res = await api.put('/user/update', userData);
+    return res.data;
+  },
+
+  forgotPassword: async (data) => {
+    const res = await api.post('/forgot-password', data);
+    return res.data;
+  }
 };

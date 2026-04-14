@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { Crown, KeyRound, UserCircle2, ArrowRight } from "lucide-react";
 
 export default function Login() {
