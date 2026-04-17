@@ -33,7 +33,7 @@ const navItems = [
       "gngnunet_office_admin",
       "mezmur_office_admin",
       "tmhrt_office_admin",
-      "super_admin"
+      "super_admin",
     ],
   },
   {
@@ -46,11 +46,7 @@ const navItems = [
     path: "/promotions",
     label: "Promotions",
     icon: Award,
-    roles: [
-      "gngnunet_office_admin",
-      "tmhrt_office_admin",
-      "super_admin"
-    ],
+    roles: ["gngnunet_office_admin", "tmhrt_office_admin", "super_admin"],
   },
   {
     path: "/courses",
@@ -72,7 +68,7 @@ const navItems = [
       "tmhrt_office_admin",
       "mezmur_office_admin",
       "teacher",
-      "super_admin"
+      "super_admin",
     ],
   },
   {
@@ -83,7 +79,7 @@ const navItems = [
       "teacher",
       "tmhrt_office_admin",
       "mezmur_office_admin",
-      "super_admin"
+      "super_admin",
     ],
   },
   {
@@ -124,22 +120,62 @@ export default function Sidebar() {
 
   const visibleItems = navItems.filter(
     (item) =>
-      item.roles.includes("*") || item.roles.some((role) => hasRole(role)) || hasRole("super_admin"),
+      item.roles.includes("*") ||
+      item.roles.some((role) => hasRole(role)) ||
+      hasRole("super_admin"),
   );
 
+  const defaultRoutes = {
+    super_admin: "/dashboard",
+    tmhrt_office_admin: "/students",
+    teacher: "/assignments",
+    mezmur_office_admin: "/mezmur",
+    gngnunet_office_admin: "/students",
+  };
+
+  const getDefaultRoute = () => {
+    const roles = user?.roles?.map((r) => r.name) || [];
+
+    for (const role of roles) {
+      if (defaultRoutes[role]) {
+        return defaultRoutes[role];
+      }
+    }
+
+    return "/results"; // fallback default
+  };
+
+  const logoPath = getDefaultRoute();
   return (
     <div className="w-72 h-full py-4 pl-4 pr-1">
       <div className="h-full w-full glass-dark rounded-3xl text-white flex flex-col shadow-2xl border border-white/5 overflow-hidden animate-[fade-in_0.5s_ease-out]">
         {/* Logo / Brand */}
-        <NavLink to="/dashboard" className="px-8 py-8 flex items-center gap-4 border-b border-brand-800/50 hover:bg-brand-800/10 transition-colors">
+        <NavLink
+          to={logoPath}
+          className="px-8 py-8 flex items-center gap-4 border-b border-brand-800/50 hover:bg-brand-800/10 transition-colors"
+        >
           <div className="h-10 w-10 flex shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-brand-400 to-brand-600 shadow-lg shadow-brand-500/30">
-            <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+            <svg
+              className="h-6 w-6 text-white"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
+              />
             </svg>
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-brand-50 font-sans">MGT System</h1>
-            <p className="text-brand-300 text-[11px] uppercase tracking-wider font-semibold mt-0.5 opacity-80">Administration</p>
+            <h1 className="text-xl font-bold tracking-tight text-brand-50 font-sans">
+              MGT System
+            </h1>
+            <p className="text-brand-300 text-[11px] uppercase tracking-wider font-semibold mt-0.5 opacity-80">
+              Administration
+            </p>
           </div>
         </NavLink>
 
@@ -154,14 +190,28 @@ export default function Sidebar() {
                   "flex items-center px-4 py-3.5 rounded-2xl transition-all duration-300 group relative",
                   isActive
                     ? "bg-brand-600/30 font-medium text-white shadow-inner border border-brand-500/30"
-                    : "text-brand-200/80 hover:bg-brand-800/40 hover:text-white"
+                    : "text-brand-200/80 hover:bg-brand-800/40 hover:text-white",
                 )
               }
             >
               {({ isActive }) => (
                 <>
-                  <div className={clsx("absolute inset-y-0 left-0 w-1 rounded-r-full transition-all duration-300", isActive ? "bg-brand-400 scale-y-100 opacity-100" : "scale-y-0 opacity-0 group-hover:scale-y-50 group-hover:opacity-50 bg-brand-500")} />
-                  <item.icon className={clsx("w-5 h-5 mr-3 transition-colors", isActive ? "text-brand-300" : "text-brand-400/50 group-hover:text-brand-300")} />
+                  <div
+                    className={clsx(
+                      "absolute inset-y-0 left-0 w-1 rounded-r-full transition-all duration-300",
+                      isActive
+                        ? "bg-brand-400 scale-y-100 opacity-100"
+                        : "scale-y-0 opacity-0 group-hover:scale-y-50 group-hover:opacity-50 bg-brand-500",
+                    )}
+                  />
+                  <item.icon
+                    className={clsx(
+                      "w-5 h-5 mr-3 transition-colors",
+                      isActive
+                        ? "text-brand-300"
+                        : "text-brand-400/50 group-hover:text-brand-300",
+                    )}
+                  />
                   <span className="tracking-wide text-sm">{t(item.label)}</span>
                 </>
               )}
@@ -176,9 +226,12 @@ export default function Sidebar() {
               {user?.name?.charAt(0)?.toUpperCase() || "U"}
             </div>
             <div className="overflow-hidden">
-              <p className="font-medium text-sm truncate">{user?.name || "Administrator"}</p>
+              <p className="font-medium text-sm truncate">
+                {user?.name || "Administrator"}
+              </p>
               <p className="text-xs text-brand-400 truncate opacity-80">
-                {user?.roles?.map((r) => r.name).join(" • ") || "No active role"}
+                {user?.roles?.map((r) => r.name).join(" • ") ||
+                  "No active role"}
               </p>
             </div>
           </div>
