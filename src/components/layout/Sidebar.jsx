@@ -12,6 +12,8 @@ import {
   Settings,
   FileDown,
   ShieldCheck,
+  Layers,
+  UserCheck,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import clsx from "clsx";
@@ -35,6 +37,12 @@ const navItems = [
     ],
   },
   {
+    path: "/teachers",
+    label: "Teachers",
+    icon: UserCheck,
+    roles: ["tmhrt_office_admin", "super_admin"],
+  },
+  {
     path: "/promotions",
     label: "Promotions",
     icon: Award,
@@ -48,6 +56,12 @@ const navItems = [
     path: "/courses",
     label: "Courses",
     icon: BookOpen,
+    roles: ["tmhrt_office_admin", "super_admin"],
+  },
+  {
+    path: "/sections",
+    label: "Sections",
+    icon: Layers,
     roles: ["tmhrt_office_admin", "super_admin"],
   },
   {
@@ -117,7 +131,7 @@ export default function Sidebar() {
     <div className="w-72 h-full py-4 pl-4 pr-1">
       <div className="h-full w-full glass-dark rounded-3xl text-white flex flex-col shadow-2xl border border-white/5 overflow-hidden animate-[fade-in_0.5s_ease-out]">
         {/* Logo / Brand */}
-        <div className="px-8 py-8 flex items-center gap-4 border-b border-brand-800/50">
+        <NavLink to="/dashboard" className="px-8 py-8 flex items-center gap-4 border-b border-brand-800/50 hover:bg-brand-800/10 transition-colors">
           <div className="h-10 w-10 flex shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-brand-400 to-brand-600 shadow-lg shadow-brand-500/30">
             <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
@@ -127,7 +141,7 @@ export default function Sidebar() {
             <h1 className="text-xl font-bold tracking-tight text-brand-50 font-sans">MGT System</h1>
             <p className="text-brand-300 text-[11px] uppercase tracking-wider font-semibold mt-0.5 opacity-80">Administration</p>
           </div>
-        </div>
+        </NavLink>
 
         {/* Navigation */}
         <nav className="flex-1 px-4 py-8 space-y-2 overflow-y-auto custom-scrollbar">

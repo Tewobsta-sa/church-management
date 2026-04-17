@@ -103,11 +103,10 @@ export default function UsersManagement() {
 
       {/* Stats Cards (Super Admin Only) */}
       {isSuperAdmin && stats && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <StatCard title="Total Accounts" value={stats.total_users || 0} icon={Users} color="brand" />
           <StatCard title="Super Admins" value={stats.super_admin_count || 0} icon={Shield} color="indigo" />
           <StatCard title="Office Admins" value={stats.other_admin_count || 0} icon={Settings} color="purple" />
-          <StatCard title="Regular Users" value={stats.regular_user_count || 0} icon={Activity} color="green" />
         </div>
       )}
 

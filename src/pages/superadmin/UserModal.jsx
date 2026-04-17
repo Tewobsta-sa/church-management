@@ -4,7 +4,6 @@ import { X, Save } from "lucide-react";
 // ✅ Match EXACT backend roles
 const availableRoles = [
   { value: "super_admin", label: "Super Admin" },
-  { value: "teacher", label: "Teacher" },
   { value: "gngnunet_office_admin", label: "Gngnunet Office Admin" },
   { value: "tmhrt_office_admin", label: "Tmhrt Office Admin" },
   { value: "mezmur_office_admin", label: "Mezmur Office Admin" }
@@ -230,7 +229,7 @@ export default function UserModal({
           <button
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-6 py-2.5 rounded-xl font-medium"
+            className="flex items-center gap-2 bg-green-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-6 py-2.5 rounded-xl font-medium"
           >
             <Save className="w-5 h-5" />
             {isSubmitting

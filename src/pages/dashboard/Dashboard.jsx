@@ -145,7 +145,7 @@ export default function Dashboard() {
             </ResponsiveContainer>
           </div>
           <div className="mt-6 space-y-3">
-             {stats?.section_distribution?.slice(0, 3).map((sec, i) => (
+             {stats?.section_distribution?.map((sec, i) => (
                <div key={i} className="flex justify-between items-center text-xs">
                   <div className="flex items-center gap-2">
                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }}></div>

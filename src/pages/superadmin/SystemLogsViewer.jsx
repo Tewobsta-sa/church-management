@@ -48,6 +48,7 @@ export default function SystemLogsViewer() {
             <tr className="bg-slate-50/50 border-b border-slate-200/60 text-slate-500 text-sm tracking-wide">
               <th className="px-6 py-4 font-semibold">User</th>
               <th className="px-6 py-4 font-semibold">Action</th>
+              <th className="px-6 py-4 font-semibold">Method</th>
               <th className="px-6 py-4 font-semibold">Endpoint</th>
               <th className="px-6 py-4 font-semibold text-right">Timestamp</th>
             </tr>
@@ -62,13 +63,16 @@ export default function SystemLogsViewer() {
                   <div className="text-xs text-slate-500">ID: {log.user_id}</div>
                 </td>
                 <td className="px-6 py-4">
-                  <span className={`inline-flex px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider border ${getMethodColor(log.method)}`}>
-                    {log.method}
+                  <span className="text-sm font-medium text-slate-700">{log.action || "N/A"}</span>
+                </td>
+                <td className="px-6 py-4">
+                  <span className={`inline-flex px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider border ${getMethodColor(log.details?.method || log.action)}`}>
+                    {log.details?.method || (['POST', 'PUT', 'PATCH', 'DELETE', 'GET'].includes(log.action) ? log.action : 'INFO')}
                   </span>
                 </td>
                 <td className="px-6 py-4">
-                  <div className="font-mono text-sm text-slate-600 font-medium tracking-tight bg-slate-100 px-2 py-1 rounded inline-block">
-                    {log.url}
+                  <div className="font-mono text-[11px] text-slate-500 font-bold tracking-tight bg-slate-100/50 px-2 py-1 rounded border border-slate-200/50 max-w-[300px] truncate" title={log.details?.url}>
+                    {log.details?.url ? new URL(log.details.url).pathname : "---"}
                   </div>
                 </td>
                 <td className="px-6 py-4 text-right text-sm text-slate-500">

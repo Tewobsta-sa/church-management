@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { X, Save, Trash2, QrCode } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { studentService } from "../../services/studentService";
+import { sectionService } from "../../services/sectionService";
+import { useAuth } from "../../context/AuthContext";
 
 export default function StudentModal({
   isOpen,
@@ -13,6 +15,7 @@ export default function StudentModal({
   canEdit = false,
   canDelete = false,
 }) {
+  const { hasRole } = useAuth();
   const [formData, setFormData] = useState({
     name: "",
     christian_name: "",
@@ -25,8 +28,9 @@ export default function StudentModal({
     parent_name: "",
     phone_number: "",
     parent_phone_number: "",
-    section_name: "",
+    section_id: "",
   });
+  const [sections, setSections] = useState([]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showQR, setShowQR] = useState(false);
@@ -41,23 +45,37 @@ export default function StudentModal({
         christian_name: student.christian_name || "",
         age: student.age || "",
         educational_level: student.educational_level || "",
-        subcity: student.subcity || "",
-        district: student.district || "",
-        special_place: student.special_place || "",
-        house_number: student.house_number || "",
-        parent_name: student.parent_name || "",
+        subcity: student.address?.subcity || student.subcity || "",
+        district: student.address?.district || student.district || "",
+        special_place: student.address?.special_place || student.special_place || "",
+        house_number: student.address?.house_number || student.house_number || "",
+        parent_name: student.contacts?.find(c => c.type === "Parent")?.name || student.parent_name || "",
         phone_number: student.phone_number || "",
-        parent_phone_number: student.parent_phone_number || "",
-        section_name: student.section_name || "",
+        parent_phone_number: student.contacts?.find(c => c.type === "Parent")?.phone_number || student.parent_phone_number || "",
+        section_id: student.section_id || "",
       });
     } else {
       setFormData({
         name: "", christian_name: "", age: "", educational_level: "",
         subcity: "", district: "", special_place: "", house_number: "",
-        parent_name: "", phone_number: "", parent_phone_number: "", section_name: "",
+        parent_name: "", phone_number: "", parent_phone_number: "", section_id: "",
       });
     }
   }, [student, isOpen]);
+
+  useEffect(() => {
+    if (isOpen) {
+      const fetchSections = async () => {
+        try {
+          const res = await sectionService.getSections(1, "", "");
+          setSections(res.data || []);
+        } catch (err) {
+          console.error("Failed to load sections", err);
+        }
+      };
+      fetchSections();
+    }
+  }, [isOpen]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -148,6 +166,8 @@ export default function StudentModal({
                <ViewData label="Age" value={student.age} />
                <ViewData label="Gender" value={student.sex} />
                <ViewData label="Phone Number" value={student.phone_number} />
+               <ViewData label="Section" value={student.section?.name || student.section_name} />
+               <ViewData label="Status" value={student.status || "Active"} />
                <ViewData label="Educational Level" value={student.educational_level} />
                {student.course_attendance_avg !== undefined && (
                  <ViewData label="Course Attendance Avg" value={`${student.course_attendance_avg}%`} />
@@ -159,16 +179,16 @@ export default function StudentModal({
                {/* Show full details only if not mezmur_office_admin or if they are super_admin */}
                {(!hasRole("mezmur_office_admin") || hasRole("super_admin")) && (
                  <>
-                   <ViewData label="Parent Name" value={student.parent_name} />
-                   <ViewData label="Parent Phone" value={student.parent_phone_number} />
+                   <ViewData label="Parent Name" value={student.contacts?.find(c => c.type === "Parent")?.name || student.parent_name} />
+                   <ViewData label="Parent Phone" value={student.contacts?.find(c => c.type === "Parent")?.phone_number || student.parent_phone_number} />
                    
                    <div className="sm:col-span-2 mt-4 pt-4 border-t border-slate-100">
                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Address Details</h4>
                      <div className="grid grid-cols-2 gap-4">
-                       <ViewData label="Subcity" value={student.subcity} />
-                       <ViewData label="District (Woreda)" value={student.district} />
-                       <ViewData label="Special Place" value={student.special_place} />
-                       <ViewData label="House Number" value={student.house_number} />
+                       <ViewData label="Subcity" value={student.address?.subcity || student.subcity} />
+                       <ViewData label="District (Woreda)" value={student.address?.district || student.district} />
+                       <ViewData label="Special Place" value={student.address?.special_place || student.special_place} />
+                       <ViewData label="House Number" value={student.address?.house_number || student.house_number} />
                      </div>
                    </div>
                  </>
@@ -219,18 +239,33 @@ export default function StudentModal({
               
               <div className="space-y-1.5 flex flex-col justify-end">
                 <label className="text-xs font-bold text-slate-500 tracking-wide uppercase">Section / Class</label>
-                <select name="section_name" value={formData.section_name} onChange={handleChange} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 transition-all font-medium text-slate-800">
+                <select 
+                  name="section_id" 
+                  value={formData.section_id} 
+                  onChange={handleChange} 
+                  required
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 transition-all font-medium text-slate-800"
+                >
                   <option value="">Unassigned</option>
-                  <option value="Section A">Section A</option>
-                  <option value="Section B">Section B</option>
+                  {sections
+                    .filter(s => {
+                      if (!track) return true;
+                      const trackName = track.toLowerCase();
+                      const progName = s.program_type?.name?.toLowerCase() || "";
+                      return progName.includes(trackName);
+                    })
+                    .map(s => (
+                      <option key={s.id} value={s.id}>{s.name} ({s.program_type?.name})</option>
+                    ))
+                  }
                 </select>
               </div>
 
               <div className="sm:col-span-2 pt-4 border-t border-slate-100 mt-2">
                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Address</h4>
               </div>
-              <InputField label="Subcity" name="subcity" value={formData.subcity} onChange={handleChange} />
-              <InputField label="District" name="district" value={formData.district} onChange={handleChange} />
+              <InputField label="Subcity" name="subcity" value={formData.subcity} onChange={handleChange} required />
+              <InputField label="District" name="district" value={formData.district} onChange={handleChange} required />
               <InputField label="Special Place" name="special_place" value={formData.special_place} onChange={handleChange} />
               <InputField label="House Number" name="house_number" value={formData.house_number} onChange={handleChange} />
             </form>
@@ -239,11 +274,7 @@ export default function StudentModal({
 
         {/* Footer */}
         <div className="border-t border-slate-100 px-8 py-5 bg-slate-50 flex items-center justify-between rounded-b-3xl">
-          {mode === "view" && canEdit && (
-            <button onClick={() => setModalMode("edit")} className="text-brand-600 font-bold hover:text-brand-700 transition-colors">
-              Edit Details
-            </button>
-          )}
+          {/* Edit button removed per request */}
           
           {!isCreate && canDelete && mode === "edit" && (
             <button type="button" onClick={handleDelete} className="flex items-center gap-2 text-red-500 font-bold hover:text-red-700 bg-red-50 hover:bg-red-100 px-4 py-2 rounded-xl transition-all">

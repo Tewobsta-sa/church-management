@@ -33,7 +33,9 @@ export const AuthProvider = ({ children }) => {
       setIsInitialized(!res.data.needs_initialization);
     } catch (e) {
       console.error("Failed to check system status", e);
-      setIsInitialized(false); // assume not initialized if API fails
+      // Do not force setup on transient API/network failures.
+      // Keep login accessible unless backend explicitly reports initialization is required.
+      setIsInitialized(true);
     }
   };
 

@@ -97,7 +97,7 @@ export default function StudentPromotion() {
              className="flex items-center gap-2 bg-white text-slate-700 border border-slate-200 px-5 py-2.5 rounded-xl font-bold shadow-sm hover:bg-slate-50 transition-all disabled:opacity-50"
            >
              <CheckCircle2 className="w-5 h-5 text-green-500" />
-             Verify Selected ({selectedIds.length})
+             Approve Promotion ({selectedIds.length})
            </button>
            {canPromote && (
              <button
@@ -119,7 +119,7 @@ export default function StudentPromotion() {
             <p className="text-4xl font-black text-slate-800">{candidates.length}</p>
          </div>
          <div className="glass-panel p-6 border-l-4 border-l-brand-500">
-            <h3 className="text-slate-500 font-bold text-xs uppercase tracking-widest mb-2">Verified (Ready)</h3>
+            <h3 className="text-slate-500 font-bold text-xs uppercase tracking-widest mb-2">Promotion Approved</h3>
             <p className="text-4xl font-black text-brand-600">{candidates.filter(c => c.is_verified).length}</p>
          </div>
          <div className="glass-panel p-6 bg-brand-50 border border-brand-100 flex items-start gap-4">
@@ -147,7 +147,7 @@ export default function StudentPromotion() {
                 <th className="px-6 py-4">Student Details</th>
                 <th className="px-6 py-4">Current Placement</th>
                 <th className="px-6 py-4">Attendance Stats</th>
-                <th className="px-6 py-4 text-right">Status</th>
+                <th className="px-6 py-4 font-semibold text-right whitespace-nowrap">Promotion Approval</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -169,7 +169,7 @@ export default function StudentPromotion() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="inline-flex items-center px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-[10px] font-black text-slate-600 uppercase">
-                        {c.section_name || "Unassigned"}
+                        {c.section?.name || c.section_name || "Unassigned"}
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -184,17 +184,17 @@ export default function StudentPromotion() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      {c.is_verified ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-50 text-green-700 text-[10px] font-black rounded-full border border-green-200 uppercase tracking-widest shadow-sm">
-                           <CheckCircle2 className="w-3 h-3" /> Verified
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-600 text-[10px] font-black rounded-full border border-amber-200 uppercase tracking-widest">
-                           <AlertCircle className="w-3 h-3" /> Pending
-                        </span>
-                      )}
-                    </td>
+                     <td className="px-6 py-4 text-right">
+                       {c.is_verified ? (
+                         <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-50 text-green-700 text-[10px] font-black rounded-full border border-green-200 uppercase tracking-widest shadow-sm">
+                            <CheckCircle2 className="w-3 h-3" /> Approved
+                         </span>
+                       ) : (
+                         <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-600 text-[10px] font-black rounded-full border border-amber-200 uppercase tracking-widest">
+                            <AlertCircle className="w-3 h-3" /> Not Ready
+                         </span>
+                       )}
+                     </td>
                   </tr>
                 ))
               )}

@@ -28,8 +28,8 @@ export const courseService = {
 
   // Assessments
   getAssessments: async (courseId) => {
-     const response = await api.get(`/assessments`, { params: { course_id: courseId } });
-     return response.data;
+     const response = await api.get(`/assessments`, { params: { course_id: courseId, per_page: 100 } });
+     return response.data.data || [];
   },
 
   createAssessment: async (data) => {

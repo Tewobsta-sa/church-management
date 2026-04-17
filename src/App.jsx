@@ -7,7 +7,7 @@ import {
 
 import { AuthProvider, useAuth } from "./context/AuthContext";
 
-import Login from "./pages/auth/Login";
+import Login from "./pages/auth/login";
 import Setup from "./pages/auth/Setup";
 import Dashboard from "./pages/dashboard/Dashboard";
 import StudentsList from "./pages/students/StudentsList";
@@ -24,6 +24,7 @@ import AppLayout from "./components/layout/AppLayout";
 import SectionsManagement from "./pages/sections/SectionsManagement";
 import SecuritySettings from "./pages/admin/SecuritySettings";
 import ForgotPassword from "./pages/auth/ForgotPassword";
+import TeachersManagement from "./pages/academic/TeachersManagement";
 
 const getPrimaryRole = (user) => user?.roles?.[0]?.name || null;
 
@@ -32,7 +33,8 @@ const getDefaultRouteForRole = (role) => {
     super_admin: "/dashboard",
     gngnunet_office_admin: "/students",
     mezmur_office_admin: "/mezmur",
-    tmhrt_office_admin: "/assignments",
+    tmhrt_office_admin: "/students",
+    distance_admin: "/students",
     teacher: "/assignments",
   };
 
@@ -199,6 +201,14 @@ function App() {
               element={
                 <RoleRoute allowedRoles={["super_admin", "gngnunet_office_admin", "tmhrt_office_admin"]}>
                   <StudentPromotion />
+                </RoleRoute>
+              }
+            />
+            <Route
+              path="/teachers"
+              element={
+                <RoleRoute allowedRoles={["super_admin", "tmhrt_office_admin"]}>
+                  <TeachersManagement />
                 </RoleRoute>
               }
             />

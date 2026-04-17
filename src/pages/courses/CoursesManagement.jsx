@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Plus, Edit2, Trash2, Search, Filter, BookOpen, Layers, Save, X, Calculator } from 'lucide-react';
 import { courseService } from '../../services/courseService';
 import { useAuth } from '../../context/AuthContext';
 
 export default function CoursesManagement() {
   const { hasRole } = useAuth();
+  const navigate = useNavigate();
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
@@ -16,7 +18,7 @@ export default function CoursesManagement() {
   
   const [formData, setFormData] = useState({ name: '', credit_hour: '', duration: '', program_type_name: 'Young' });
   const [assessments, setAssessments] = useState([]);
-  const [newAssessment, setNewAssessment] = useState({ name: '', max_score: 100, weight: 0 });
+  const [newAssessment, setNewAssessment] = useState({ title: '', max_score: 0, weight: 0 });
 
   const fetchCourses = async () => {
     setLoading(true);
@@ -78,10 +80,22 @@ export default function CoursesManagement() {
   };
 
   const handleAddAssessment = async () => {
-    if (!newAssessment.name || !newAssessment.weight) return;
+    if (!newAssessment.title || !newAssessment.weight) return;
     try {
-      await courseService.createAssessment({ ...newAssessment, course_id: selectedCourse.id });
-      setNewAssessment({ name: '', max_score: 100, weight: 0 });
+      const weightNum = Number(newAssessment.weight);
+      if (Number.isNaN(weightNum) || weightNum <= 0) {
+        alert("Assessment weight must be greater than 0");
+        return;
+      }
+
+      // Rule: component weight also defines its max score (e.g. weight 30 -> score out of 30).
+      await courseService.createAssessment({
+        ...newAssessment,
+        course_id: selectedCourse.id,
+        weight: weightNum,
+        max_score: weightNum,
+      });
+      setNewAssessment({ title: '', max_score: 0, weight: 0 });
       const data = await courseService.getAssessments(selectedCourse.id);
       setAssessments(data || []);
     } catch (err) {
@@ -100,7 +114,7 @@ export default function CoursesManagement() {
     }
   };
 
-  const totalWeight = assessments.reduce((sum, a) => sum + (Number(a.weight) || 0), 0);
+  const totalWeight = (Array.isArray(assessments) ? assessments : []).reduce((sum, a) => sum + (Number(a.weight) || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -110,13 +124,22 @@ export default function CoursesManagement() {
           <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Young Program Curriculum</h1>
           <p className="text-slate-500 font-medium mt-1">Manage courses and weighted assessment structures</p>
         </div>
-        <button
-          onClick={() => openCourseModal()}
-          className="flex items-center gap-2 bg-gradient-to-r from-brand-700 to-brand-500 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-brand-500/30 hover:-translate-y-0.5 transition-all"
-        >
-          <Plus className="w-5 h-5" />
-          Create New Course
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={() => navigate('/sections')}
+            className="flex items-center gap-2 bg-white text-slate-700 px-5 py-2.5 rounded-xl font-bold shadow-sm border border-slate-200 hover:bg-slate-50 transition-all"
+          >
+            <Layers className="w-5 h-5 text-brand-500" />
+            Manage Sections
+          </button>
+          <button
+            onClick={() => openCourseModal()}
+            className="flex items-center gap-2 bg-gradient-to-r from-brand-700 to-brand-500 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-brand-500/30 hover:-translate-y-0.5 transition-all"
+          >
+            <Plus className="w-5 h-5" />
+            Create New Course
+          </button>
+        </div>
       </div>
 
       {/* Courses Grid */}
@@ -248,7 +271,7 @@ export default function CoursesManagement() {
                      assessments.map(a => (
                        <div key={a.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
                           <div>
-                            <p className="font-black text-slate-800">{a.name}</p>
+                            <p className="font-black text-slate-800">{a.title}</p>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Max Score: {a.max_score}</p>
                           </div>
                           <div className="flex items-center gap-4">
@@ -271,8 +294,8 @@ export default function CoursesManagement() {
                       <div className="lg:col-span-2">
                         <input 
                           placeholder="e.g. Midterm Exam"
-                          value={newAssessment.name}
-                          onChange={e => setNewAssessment({...newAssessment, name: e.target.value})}
+                          value={newAssessment.title}
+                          onChange={e => setNewAssessment({...newAssessment, title: e.target.value})}
                           className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-brand-500 font-bold text-sm"
                         />
                       </div>
