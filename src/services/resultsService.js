@@ -9,5 +9,9 @@ export const resultsService = {
   getStudentReport: async (studentId) => {
     const response = await api.get(`/students/${studentId}/totals`);
     return response.data;
-  }
+  },
+  getCourseGrades: async (courseId) => {
+    const response = await api.get(`/courses/${courseId}/grades`);
+    return response.data;
+  },
 };
