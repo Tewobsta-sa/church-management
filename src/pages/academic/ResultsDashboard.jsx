@@ -71,29 +71,30 @@ export default function ResultsDashboard() {
     setReportLoading(true);
 
     try {
-      const data = await resultsService.getStudentReport(studentId);
+      // 1. GET COURSE TOTALS + OVERALL AVERAGE
+      const totals = await resultsService.getStudentReport(studentId);
 
-      // FETCH REAL COURSE GRADES
-      const coursesWithAssessments = await Promise.all(
-        data.courses.map(async (course) => {
-          const courseGrades = await resultsService.getCourseGrades(
+      // 2. GET FULL COURSE BREAKDOWN (assessments per course)
+      const coursesWithDetails = await Promise.all(
+        totals.courses.map(async (course) => {
+          const courseDetails = await resultsService.getCourseGrades(
             course.course_id,
           );
 
           return {
-            ...course,
-            assessments: courseGrades.assessments,
+            ...course, // percentage + name
+            assessments: courseDetails.assessments, // detailed breakdown
           };
         }),
       );
 
       setSelectedStudentReport({
-        ...data,
-        courses: coursesWithAssessments,
+        ...totals,
+        courses: coursesWithDetails,
       });
     } catch (err) {
       console.error(err);
-      alert("Failed to load student report");
+      alert("Failed to load report");
     } finally {
       setReportLoading(false);
     }
@@ -256,9 +257,17 @@ export default function ResultsDashboard() {
                 <h2 className="text-3xl font-black text-slate-800">
                   Student Report Card
                 </h2>
-                <p className="text-sm font-bold text-brand-600 uppercase tracking-widest">
-                  {selectedStudentReport?.student?.name}
-                </p>
+                <div className="flex items-center gap-3">
+                  <p className="text-sm font-bold text-brand-600 uppercase tracking-widest">
+                    {selectedStudentReport?.student?.name}
+                  </p>
+
+                  {selectedStudentReport?.student?.is_verified === 1 && (
+                    <span className="px-3 py-1 text-xs font-black uppercase bg-green-100 text-green-700 rounded-full">
+                      Promoted
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="flex gap-3">
@@ -295,55 +304,71 @@ export default function ResultsDashboard() {
                   {/* Table */}
                   <div className="overflow-x-auto rounded-2xl border border-slate-200">
                     <table className="w-full text-sm">
-                      <thead className="bg-slate-100">
-                        <tr>
-                          <th className="p-4 text-left">Course</th>
-                          <th className="p-4 text-left">Assessment</th>
-                          <th className="p-4 text-center">Score</th>
-                          <th className="p-4 text-center">Max</th>
-                          <th className="p-4 text-center">Weight</th>
-                          <th className="p-4 text-center">%</th>
-                        </tr>
-                      </thead>
-
                       <tbody>
-                        {selectedStudentReport?.courses?.map((course) =>
-                          course.assessments?.map((a) =>
-                            a.grades
-                              ?.filter(
-                                (g) =>
-                                  g.student_id ===
-                                  selectedStudentReport.student.id,
-                              )
-                              .map((g, idx) => (
-                                <tr
-                                  key={`${course.course_id}-${a.assessment_id}-${idx}`}
-                                  className="border-t"
+                        {selectedStudentReport?.courses?.map((course) => {
+                          const studentId = selectedStudentReport?.student?.id;
+
+                          // build assessment headers dynamically
+                          const assessments = course.assessments || [];
+
+                          // extract student's scores
+                          const scoreRow = assessments.map((a) => {
+                            const grade = a.grades?.find(
+                              (g) => g.student_id === studentId,
+                            );
+
+                            return {
+                              title: a.assessment_title,
+                              score: grade?.score ?? 0,
+                            };
+                          });
+
+                          return (
+                            <>
+                              {/* COURSE TITLE ROW */}
+                              <tr
+                                key={course.course_id}
+                                className="bg-slate-50"
+                              >
+                                <td
+                                  colSpan={10}
+                                  className="p-4 font-black text-slate-800"
                                 >
-                                  <td className="p-4 font-bold">
-                                    {course.course_name}
+                                  {course.course_name}
+                                </td>
+                              </tr>
+
+                              {/* HEADER ROW (ASSESSMENTS) */}
+                              <tr className="bg-slate-100">
+                                {assessments.map((a) => (
+                                  <th
+                                    key={a.assessment_id}
+                                    className="p-3 text-center"
+                                  >
+                                    {a.assessment_title}
+                                  </th>
+                                ))}
+
+                                <th className="p-3 text-center font-black">
+                                  TOTAL
+                                </th>
+                              </tr>
+
+                              {/* SCORE ROW */}
+                              <tr className="border-b">
+                                {scoreRow.map((s, i) => (
+                                  <td key={i} className="p-3 text-center">
+                                    {s.score}
                                   </td>
+                                ))}
 
-                                  <td className="p-4">{a.assessment_title}</td>
-
-                                  <td className="p-4 text-center">{g.score}</td>
-
-                                  <td className="p-4 text-center">
-                                    {a.max_score}
-                                  </td>
-
-                                  <td className="p-4 text-center">
-                                    {a.weight}%
-                                  </td>
-
-                                  <td className="p-4 text-center">
-                                    {((g.score / a.max_score) * 100).toFixed(1)}
-                                    %
-                                  </td>
-                                </tr>
-                              )),
-                          ),
-                        )}
+                                <td className="p-3 text-center font-black text-green-600">
+                                  {course.course_percentage}%
+                                </td>
+                              </tr>
+                            </>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
