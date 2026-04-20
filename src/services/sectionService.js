@@ -8,10 +8,13 @@ export const sectionService = {
   },
 
   // Sections
-  getSections: async (page = 1, search = '', programTypeId = '') => {
-    const params = { page, search };
-    if (programTypeId) params.program_type_id = programTypeId;
-    const res = await api.get('/sections', { params });
+  getSections: async () => {
+    const res = await api.get("/sections", {
+      params: {
+        program_type: "Young", // 👈 tailored to your use case
+      },
+    });
+
     return res.data;
   },
 
