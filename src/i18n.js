@@ -1,55 +1,32 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
+import LanguageDetector from 'i18next-browser-languagedetector';
 
-// In a real application, you'd fetch these from separate JSON files or API
-const resources = {
-  en: {
-    translation: {
-      "Dashboard": "Dashboard",
-      "Students": "Students",
-      "Courses": "Courses",
-      "Schedules": "Schedules",
-      "Attendance": "Attendance",
-      "Results": "Results",
-      "Mezmur Ministry": "Mezmur Ministry",
-      "Admin": "Admin",
-      "Users": "Users",
-      "Logs": "Logs",
-      "Settings": "Settings",
-      "Profile": "Profile",
-      "Logout": "Logout",
-      "Language": "Language"
-    }
-  },
-  am: {
-    translation: {
-      "Dashboard": "ዳሽቦርድ",
-      "Students": "ተማሪዎች",
-      "Courses": "ትምህርቶች",
-      "Schedules": "መርሃ ግብሮች",
-      "Attendance": "ክትትል",
-      "Results": "ውጤቶች",
-      "Mezmur Ministry": "መዝሙር ክፍል",
-      "Admin": "አስተዳዳሪ",
-      "Users": "ተጠቃሚዎች",
-      "Logs": "የስርዓት መዝገብ",
-      "Settings": "ቅንብሮች",
-      "Profile": "መገለጫ",
-      "Logout": "መውጣት",
-      "Language": "ቋንቋ"
-    }
-  }
-};
+import en from './i18n/en.json';
+import am from './i18n/am.json';
+
+export const SUPPORTED_LANGUAGES = [
+  { code: 'en', label: 'English' },
+  { code: 'am', label: 'አማርኛ' },
+];
 
 i18n
+  .use(LanguageDetector)
   .use(initReactI18next)
   .init({
-    resources,
-    lng: "en", // default language
-    fallbackLng: "en",
-    interpolation: {
-      escapeValue: false 
-    }
+    resources: {
+      en: { translation: en },
+      am: { translation: am },
+    },
+    fallbackLng: 'en',
+    supportedLngs: ['en', 'am'],
+    interpolation: { escapeValue: false },
+    detection: {
+      order: ['localStorage', 'navigator'],
+      caches: ['localStorage'],
+      lookupLocalStorage: 'app_lang',
+    },
+    returnNull: false,
   });
 
 export default i18n;

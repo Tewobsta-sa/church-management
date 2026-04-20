@@ -17,13 +17,13 @@ import clsx from "clsx";
 const navItems = [
   {
     path: "/users",
-    label: "Admin",
+    labelKey: "nav.Admin",
     icon: Settings,
     roles: ["super_admin"],
   },
   {
     path: "/students",
-    label: "Students",
+    labelKey: "nav.Students",
     icon: Users,
     roles: [
       "gngnunet_office_admin",
@@ -34,7 +34,7 @@ const navItems = [
   },
   {
     path: "/promotions",
-    label: "Promotions",
+    labelKey: "nav.Promotions",
     icon: Award,
     roles: [
       "gngnunet_office_admin",
@@ -44,13 +44,13 @@ const navItems = [
   },
   {
     path: "/courses",
-    label: "Courses",
+    labelKey: "nav.Courses",
     icon: BookOpen,
     roles: ["tmhrt_office_admin", "super_admin"],
   },
   {
     path: "/assignments",
-    label: "Schedules",
+    labelKey: "nav.Schedules",
     icon: Calendar,
     roles: [
       "tmhrt_office_admin",
@@ -61,7 +61,7 @@ const navItems = [
   },
   {
     path: "/attendance",
-    label: "Attendance",
+    labelKey: "nav.Attendance",
     icon: CheckSquare,
     roles: [
       "teacher",
@@ -72,13 +72,13 @@ const navItems = [
   },
   {
     path: "/grades",
-    label: "Results",
+    labelKey: "nav.Results",
     icon: Award,
     roles: ["teacher", "tmhrt_office_admin", "super_admin"],
   },
   {
     path: "/mezmur",
-    label: "Mezmur Ministry",
+    labelKey: "nav.Mezmur Ministry",
     icon: Music,
     roles: ["mezmur_office_admin", "super_admin"],
   },
@@ -104,8 +104,8 @@ export default function Sidebar() {
             </svg>
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-brand-50 font-sans">MGT System</h1>
-            <p className="text-brand-300 text-[11px] uppercase tracking-wider font-semibold mt-0.5 opacity-80">Administration</p>
+            <h1 className="text-xl font-bold tracking-tight text-brand-50 font-sans">{t('app.name')}</h1>
+            <p className="text-brand-300 text-[11px] uppercase tracking-wider font-semibold mt-0.5 opacity-80">{t('app.subtitle')}</p>
           </div>
         </div>
 
@@ -128,7 +128,7 @@ export default function Sidebar() {
                 <>
                   <div className={clsx("absolute inset-y-0 left-0 w-1 rounded-r-full transition-all duration-300", isActive ? "bg-brand-400 scale-y-100 opacity-100" : "scale-y-0 opacity-0 group-hover:scale-y-50 group-hover:opacity-50 bg-brand-500")} />
                   <item.icon className={clsx("w-5 h-5 mr-3 transition-colors", isActive ? "text-brand-300" : "text-brand-400/50 group-hover:text-brand-300")} />
-                  <span className="tracking-wide text-sm">{t(item.label)}</span>
+                  <span className="tracking-wide text-sm">{t(item.labelKey)}</span>
                 </>
               )}
             </NavLink>
@@ -142,9 +142,9 @@ export default function Sidebar() {
               {user?.name?.charAt(0)?.toUpperCase() || "U"}
             </div>
             <div className="overflow-hidden">
-              <p className="font-medium text-sm truncate">{user?.name || "Administrator"}</p>
+              <p className="font-medium text-sm truncate">{user?.name || t('nav.Admin')}</p>
               <p className="text-xs text-brand-400 truncate opacity-80">
-                {user?.roles?.map((r) => r.name).join(" • ") || "No active role"}
+                {user?.roles?.map((r) => r.name).join(" • ") || ""}
               </p>
             </div>
           </div>
@@ -153,7 +153,7 @@ export default function Sidebar() {
             className="w-full flex items-center justify-center px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl transition-all duration-200 text-sm font-medium border border-red-500/20 hover:border-red-500/30"
           >
             <LogOut className="w-4 h-4 mr-2" />
-            Sign Out
+            {t('nav.Logout')}
           </button>
         </div>
       </div>

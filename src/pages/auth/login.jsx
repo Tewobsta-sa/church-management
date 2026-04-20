@@ -2,8 +2,10 @@ import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { Crown, KeyRound, UserCircle2, ArrowRight } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export default function Login() {
+  const { t } = useTranslation();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -21,10 +23,10 @@ export default function Login() {
       if (data?.access_token) {
         navigate("/");
       } else {
-        setError("Invalid login credentials.");
+        setError(t("auth.invalidCredentials"));
       }
     } catch (err) {
-      setError(err.response?.data?.message || "Login failed due to server error.");
+      setError(err.response?.data?.message || t("auth.loginFailed"));
     } finally {
       setIsLoading(false);
     }
@@ -45,8 +47,8 @@ export default function Login() {
           <div className="mx-auto w-20 h-20 bg-gradient-to-tr from-brand-500 to-brand-700 rounded-2xl flex items-center justify-center shadow-xl shadow-brand-500/30 mb-6 rotate-3">
              <Crown className="w-10 h-10 text-white drop-shadow-md -rotate-3" />
           </div>
-          <h1 className="text-4xl font-extrabold tracking-tight text-slate-800 mb-2">MGT System</h1>
-          <p className="text-slate-500 font-medium">Secure Administrative Login</p>
+          <h1 className="text-4xl font-extrabold tracking-tight text-slate-800 mb-2">{t("app.name")}</h1>
+          <p className="text-slate-500 font-medium">{t("auth.adminLogin")}</p>
         </div>
 
         {/* Glass Card Form */}
@@ -60,7 +62,7 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <label className="text-sm font-semibold tracking-wide text-slate-700">Username / ID</label>
+              <label className="text-sm font-semibold tracking-wide text-slate-700">{t("auth.username")}</label>
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-brand-600 transition-colors">
                   <UserCircle2 className="h-5 w-5" />
@@ -70,7 +72,7 @@ export default function Login() {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="w-full pl-11 pr-4 py-3.5 bg-white/50 border border-slate-200 rounded-xl outline-none focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 transition-all font-medium text-slate-800 placeholder:text-slate-400"
-                  placeholder="Enter administrative ID"
+                  placeholder={t("auth.usernamePlaceholder")}
                   required
                   autoComplete="username"
                   autoFocus
@@ -80,7 +82,7 @@ export default function Login() {
 
             <div className="space-y-2">
               <label className="flex justify-between text-sm font-semibold tracking-wide text-slate-700">
-                <span>Passcode</span>
+                <span>{t("auth.password")}</span>
               </label>
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-brand-600 transition-colors">
@@ -91,7 +93,7 @@ export default function Login() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-11 pr-4 py-3.5 bg-white/50 border border-slate-200 rounded-xl outline-none focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 transition-all font-medium text-slate-800 placeholder:text-slate-400"
-                  placeholder="••••••••"
+                  placeholder={t("auth.passwordPlaceholder")}
                   required
                   autoComplete="current-password"
                 />
@@ -107,7 +109,7 @@ export default function Login() {
                  <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
               ) : (
                 <>
-                  <span className="tracking-wide">Authorize Access</span>
+                  <span className="tracking-wide">{t("auth.signIn")}</span>
                   <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </>
               )}

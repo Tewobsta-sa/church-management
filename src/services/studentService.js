@@ -33,5 +33,30 @@ export const studentService = {
   deleteStudent: async (id, track) => {
     const response = await api.delete(`/students/${track}/${id}`);
     return response.data;
-  }
+  },
+
+  /**
+   * Download a CSV template for bulk import of a given track.
+   * Returns a Blob which the caller can save as a file.
+   */
+  downloadImportTemplate: async (track) => {
+    const response = await api.get(`/students/import/template/${track}`, {
+      responseType: "blob",
+    });
+    return response.data;
+  },
+
+  /**
+   * Upload a CSV/XLSX file to bulk-import students for a given track.
+   * Returns the server response body (success + error rows).
+   */
+  bulkImport: async (file, track) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await api.post(`/students/import/${track}`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  },
 };
+
