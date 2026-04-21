@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
 import { X, Save } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { translateTrack } from '../../i18n/tracks';
 
 export default function SectionModal({ isOpen, onClose, section = null, programTypes = [], onSave }) {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     name: '',
     program_type_id: '',
@@ -79,7 +82,7 @@ export default function SectionModal({ isOpen, onClose, section = null, programT
               <option value="">Select Program Type</option>
               {programTypes.map(pt => (
                 <option key={pt.id} value={pt.id}>
-                  {pt.name}
+                  {translateTrack(t, pt.name)}
                 </option>
               ))}
             </select>

@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import { sectionService } from '../../services/sectionService';
 import { Plus, Edit2, Trash2, Eye, BookOpen, Users, UserCheck, Search, Filter } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import SectionModal from './SectionModal';
+import { translateTrack } from '../../i18n/tracks';
 
 export default function SectionsManagement() {
+  const { t } = useTranslation();
   const [sections, setSections] = useState([]);
   const [programTypes, setProgramTypes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -165,7 +168,7 @@ export default function SectionsManagement() {
                    </td>
                    <td className="px-6 py-4">
                      <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold bg-brand-50 text-brand-700 border border-brand-100 uppercase">
-                        {programTypes.find(pt => pt.id === section.program_type_id)?.name || 'N/A'}
+                        {translateTrack(t, programTypes.find(pt => pt.id === section.program_type_id)?.name) || 'N/A'}
                      </span>
                    </td>
                    <td className="px-6 py-4 font-semibold text-slate-600">{section.order_no || '-'}</td>
@@ -197,7 +200,7 @@ export default function SectionsManagement() {
               <div>
                 <h2 className="text-2xl font-black text-slate-800 tracking-tight">{detailSection.name} Overview</h2>
                 <p className="text-sm font-medium text-slate-500 mt-1 uppercase tracking-widest text-brand-600">
-                  {programTypes.find(pt => pt.id === detailSection.program_type_id)?.name || 'Unknown Track'}
+                  {translateTrack(t, programTypes.find(pt => pt.id === detailSection.program_type_id)?.name) || 'Unknown Track'}
                 </p>
               </div>
               <button onClick={closeDetail} className="p-2 bg-slate-200/50 text-slate-500 hover:bg-slate-200 rounded-full transition-colors">

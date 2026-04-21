@@ -5,6 +5,7 @@ import { useAuth } from "../../context/AuthContext";
 import { courseService } from "../../services/courseService";
 import { sectionService } from "../../services/sectionService";
 import CourseModal from "./CourseModal";
+import { translateTrack } from "../../i18n/tracks";
 
 export default function CoursesManagement() {
   const { t } = useTranslation();
@@ -112,7 +113,7 @@ export default function CoursesManagement() {
           >
             <option value="">{t("common.all")} {t("common.programType")}</option>
             {programTypes.map((pt) => (
-              <option key={pt.id} value={pt.name}>{pt.name}</option>
+              <option key={pt.id} value={pt.name}>{translateTrack(t, pt.name)}</option>
             ))}
           </select>
         </div>
@@ -155,7 +156,10 @@ export default function CoursesManagement() {
                     </td>
                     <td className="px-6 py-4">
                       <span className="px-2.5 py-1 rounded-md text-xs font-bold bg-brand-50 text-brand-700 border border-brand-100">
-                        {course.program_type?.name || course.programType?.name || "—"}
+                        {translateTrack(
+                          t,
+                          course.program_type?.name || course.programType?.name,
+                        ) || "—"}
                       </span>
                     </td>
                     <td className="px-6 py-4 font-semibold text-slate-600">{course.credit_hour}</td>

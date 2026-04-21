@@ -3,6 +3,7 @@ import { X, Plus, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { courseService } from "../../services/courseService";
 import { sectionService } from "../../services/sectionService";
+import { translateTrack } from "../../i18n/tracks";
 
 export default function CourseModal({ isOpen, onClose, course = null, onSuccess }) {
   const { t } = useTranslation();
@@ -180,7 +181,7 @@ export default function CourseModal({ isOpen, onClose, course = null, onSuccess 
               >
                 <option value="">{t("common.select")}…</option>
                 {programTypes.map((pt) => (
-                  <option key={pt.id} value={pt.name}>{pt.name}</option>
+                  <option key={pt.id} value={pt.name}>{translateTrack(t, pt.name)}</option>
                 ))}
               </select>
             </div>

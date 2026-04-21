@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "../../context/AuthContext";
 import { courseService } from "../../services/courseService";
 import { gradeService } from "../../services/gradeService";
+import { translateTrack } from "../../i18n/tracks";
 
 /**
  * Letter grade based on percentage (0-100).
@@ -251,9 +252,12 @@ export default function Grades() {
             </select>
             {activeCourse?.program_type && (
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                {typeof activeCourse.program_type === "string"
-                  ? activeCourse.program_type
-                  : activeCourse.program_type?.name || ""}
+                {translateTrack(
+                  t,
+                  typeof activeCourse.program_type === "string"
+                    ? activeCourse.program_type
+                    : activeCourse.program_type?.name,
+                )}
               </p>
             )}
           </div>
