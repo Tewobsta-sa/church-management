@@ -251,7 +251,9 @@ export default function Grades() {
             </select>
             {activeCourse?.program_type && (
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                {activeCourse.program_type}
+                {typeof activeCourse.program_type === "string"
+                  ? activeCourse.program_type
+                  : activeCourse.program_type?.name || ""}
               </p>
             )}
           </div>
