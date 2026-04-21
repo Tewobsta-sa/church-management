@@ -128,11 +128,16 @@ export default function BulkImportModal({ isOpen, onClose, track = "young", onSu
                 <p>{t("students.import.successBody", { count: result.created_count || 0 })}</p>
                 {Array.isArray(result.errors) && result.errors.length > 0 && (
                   <ul className="list-disc list-inside space-y-1 text-red-600 text-xs">
-                    {result.errors.slice(0, 20).map((err, i) => (
-                      <li key={i}>
-                        {t("students.import.errorRow", { row: err.row })}: {err.message}
-                      </li>
-                    ))}
+                    {result.errors.slice(0, 20).map((err, i) => {
+                      const msg = Array.isArray(err.errors)
+                        ? err.errors.join("; ")
+                        : err.message || "";
+                      return (
+                        <li key={i}>
+                          {t("students.import.errorRow", { row: err.row })}: {msg}
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </div>
