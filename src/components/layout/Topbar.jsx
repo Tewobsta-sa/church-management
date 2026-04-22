@@ -1,11 +1,11 @@
-import { Menu, LogOut, Bell, UserCircle, Globe } from "lucide-react";
+import { Menu, Bell, UserCircle, Globe } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import ProfileModal from "./ProfileModal";
 
 export default function Topbar() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { t, i18n } = useTranslation();
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
@@ -28,10 +28,10 @@ export default function Topbar() {
           </div>
           <div className="hidden lg:block">
             <p className="text-sm font-medium text-slate-400 uppercase tracking-widest">
-              {t('Dashboard')}
+              {t('nav.Dashboard')}
             </p>
             <h2 className="text-xl font-bold tracking-tight text-slate-800">
-              Welcome back, {user?.name?.split(' ')[0] || 'Admin'}
+              {t('app.welcomeBack', { name: user?.name?.split(' ')[0] || t('nav.Admin') })}
             </h2>
           </div>
         </div>

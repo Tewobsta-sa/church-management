@@ -1,525 +1,360 @@
-import { useState, useEffect, useMemo } from "react";
-import { Search, Save, Filter, BookOpen, Layers } from "lucide-react";
-import { sectionService } from "../../services/sectionService";
-import { courseService } from "../../services/courseService";
-import api from "../../services/api";
+import { useEffect, useMemo, useState } from "react";
+import { Search, Save, BookOpen } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../../context/AuthContext";
+import { courseService } from "../../services/courseService";
+import { gradeService } from "../../services/gradeService";
+import { translateTrack } from "../../i18n/tracks";
+
+/**
+ * Letter grade based on percentage (0-100).
+ */
+function getLetterGrade(pct) {
+  if (pct >= 90) return "A+";
+  if (pct >= 85) return "A";
+  if (pct >= 80) return "A-";
+  if (pct >= 75) return "B+";
+  if (pct >= 70) return "B";
+  if (pct >= 65) return "B-";
+  if (pct >= 60) return "C+";
+  if (pct >= 50) return "C";
+  if (pct >= 40) return "D";
+  return "F";
+}
+
+function getGradeColor(grade) {
+  if (grade.startsWith("A")) return "text-green-600 bg-green-50 border-green-200";
+  if (grade.startsWith("B")) return "text-brand-600 bg-brand-50 border-brand-200";
+  if (grade.startsWith("C")) return "text-amber-600 bg-amber-50 border-amber-200";
+  return "text-red-600 bg-red-50 border-red-200";
+}
 
 export default function Grades() {
+  const { t } = useTranslation();
   const { hasRole } = useAuth();
-  const canEdit = hasRole("tmhrt_office_admin") || hasRole("teacher");
-  const isSuperAdmin = hasRole("super_admin");
+  const isTeacher = hasRole("teacher") && !hasRole("tmhrt_office_admin") && !hasRole("super_admin");
 
-  const [sections, setSections] = useState([]);
-  const [selectedSection, setSelectedSection] = useState("");
-  const [courses, setCourses] = useState([]);
-  const [sectionCourses, setSectionCourses] = useState([]);
-  const [selectedCourse, setSelectedCourse] = useState("");
-  const [students, setStudents] = useState([]);
+  const [myCourses, setMyCourses] = useState([]);
+  const [selected, setSelected] = useState(null); // { course_id, section_id }
+
   const [assessments, setAssessments] = useState([]);
-  const [gradesByStudent, setGradesByStudent] = useState({});
-  const [pendingChanges, setPendingChanges] = useState({});
+  const [students, setStudents] = useState([]);
+  // grades[studentId][assessmentId] = score | ""
+  const [grades, setGrades] = useState({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+  const [successMsg, setSuccessMsg] = useState(null);
   const [search, setSearch] = useState("");
-  const [message, setMessage] = useState("");
 
+  // Load the teacher's courses (or admin view: all courses with assessments)
   useEffect(() => {
-    const fetchInitialData = async () => {
+    const load = async () => {
       try {
-        const secRes = await sectionService.getSections(1, "", "");
-
-        const fetchedSections = secRes?.data || [];
-        setSections(fetchedSections);
-
-        if (fetchedSections.length > 0) {
-          const firstSectionId = String(fetchedSections[0].id);
-          setSelectedSection(firstSectionId);
-
-          const courseRes =
-            await sectionService.getSectionCourses(firstSectionId);
-
-          setCourses(Array.isArray(courseRes) ? courseRes : []);
-        }
-      } catch (err) {
-        console.error("Failed to fetch initial data", err);
-      }
-    };
-    fetchInitialData();
-  }, []);
-
-  useEffect(() => {
-    const fetchStudents = async () => {
-      if (!selectedSection || !selectedCourse) return;
-
-      setLoading(true);
-
-      try {
-        let res;
-
-        if (hasRole("teacher")) {
-          res = await sectionService.getSectionStudents(selectedSection);
-          setStudents(res || []);
+        setLoading(true);
+        setError(null);
+        if (isTeacher) {
+          const data = await gradeService.myCourses();
+          setMyCourses(Array.isArray(data) ? data : data?.data || []);
         } else {
-          // admin can still view whole section
-          res = await sectionService.getSectionStudents(selectedSection);
-          setStudents(res || []);
+          const data = await courseService.list();
+          const list = (Array.isArray(data) ? data : data?.data || []).map((c) => ({
+            course_id: c.id,
+            course_name: c.name,
+            section_id: null,
+            section_name: null,
+            program_type: c.program_type?.name || c.programType?.name || "",
+          }));
+          setMyCourses(list);
         }
       } catch (err) {
-        console.error("Failed to fetch students", err);
-        setStudents([]);
+        setError(err.response?.data?.message || t("common.serverError"));
       } finally {
         setLoading(false);
       }
     };
+    load();
+     
+  }, [isTeacher]);
 
-    fetchStudents();
-  }, [selectedSection, selectedCourse]);
-
+  // Auto-pick first course when list loads
   useEffect(() => {
-    const fetchSectionCourses = async () => {
-      if (!selectedSection) {
-        setSectionCourses([]);
-        setSelectedCourse("");
-        return;
-      }
+    if (!selected && myCourses.length > 0) {
+      const first = myCourses[0];
+      setSelected({ course_id: first.course_id, section_id: first.section_id });
+    }
+  }, [myCourses, selected]);
 
-      try {
-        const assigned =
-          await sectionService.getSectionCourses(selectedSection);
-
-        const courseList = Array.isArray(assigned) ? assigned : [];
-
-        setSectionCourses(courseList);
-        setCourses(courseList);
-
-        if (courseList.length > 0) {
-          setSelectedCourse(String(courseList[0].id));
-        } else {
-          setSelectedCourse("");
-        }
-      } catch (err) {
-        console.error("Failed to fetch section courses", err);
-        setSectionCourses([]);
-        setSelectedCourse("");
-      }
-    };
-
-    fetchSectionCourses();
-  }, [selectedSection]);
-
+  // When selected changes, load assessments + students
   useEffect(() => {
-    const fetchCourseGrades = async () => {
-      if (!selectedCourse) {
-        setAssessments([]);
-        setGradesByStudent({});
-        setPendingChanges({});
-        return;
-      }
-
-      setLoading(true);
+    if (!selected) return;
+    const load = async () => {
       try {
-        const res = await api.get(`/courses/${selectedCourse}/grades`);
-        const courseAssessments = res.data?.assessments || [];
-        setAssessments(courseAssessments);
+        setLoading(true);
+        setError(null);
+        setSuccessMsg(null);
+        const [assessRes, studentsRes] = await Promise.all([
+          courseService.assessments(selected.course_id),
+          courseService.courseStudents(selected.course_id, selected.section_id),
+        ]);
+        const assessList = Array.isArray(assessRes) ? assessRes : assessRes?.data || [];
+        const studentList = studentsRes?.students || [];
+        setAssessments(assessList);
+        setStudents(studentList);
 
-        const byStudent = {};
-        courseAssessments.forEach((assessment) => {
-          (assessment.grades || []).forEach((grade) => {
-            if (!byStudent[grade.student_id]) byStudent[grade.student_id] = {};
-            byStudent[grade.student_id][assessment.assessment_id] = Number(
-              grade.score,
-            );
+        // Build initial grades map from students[].grades[]
+        const initial = {};
+        studentList.forEach((s) => {
+          initial[s.id] = {};
+          (s.grades || []).forEach((g) => {
+            initial[s.id][g.assessment_id] = g.score;
           });
         });
-        setGradesByStudent(byStudent);
-        setPendingChanges({});
+        setGrades(initial);
       } catch (err) {
-        console.error("Failed to fetch course grades", err);
-        setAssessments([]);
-        setGradesByStudent({});
+        setError(err.response?.data?.message || t("common.serverError"));
       } finally {
         setLoading(false);
       }
     };
+    load();
+     
+  }, [selected]);
 
-    fetchCourseGrades();
-  }, [selectedCourse]);
-
-  const availableCourses = useMemo(() => {
-    const assignedIds = new Set(sectionCourses.map((c) => String(c.id)));
-    return courses.filter((c) => assignedIds.has(String(c.id)));
-  }, [courses, sectionCourses]);
-
-  const handleGradeChange = (studentId, assessment, value) => {
-    if (!canEdit) return;
-
-    const key = `${studentId}-${assessment.assessment_id}`;
-    const numVal = value === "" ? "" : Number(value);
-    if (
-      numVal !== "" &&
-      (Number.isNaN(numVal) ||
-        numVal < 0 ||
-        numVal > Number(assessment.max_score))
-    )
-      return;
-
-    setPendingChanges((prev) => ({ ...prev, [key]: numVal }));
-  };
-
-  const getLetterGrade = (total) => {
-    if (total >= 90) return "A+";
-    if (total >= 85) return "A";
-    if (total >= 80) return "A-";
-    if (total >= 75) return "B+";
-    if (total >= 70) return "B";
-    if (total >= 65) return "B-";
-    if (total >= 60) return "C+";
-    if (total >= 50) return "C";
-    if (total >= 40) return "D";
-    return "F";
-  };
-
-  const getGradeColor = (grade) => {
-    if (grade.startsWith("A"))
-      return "text-green-600 bg-green-50 border-green-200";
-    if (grade.startsWith("B"))
-      return "text-brand-600 bg-brand-50 border-brand-200";
-    if (grade.startsWith("C"))
-      return "text-amber-600 bg-amber-50 border-amber-200";
-    return "text-red-600 bg-red-50 border-red-200";
-  };
-
-  const getCellValue = (studentId, assessmentId) => {
-    const changeKey = `${studentId}-${assessmentId}`;
-    if (Object.prototype.hasOwnProperty.call(pendingChanges, changeKey)) {
-      return pendingChanges[changeKey];
-    }
-    return gradesByStudent?.[studentId]?.[assessmentId] ?? "";
-  };
-
-  const assessmentsWeightTotal = useMemo(
-    () => assessments.reduce((sum, a) => sum + Number(a.weight || 0), 0),
-    [assessments],
+  const totalWeight = useMemo(
+    () => assessments.reduce((acc, a) => acc + (Number(a.weight) || 0), 0),
+    [assessments]
   );
 
-  const computeWeightedTotal = (studentId) => {
-    if (!assessments.length) return 0;
-
-    let weightedPoints = 0;
-    let totalWeights = 0;
-
+  const computeWeightedScore = (studentId) => {
+    if (assessments.length === 0) return 0;
+    let sum = 0;
     assessments.forEach((a) => {
-      const weight = Number(a.weight || 0);
-      const maxScore = Number(a.max_score || 0);
-      const score = Number(getCellValue(studentId, a.assessment_id));
-
-      totalWeights += weight;
-
-      if (!Number.isNaN(score) && maxScore > 0 && weight > 0) {
-        weightedPoints += (score / maxScore) * weight;
-      }
+      const raw = grades[studentId]?.[a.id];
+      if (raw === undefined || raw === null || raw === "") return;
+      const pct = Math.max(0, Math.min(1, Number(raw) / Number(a.max_score))) || 0;
+      sum += pct * Number(a.weight);
     });
-
-    // Normalize to 100 so grading stays consistent even if configured weights != 100.
-    if (totalWeights <= 0) return 0;
-    return Number(((weightedPoints / totalWeights) * 100).toFixed(2));
+    return Math.round(sum * 100) / 100;
   };
 
-  const filteredStudents = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return students;
-    return students.filter(
-      (s) =>
-        (s.name || "").toLowerCase().includes(q) ||
-        (s.student_id || "").toLowerCase().includes(q),
-    );
-  }, [students, search]);
+  const handleGradeChange = (studentId, assessmentId, value) => {
+    setGrades((prev) => ({
+      ...prev,
+      [studentId]: { ...(prev[studentId] || {}), [assessmentId]: value },
+    }));
+  };
 
-  const hasPendingChanges = useMemo(
-    () => Object.values(pendingChanges).some((v) => v !== ""),
-    [pendingChanges],
-  );
-
-  const handlePublishGrades = async () => {
-    if (!canEdit || saving) return;
-
-    const payloads = Object.entries(pendingChanges)
-      .filter(([, score]) => score !== "")
-      .map(([key, score]) => {
-        const [studentId, assessmentId] = key.split("-");
-        return {
-          student_id: Number(studentId),
-          assessment_id: Number(assessmentId),
-          score: Number(score),
-        };
-      });
-
-    if (!payloads.length) {
-      setMessage("No grade changes to publish.");
-      return;
-    }
-
+  const handleSave = async () => {
     setSaving(true);
-    setMessage("");
+    setError(null);
+    setSuccessMsg(null);
     try {
-      await Promise.all(
-        payloads.map((payload) => api.post("/grades", payload)),
-      );
-      setMessage("Grades published successfully.");
-      setPendingChanges({});
-
-      // Refresh latest saved grades from server
-      const res = await api.get(`/courses/${selectedCourse}/grades`);
-      const byStudent = {};
-      (res.data?.assessments || []).forEach((assessment) => {
-        (assessment.grades || []).forEach((grade) => {
-          if (!byStudent[grade.student_id]) byStudent[grade.student_id] = {};
-          byStudent[grade.student_id][assessment.assessment_id] = Number(
-            grade.score,
-          );
-        });
-      });
-      setAssessments(res.data?.assessments || []);
-      setGradesByStudent(byStudent);
+      const payload = [];
+      for (const s of students) {
+        for (const a of assessments) {
+          const value = grades[s.id]?.[a.id];
+          if (value === undefined) continue;
+          // Treat "" as deletion (null)
+          payload.push({
+            assessment_id: a.id,
+            student_id: s.id,
+            score: value === "" ? null : Number(value),
+          });
+        }
+      }
+      if (payload.length === 0) {
+        setError(t("grades.noChanges"));
+        return;
+      }
+      const res = await gradeService.saveBulk(payload);
+      const okCount = res?.saved_count ?? payload.length;
+      const errs = res?.errors || [];
+      if (errs.length > 0) {
+        setError(
+          errs
+            .map((e) => `${e.assessment_id ?? ""}/${e.student_id ?? ""}: ${e.message || ""}`)
+            .join("\n")
+        );
+      } else {
+        setSuccessMsg(t("grades.savedCount", { count: okCount }));
+      }
     } catch (err) {
-      setMessage(err.response?.data?.message || "Failed to publish grades.");
+      setError(err.response?.data?.message || t("common.serverError"));
     } finally {
       setSaving(false);
     }
   };
 
+  const filteredStudents = useMemo(() => {
+    if (!search) return students;
+    const q = search.toLowerCase();
+    return students.filter(
+      (s) =>
+        s.name?.toLowerCase().includes(q) ||
+        s.student_id?.toLowerCase().includes(q)
+    );
+  }, [students, search]);
+
+  const activeCourse = myCourses.find(
+    (c) => c.course_id === selected?.course_id && c.section_id === selected?.section_id
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">
-            Academic Results
-          </h1>
-          <p className="text-slate-500 font-medium mt-1">
-            {isSuperAdmin
-              ? "View configured assessments and grade sheets"
-              : "Manage grading sheets and compute final scores"}
-          </p>
+          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">{t("grades.title")}</h1>
+          <p className="text-slate-500 font-medium mt-1">{t("grades.subtitle")}</p>
         </div>
         <button
-          type="button"
-          disabled={!canEdit || saving}
-          onClick={handlePublishGrades}
-          className="flex items-center gap-2 bg-gradient-to-r from-brand-600 to-brand-500 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-brand-500/30 hover:-translate-y-0.5 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+          onClick={handleSave}
+          disabled={saving || !selected || students.length === 0}
+          className="flex items-center gap-2 bg-gradient-to-r from-brand-600 to-brand-500 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-brand-500/30 hover:-translate-y-0.5 transition-all disabled:opacity-50"
         >
           <Save className="w-5 h-5" />
-          {saving ? "Publishing..." : canEdit ? "Publish Grades" : "View Only"}
+          {saving ? t("common.saving") : t("grades.saveGrades")}
         </button>
       </div>
-      {message && (
-        <div className="text-sm font-bold text-slate-600 bg-slate-100 px-4 py-3 rounded-xl border border-slate-200">
-          {message}
-        </div>
-      )}
-      {canEdit && hasPendingChanges && (
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-sm font-bold text-amber-800 bg-amber-50 px-4 py-3 rounded-xl border border-amber-200">
-          <span>You have unsaved grade changes.</span>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setPendingChanges({})}
-              className="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 transition-colors"
-            >
-              Discard
-            </button>
-            <button
-              type="button"
-              onClick={handlePublishGrades}
-              disabled={saving}
-              className="px-4 py-2 rounded-lg bg-brand-600 text-white hover:bg-brand-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {saving ? "Saving..." : "Save Changes"}
-            </button>
-          </div>
-        </div>
-      )}
-      {assessments.length > 0 && (
-        <div
-          className={`text-sm font-bold px-4 py-3 rounded-xl border ${Math.round(assessmentsWeightTotal) === 100 ? "text-green-700 bg-green-50 border-green-200" : "text-amber-700 bg-amber-50 border-amber-200"}`}
-        >
-          Assessment weights total: {Number(assessmentsWeightTotal.toFixed(2))}
-          %.
-          {Math.round(assessmentsWeightTotal) !== 100
-            ? " Grades are normalized to /100 automatically."
-            : ""}
-        </div>
-      )}
 
-      <div className="glass-panel p-4 flex flex-wrap sm:flex-nowrap gap-8 items-center border-b-[3px] border-b-brand-500">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-brand-50 rounded-xl flex items-center justify-center text-brand-600">
-            <Layers className="w-5 h-5" />
-          </div>
-          <div>
-            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">
-              Section
-            </label>
-            <select
-              disabled={hasRole("teacher")}
-              className="bg-transparent border-none outline-none font-bold text-slate-700 p-0 cursor-pointer hover:text-brand-600 transition-colors"
-              value={selectedSection}
-              onChange={(e) => setSelectedSection(e.target.value)}
-            >
-              <option value="">Select Section</option>
-              {sections.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="w-px h-10 bg-slate-200 hidden sm:block"></div>
-
+      <div className="glass-panel p-4 flex flex-wrap sm:flex-nowrap gap-4 items-center border-b-[3px] border-b-brand-500">
         <div className="flex items-center gap-3 mr-auto">
-          <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-500">
-            <BookOpen className="w-5 h-5" />
+          <div className="w-12 h-12 bg-brand-50 rounded-xl flex items-center justify-center text-brand-600">
+            <BookOpen className="w-6 h-6" />
           </div>
           <div>
-            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">
-              Active Course
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">
+              {t("grades.activeCourse")}
             </label>
             <select
-              disabled={hasRole("teacher")}
-              className="bg-transparent border-none outline-none font-bold text-slate-700 p-0 cursor-pointer hover:text-brand-600 transition-colors"
-              value={selectedCourse}
-              onChange={(e) => setSelectedCourse(e.target.value)}
+              className="bg-transparent border-none outline-none font-black text-xl text-slate-800 p-0 cursor-pointer hover:text-brand-600 transition-colors"
+              value={selected ? `${selected.course_id}:${selected.section_id ?? ""}` : ""}
+              onChange={(e) => {
+                const [cid, sid] = e.target.value.split(":");
+                setSelected({
+                  course_id: Number(cid),
+                  section_id: sid ? Number(sid) : null,
+                });
+              }}
             >
-              <option value="">Select Course</option>
-              {availableCourses.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
+              {myCourses.length === 0 ? (
+                <option value="">{t("grades.noCourses")}</option>
+              ) : (
+                myCourses.map((c) => (
+                  <option
+                    key={`${c.course_id}:${c.section_id ?? ""}`}
+                    value={`${c.course_id}:${c.section_id ?? ""}`}
+                  >
+                    {c.course_name}{c.section_name ? ` · ${c.section_name}` : ""}
+                  </option>
+                ))
+              )}
             </select>
+            {activeCourse?.program_type && (
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                {translateTrack(
+                  t,
+                  typeof activeCourse.program_type === "string"
+                    ? activeCourse.program_type
+                    : activeCourse.program_type?.name,
+                )}
+              </p>
+            )}
           </div>
         </div>
         <div className="relative w-full sm:w-64">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
+            placeholder={t("grades.searchStudent")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search student..."
             className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm font-medium bg-white outline-none focus:border-brand-500"
           />
         </div>
-        <button className="p-2 border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50 bg-white">
-          <Filter className="w-4 h-4" />
-        </button>
       </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 whitespace-pre-line">
+          {error}
+        </div>
+      )}
+      {successMsg && (
+        <div className="bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg px-4 py-3">
+          {successMsg}
+        </div>
+      )}
+
+      {assessments.length > 0 && Math.abs(totalWeight - 100) > 0.01 && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg px-4 py-3">
+          {t("grades.weightWarning", { sum: totalWeight })}
+        </div>
+      )}
 
       <div className="glass-panel overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-200/60 text-slate-500 text-xs uppercase tracking-widest font-bold">
-                <th className="px-6 py-4">Student</th>
-                {assessments.map((assessment) => (
-                  <th key={assessment.assessment_id} className="px-6 py-4 w-36">
-                    {assessment.assessment_title}
+                <th className="px-6 py-4">{t("grades.student")}</th>
+                {assessments.map((a) => (
+                  <th key={a.id} className="px-4 py-4 w-36">
+                    {a.title}{" "}
                     <span className="text-slate-400 normal-case tracking-normal ml-1">
-                      ({assessment.weight}% / {assessment.max_score})
+                      ({a.weight}% · /{a.max_score})
                     </span>
                   </th>
                 ))}
-                <th className="px-6 py-4 w-32 text-center">Total Score</th>
-                <th className="px-6 py-4 w-24 text-center">Grade</th>
+                <th className="px-4 py-4 w-28 text-center">{t("grades.total")}</th>
+                <th className="px-4 py-4 w-20 text-center">{t("grades.letter")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td
-                    colSpan={Math.max(3, assessments.length + 3)}
-                    className="px-6 py-12 text-center text-slate-400 font-bold animate-pulse"
-                  >
-                    Loading...
+                  <td colSpan={assessments.length + 3} className="px-6 py-12 text-center text-slate-500">
+                    {t("common.loading")}
                   </td>
                 </tr>
               ) : filteredStudents.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={Math.max(3, assessments.length + 3)}
-                    className="px-6 py-12 text-center text-slate-400 font-bold"
-                  >
-                    No students found in this section
-                  </td>
-                </tr>
-              ) : availableCourses.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={Math.max(3, assessments.length + 3)}
-                    className="px-6 py-12 text-center text-slate-400 font-bold"
-                  >
-                    No course is assigned to this section
-                  </td>
-                </tr>
-              ) : assessments.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={Math.max(3, assessments.length + 3)}
-                    className="px-6 py-12 text-center text-slate-400 font-bold"
-                  >
-                    No assessments configured for this course
+                  <td colSpan={assessments.length + 3} className="px-6 py-12 text-center text-slate-500">
+                    {t("grades.noStudents")}
                   </td>
                 </tr>
               ) : (
                 filteredStudents.map((s) => {
-                  const total = computeWeightedTotal(s.id);
-                  const letter = getLetterGrade(total);
+                  const pct = computeWeightedScore(s.id);
+                  const letter = getLetterGrade(pct);
                   return (
-                    <tr
-                      key={s.id}
-                      className="hover:bg-slate-50/50 transition-colors group"
-                    >
+                    <tr key={s.id} className="hover:bg-slate-50/50 transition-colors group">
                       <td className="px-6 py-4">
                         <p className="font-bold text-slate-800">{s.name}</p>
-                        <p className="text-xs font-semibold text-slate-500">
-                          {s.student_id}
-                        </p>
+                        <p className="text-xs font-semibold text-slate-500">{s.student_id}</p>
                       </td>
-                      {assessments.map((assessment) => (
-                        <td
-                          key={`${s.id}-${assessment.assessment_id}`}
-                          className="px-6 py-4"
-                        >
+                      {assessments.map((a) => (
+                        <td key={a.id} className="px-4 py-4">
                           <input
                             type="number"
-                            max={assessment.max_score}
-                            min="0"
-                            disabled={!canEdit}
-                            value={getCellValue(s.id, assessment.assessment_id)}
-                            onChange={(e) =>
-                              handleGradeChange(
-                                s.id,
-                                assessment,
-                                e.target.value,
-                              )
+                            min={0}
+                            max={a.max_score}
+                            step="0.01"
+                            value={
+                              grades[s.id]?.[a.id] === undefined || grades[s.id]?.[a.id] === null
+                                ? ""
+                                : grades[s.id][a.id]
                             }
-                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-center font-bold text-slate-700 outline-none focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-500/20 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+                            onChange={(e) => handleGradeChange(s.id, a.id, e.target.value)}
+                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-center font-bold text-slate-700 outline-none focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-500/20 transition-all"
                           />
                         </td>
                       ))}
-                      <td className="px-6 py-4 text-center">
-                        <span className="text-xl font-black text-slate-800">
-                          {total}
-                        </span>
-                        <span className="text-xs font-bold text-slate-400">
-                          /100
-                        </span>
+                      <td className="px-4 py-4 text-center">
+                        <span className="text-xl font-black text-slate-800">{pct}</span>
+                        <span className="text-xs font-bold text-slate-400">/100</span>
                       </td>
-                      <td className="px-6 py-4 text-center">
-                        <span
-                          className={`inline-flex items-center justify-center w-10 h-10 rounded-xl border text-xl font-black ${getGradeColor(letter)}`}
-                        >
+                      <td className="px-4 py-4 text-center">
+                        <span className={`inline-flex items-center justify-center w-10 h-10 rounded-xl border text-xl font-black ${getGradeColor(letter)}`}>
                           {letter}
                         </span>
                       </td>
