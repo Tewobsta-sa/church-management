@@ -8,7 +8,7 @@ import {
 import { AuthProvider, useAuth } from "./context/AuthContext";
 
 import Login from "./pages/auth/login";
-import Setup from "./pages/auth/Setup";
+import Setup from "./pages/auth/setup";
 import Dashboard from "./pages/dashboard/Dashboard";
 import StudentsList from "./pages/students/StudentsList";
 import StudentPromotion from "./pages/students/StudentPromotion";

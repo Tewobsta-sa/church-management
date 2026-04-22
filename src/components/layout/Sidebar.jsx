@@ -21,13 +21,13 @@ import clsx from "clsx";
 const navItems = [
   {
     path: "/users",
-    label: "Admin",
+    labelKey: "nav.Admin",
     icon: Settings,
     roles: ["super_admin"],
   },
   {
     path: "/students",
-    label: "Students",
+    labelKey: "nav.Students",
     icon: Users,
     roles: [
       "gngnunet_office_admin",
@@ -38,31 +38,31 @@ const navItems = [
   },
   {
     path: "/teachers",
-    label: "Teachers",
+    labelKey: "nav.Teachers",
     icon: UserCheck,
     roles: ["tmhrt_office_admin", "super_admin"],
   },
   {
     path: "/promotions",
-    label: "Promotions",
+    labelKey: "nav.Promotions",
     icon: Award,
     roles: ["gngnunet_office_admin", "tmhrt_office_admin", "super_admin"],
   },
   {
     path: "/courses",
-    label: "Courses",
+    labelKey: "nav.Courses",
     icon: BookOpen,
     roles: ["tmhrt_office_admin", "super_admin"],
   },
   {
     path: "/sections",
-    label: "Sections",
+    labelKey: "nav.Sections",
     icon: Layers,
     roles: ["tmhrt_office_admin", "super_admin"],
   },
   {
     path: "/assignments",
-    label: "Schedules",
+    labelKey: "nav.Schedules",
     icon: Calendar,
     roles: [
       "tmhrt_office_admin",
@@ -73,7 +73,7 @@ const navItems = [
   },
   {
     path: "/attendance",
-    label: "Attendance",
+    labelKey: "nav.Attendance",
     icon: CheckSquare,
     roles: [
       "teacher",
@@ -84,31 +84,31 @@ const navItems = [
   },
   {
     path: "/grades",
-    label: "Grading",
+    labelKey: "nav.Grading",
     icon: CheckSquare,
     roles: ["teacher", "tmhrt_office_admin", "super_admin"],
   },
   {
     path: "/results",
-    label: "Results",
+    labelKey: "nav.Results",
     icon: Award,
     roles: ["tmhrt_office_admin", "super_admin"],
   },
   {
     path: "/mezmur",
-    label: "Mezmur Ministry",
+    labelKey: "nav.Mezmur Ministry",
     icon: Music,
     roles: ["mezmur_office_admin", "super_admin"],
   },
   {
     path: "/reports",
-    label: "Reports",
+    labelKey: "nav.Reports",
     icon: FileDown,
     roles: ["super_admin", "tmhrt_office_admin", "gngnunet_office_admin"],
   },
   {
     path: "/security",
-    label: "Security",
+    labelKey: "nav.Security",
     icon: ShieldCheck,
     roles: ["*"],
   },
@@ -171,10 +171,10 @@ export default function Sidebar() {
           </div>
           <div>
             <h1 className="text-xl font-bold tracking-tight text-brand-50 font-sans">
-              MGT System
+              {t("app.name")}
             </h1>
             <p className="text-brand-300 text-[11px] uppercase tracking-wider font-semibold mt-0.5 opacity-80">
-              Administration
+              {t("app.subtitle")}
             </p>
           </div>
         </NavLink>
@@ -212,7 +212,9 @@ export default function Sidebar() {
                         : "text-brand-400/50 group-hover:text-brand-300",
                     )}
                   />
-                  <span className="tracking-wide text-sm">{t(item.label)}</span>
+                  <span className="tracking-wide text-sm">
+                    {t(item.labelKey)}
+                  </span>
                 </>
               )}
             </NavLink>
@@ -227,20 +229,19 @@ export default function Sidebar() {
             </div>
             <div className="overflow-hidden">
               <p className="font-medium text-sm truncate">
-                {user?.name || "Administrator"}
+                {user?.name || t("nav.Admin")}
               </p>
               <p className="text-xs text-brand-400 truncate opacity-80">
-                {user?.roles?.map((r) => r.name).join(" • ") ||
-                  "No active role"}
+                {user?.roles?.map((r) => r.name).join(" • ") || ""}
               </p>
             </div>
           </div>
           <button
             onClick={logout}
-            className="w-full flex items-center justify-center px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl transition-all duration-200 text-sm font-medium border border-red-500/20 hover:border-red-500/30"
+            className="w-full flex items-center justify-center gap-2 p-3 text-sm font-medium rounded-xl bg-red-900/20 text-red-300 border border-red-800/20 hover:bg-red-900/40 hover:text-red-200 transition-all group"
           >
-            <LogOut className="w-4 h-4 mr-2" />
-            Sign Out
+            <LogOut className="h-4 w-4 group-hover:scale-110 transition-transform" />
+            {t("nav.Logout")}
           </button>
         </div>
       </div>

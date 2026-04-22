@@ -1,33 +1,39 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Plus, Edit2, Trash2, Search, Filter, BookOpen, Layers, Save, X, Calculator } from 'lucide-react';
-import { courseService } from '../../services/courseService';
-import { useAuth } from '../../context/AuthContext';
+import { useEffect, useMemo, useState } from "react";
+import { Plus, Edit2, Trash2, Search, Filter, BookOpen } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { useAuth } from "../../context/AuthContext";
+import { courseService } from "../../services/courseService";
+import { sectionService } from "../../services/sectionService";
+import CourseModal from "./CourseModal";
+import { translateTrack } from "../../i18n/tracks";
 
 export default function CoursesManagement() {
+  const { t } = useTranslation();
   const { hasRole } = useAuth();
-  const navigate = useNavigate();
+
   const [courses, setCourses] = useState([]);
+  const [programTypes, setProgramTypes] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState('');
-  
-  // Modal states
-  const [courseModalOpen, setCourseModalOpen] = useState(false);
-  const [assessmentModalOpen, setAssessmentModalOpen] = useState(false);
-  const [selectedCourse, setSelectedCourse] = useState(null);
-  
-  const [formData, setFormData] = useState({ name: '', credit_hour: '', duration: '', program_type_name: 'Young' });
-  const [assessments, setAssessments] = useState([]);
-  const [newAssessment, setNewAssessment] = useState({ title: '', max_score: 0, weight: 0 });
+  const [error, setError] = useState(null);
+  const [search, setSearch] = useState("");
+  const [programFilter, setProgramFilter] = useState("");
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+
+  const canManage =
+    hasRole("tmhrt_office_admin") ||
+    hasRole("distance_admin") ||
+    hasRole("super_admin");
 
   const fetchCourses = async () => {
-    setLoading(true);
     try {
-      const data = await courseService.getCourses();
-      // Filter for Young track only as per request
-      setCourses(data.filter(c => c.program_type?.name === 'Young'));
-    } catch (err) {
-      console.error("Failed to fetch courses", err);
+      setLoading(true);
+      setError(null);
+      const data = await courseService.list();
+      setCourses(Array.isArray(data) ? data : data?.data || []);
+    } catch {
+      setError(t("common.serverError"));
     } finally {
       setLoading(false);
     }
@@ -35,295 +41,188 @@ export default function CoursesManagement() {
 
   useEffect(() => {
     fetchCourses();
+    sectionService
+      .getProgramTypes()
+      .then((data) => setProgramTypes(Array.isArray(data) ? data : data?.data || []))
+      .catch(() => setProgramTypes([]));
+     
   }, []);
 
-  const openCourseModal = (course = null) => {
-    if (course) {
-      setSelectedCourse(course);
-      setFormData({ 
-        name: course.name, 
-        credit_hour: course.credit_hour, 
-        duration: course.duration, 
-        program_type_name: 'Young' 
-      });
-    } else {
-      setSelectedCourse(null);
-      setFormData({ name: '', credit_hour: '', duration: '', program_type_name: 'Young' });
-    }
-    setCourseModalOpen(true);
-  };
+  const filtered = useMemo(() => {
+    return courses.filter((c) => {
+      const matchesSearch =
+        !search ||
+        c.name?.toLowerCase().includes(search.toLowerCase());
+      const matchesProgram =
+        !programFilter ||
+        c.program_type?.name === programFilter ||
+        c.programType?.name === programFilter;
+      return matchesSearch && matchesProgram;
+    });
+  }, [courses, search, programFilter]);
 
-  const handleCourseSubmit = async (e) => {
-    e.preventDefault();
+  const handleDelete = async (course) => {
+    if (!window.confirm(t("courses.confirmDelete"))) return;
     try {
-      if (selectedCourse) {
-        await courseService.updateCourse(selectedCourse.id, formData);
-      } else {
-        await courseService.createCourse(formData);
-      }
-      setCourseModalOpen(false);
+      await courseService.remove(course.id);
       fetchCourses();
     } catch (err) {
-      alert("Error saving course");
+      alert(err.response?.data?.message || t("common.serverError"));
     }
   };
-
-  const openAssessmentModal = async (course) => {
-    setSelectedCourse(course);
-    setAssessmentModalOpen(true);
-    try {
-      const data = await courseService.getAssessments(course.id);
-      setAssessments(data || []);
-    } catch (err) {
-      setAssessments([]);
-    }
-  };
-
-  const handleAddAssessment = async () => {
-    if (!newAssessment.title || !newAssessment.weight) return;
-    try {
-      const weightNum = Number(newAssessment.weight);
-      if (Number.isNaN(weightNum) || weightNum <= 0) {
-        alert("Assessment weight must be greater than 0");
-        return;
-      }
-
-      // Rule: component weight also defines its max score (e.g. weight 30 -> score out of 30).
-      await courseService.createAssessment({
-        ...newAssessment,
-        course_id: selectedCourse.id,
-        weight: weightNum,
-        max_score: weightNum,
-      });
-      setNewAssessment({ title: '', max_score: 0, weight: 0 });
-      const data = await courseService.getAssessments(selectedCourse.id);
-      setAssessments(data || []);
-    } catch (err) {
-      alert("Error adding assessment");
-    }
-  };
-
-  const handleDeleteAssessment = async (id) => {
-    if(!confirm("Delete this assessment?")) return;
-    try {
-      await courseService.deleteAssessment(id);
-      const data = await courseService.getAssessments(selectedCourse.id);
-      setAssessments(data || []);
-    } catch (err) {
-      alert("Error deleting assessment");
-    }
-  };
-
-  const totalWeight = (Array.isArray(assessments) ? assessments : []).reduce((sum, a) => sum + (Number(a.weight) || 0), 0);
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Young Program Curriculum</h1>
-          <p className="text-slate-500 font-medium mt-1">Manage courses and weighted assessment structures</p>
+          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">{t("courses.title")}</h1>
+          <p className="text-slate-500 font-medium mt-1">{t("courses.subtitle")}</p>
         </div>
-        <div className="flex gap-3">
+        {canManage && (
           <button
-            onClick={() => navigate('/sections')}
-            className="flex items-center gap-2 bg-white text-slate-700 px-5 py-2.5 rounded-xl font-bold shadow-sm border border-slate-200 hover:bg-slate-50 transition-all"
-          >
-            <Layers className="w-5 h-5 text-brand-500" />
-            Manage Sections
-          </button>
-          <button
-            onClick={() => openCourseModal()}
-            className="flex items-center gap-2 bg-gradient-to-r from-brand-700 to-brand-500 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-brand-500/30 hover:-translate-y-0.5 transition-all"
+            onClick={() => { setEditing(null); setModalOpen(true); }}
+            className="flex items-center gap-2 bg-gradient-to-r from-brand-600 to-brand-500 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-brand-500/30 hover:-translate-y-0.5 transition-all"
           >
             <Plus className="w-5 h-5" />
-            Create New Course
+            {t("courses.createCourse")}
           </button>
-        </div>
-      </div>
-
-      {/* Courses Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {loading ? (
-           <div className="col-span-full py-20 text-center font-bold text-slate-400">Loading curriculum...</div>
-        ) : courses.length === 0 ? (
-           <div className="col-span-full py-20 text-center font-bold text-slate-400">No courses found for the Young track.</div>
-        ) : (
-          courses.map(course => (
-            <div key={course.id} className="glass-panel group hover:border-brand-300 transition-all flex flex-col">
-              <div className="p-6 flex-1">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="p-3 bg-brand-50 text-brand-600 rounded-2xl">
-                    <BookOpen className="w-6 h-6" />
-                  </div>
-                  <div className="flex gap-1">
-                    <button onClick={() => openCourseModal(course)} className="p-2 text-slate-300 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-all">
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button onClick={async () => { if(confirm("Delete course?")) { await courseService.deleteCourse(course.id); fetchCourses(); } }} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-                <h3 className="text-xl font-black text-slate-800 leading-tight mb-1">{course.name}</h3>
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-widest">
-                  <span>{course.credit_hour} Credit Hours</span>
-                  <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
-                  <span>{course.duration} Months</span>
-                </div>
-              </div>
-              <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-100 flex justify-between items-center rounded-b-3xl">
-                <button 
-                  onClick={() => openAssessmentModal(course)}
-                  className="flex items-center gap-1.5 text-xs font-black text-brand-600 uppercase tracking-wider hover:text-brand-700 transition-colors"
-                >
-                  <Layers className="w-4 h-4" />
-                  Manage Assessments
-                </button>
-                <span className="text-[10px] font-black uppercase text-slate-400">Young Track</span>
-              </div>
-            </div>
-          ))
         )}
       </div>
 
-      {/* Course Modal */}
-      {courseModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md transform transition-all animate-[slide-up_0.3s_ease-out]">
-             <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center">
-                <h2 className="text-2xl font-black text-slate-800">{selectedCourse ? 'Edit Course' : 'New Course'}</h2>
-                <button onClick={() => setCourseModalOpen(false)}><X className="w-6 h-6 text-slate-400" /></button>
-             </div>
-             <form onSubmit={handleCourseSubmit} className="p-8 space-y-4">
-                <div>
-                   <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest block mb-2">Course Name</label>
-                   <input 
-                     required
-                     value={formData.name}
-                     onChange={e => setFormData({...formData, name: e.target.value})}
-                     className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 transition-all font-bold"
-                     placeholder="e.g. Intro to Theology"
-                   />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest block mb-2">Credit Hours</label>
-                    <input 
-                      type="number"
-                      required
-                      value={formData.credit_hour}
-                      onChange={e => setFormData({...formData, credit_hour: e.target.value})}
-                      className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-brand-500 transition-all font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest block mb-2">Duration (Months)</label>
-                    <input 
-                      type="number"
-                      required
-                      value={formData.duration}
-                      onChange={e => setFormData({...formData, duration: e.target.value})}
-                      className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-brand-500 transition-all font-bold"
-                    />
-                  </div>
-                </div>
-                <button type="submit" className="w-full py-4 bg-slate-800 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-slate-700 transition-all shadow-xl shadow-slate-200">
-                  {selectedCourse ? 'Update Course' : 'Create Course'}
-                </button>
-             </form>
+      <div className="glass-panel p-3 flex flex-wrap sm:flex-nowrap gap-3 items-center">
+        <div className="relative w-full sm:flex-1 max-w-sm">
+          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+            <Search className="h-5 w-5" />
           </div>
+          <input
+            type="text"
+            placeholder={t("common.search") + "…"}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-11 pr-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:border-brand-500 outline-none focus:ring-4 focus:ring-brand-500/10 transition-all text-sm font-medium"
+          />
         </div>
-      )}
-
-      {/* Assessment Modal */}
-      {assessmentModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl transform transition-all flex flex-col max-h-[90vh]">
-             <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center shrink-0">
-                <div>
-                  <h2 className="text-2xl font-black text-slate-800">Weights & Assessments</h2>
-                  <p className="text-xs font-bold text-brand-600 uppercase tracking-widest">{selectedCourse?.name}</p>
-                </div>
-                <button onClick={() => setAssessmentModalOpen(false)}><X className="w-6 h-6 text-slate-400" /></button>
-             </div>
-             
-             <div className="p-8 overflow-y-auto">
-                {/* Total Weight Alert */}
-                <div className={`mb-6 p-4 rounded-2xl border flex items-center justify-between ${totalWeight === 100 ? 'bg-green-50 border-green-100 text-green-700' : 'bg-amber-50 border-amber-100 text-amber-700'}`}>
-                   <div className="flex items-center gap-3">
-                      <Calculator className="w-5 h-5" />
-                      <div>
-                        <span className="font-black uppercase text-xs tracking-wider">Total Combined Weight:</span>
-                        <span className="ml-2 font-black text-lg">{totalWeight}%</span>
-                      </div>
-                   </div>
-                   {totalWeight !== 100 && (
-                     <span className="text-[10px] font-black uppercase tracking-tighter opacity-70">Should equal 100%</span>
-                   )}
-                </div>
-
-                {/* List */}
-                <div className="space-y-3 mb-8">
-                   {assessments.length === 0 ? (
-                     <p className="text-center py-6 text-slate-400 font-bold uppercase text-[10px] tracking-widest border-2 border-dashed border-slate-100 rounded-2xl">No assessments defined yet</p>
-                   ) : (
-                     assessments.map(a => (
-                       <div key={a.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
-                          <div>
-                            <p className="font-black text-slate-800">{a.title}</p>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Max Score: {a.max_score}</p>
-                          </div>
-                          <div className="flex items-center gap-4">
-                             <div className="px-3 py-1 bg-white border border-slate-200 rounded-lg font-black text-brand-600">
-                                {a.weight}%
-                             </div>
-                             <button onClick={() => handleDeleteAssessment(a.id)} className="text-slate-300 hover:text-red-500 transition-colors">
-                                <Trash2 className="w-4 h-4" />
-                             </button>
-                          </div>
-                       </div>
-                     ))
-                   )}
-                </div>
-
-                {/* Add Form */}
-                <div className="bg-slate-50 p-6 rounded-2xl border-2 border-slate-200 border-dashed">
-                   <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Add New Assessment</h4>
-                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                      <div className="lg:col-span-2">
-                        <input 
-                          placeholder="e.g. Midterm Exam"
-                          value={newAssessment.title}
-                          onChange={e => setNewAssessment({...newAssessment, title: e.target.value})}
-                          className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-brand-500 font-bold text-sm"
-                        />
-                      </div>
-                      <div>
-                        <input 
-                          type="number"
-                          placeholder="Weight %"
-                          value={newAssessment.weight || ''}
-                          onChange={e => setNewAssessment({...newAssessment, weight: e.target.value})}
-                          className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-brand-500 font-bold text-sm text-center"
-                        />
-                      </div>
-                      <button 
-                        onClick={handleAddAssessment}
-                        className="bg-brand-600 text-white rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-brand-700 transition-all"
-                      >
-                         Add Component
-                      </button>
-                   </div>
-                </div>
-             </div>
-
-             <div className="p-8 border-t border-slate-100 bg-slate-50 rounded-b-3xl">
-                <button onClick={() => setAssessmentModalOpen(false)} className="w-full py-4 bg-slate-800 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-slate-200">Done</button>
-             </div>
+        <div className="relative w-full sm:w-64">
+          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+            <Filter className="h-4 w-4" />
           </div>
+          <select
+            value={programFilter}
+            onChange={(e) => setProgramFilter(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:border-brand-500 outline-none focus:ring-4 focus:ring-brand-500/10 transition-all text-sm font-bold text-slate-700"
+          >
+            <option value="">{t("common.all")} {t("common.programType")}</option>
+            {programTypes.map((pt) => (
+              <option key={pt.id} value={pt.name}>{translateTrack(t, pt.name)}</option>
+            ))}
+          </select>
         </div>
-      )}
+      </div>
+
+      <div className="glass-panel overflow-hidden">
+        <table className="w-full text-left">
+          <thead>
+            <tr className="bg-slate-50/50 border-b border-slate-200/60 text-slate-500 text-sm tracking-wide">
+              <th className="px-6 py-4 font-semibold">{t("courses.fields.name")}</th>
+              <th className="px-6 py-4 font-semibold">{t("courses.fields.programType")}</th>
+              <th className="px-6 py-4 font-semibold">{t("courses.fields.creditHour")}</th>
+              <th className="px-6 py-4 font-semibold">{t("courses.assessments.title")}</th>
+              <th className="px-6 py-4 font-semibold text-right">{t("common.actions")}</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {loading ? (
+              <tr><td colSpan="5" className="text-center py-10 font-medium text-slate-500">{t("common.loading")}</td></tr>
+            ) : error ? (
+              <tr><td colSpan="5" className="text-center py-10 font-medium text-red-500">{error}</td></tr>
+            ) : filtered.length === 0 ? (
+              <tr>
+                <td colSpan="5" className="text-center py-10 font-medium text-slate-500">
+                  <BookOpen className="mx-auto w-10 h-10 text-slate-300 mb-2" />
+                  {t("courses.noCourses")}
+                </td>
+              </tr>
+            ) : (
+              filtered.map((course) => {
+                const assessments = course.assessments || [];
+                const weightsSum = assessments.reduce((a, b) => a + (Number(b.weight) || 0), 0);
+                return (
+                  <tr key={course.id} className="hover:bg-slate-50/50 transition-colors group">
+                    <td className="px-6 py-4">
+                      <div className="font-bold text-slate-800">{course.name}</div>
+                      <div className="text-xs font-semibold text-slate-400">
+                        {t("courses.fields.duration")}: {course.duration}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="px-2.5 py-1 rounded-md text-xs font-bold bg-brand-50 text-brand-700 border border-brand-100">
+                        {translateTrack(
+                          t,
+                          course.program_type?.name || course.programType?.name,
+                        ) || "—"}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 font-semibold text-slate-600">{course.credit_hour}</td>
+                    <td className="px-6 py-4">
+                      {assessments.length === 0 ? (
+                        <span className="text-xs text-slate-400">{t("common.none")}</span>
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {assessments.map((a) => (
+                            <span
+                              key={a.id || a.title}
+                              className="px-2 py-0.5 bg-slate-100 text-slate-700 text-[11px] rounded"
+                              title={`${a.title} · ${a.max_score} ${t("grades.maxShort")}`}
+                            >
+                              {a.title} {a.weight}%
+                            </span>
+                          ))}
+                          <span
+                            className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
+                              Math.abs(weightsSum - 100) < 0.01
+                                ? "bg-green-50 text-green-700"
+                                : "bg-red-50 text-red-700"
+                            }`}
+                          >
+                            Σ {weightsSum}%
+                          </span>
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      {canManage && (
+                        <div className="flex gap-2 justify-end opacity-70 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => { setEditing(course); setModalOpen(true); }}
+                            className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
+                            title={t("courses.editCourse")}
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(course)}
+                            className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                            title={t("courses.deleteCourse")}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <CourseModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        course={editing}
+        onSuccess={fetchCourses}
+      />
     </div>
   );
 }
