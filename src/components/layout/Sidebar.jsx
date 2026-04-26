@@ -8,7 +8,6 @@ import {
   Calendar,
   CheckSquare,
   Award,
-  Music,
   Settings,
   FileDown,
   ShieldCheck,
@@ -95,12 +94,6 @@ const navItems = [
     roles: ["tmhrt_office_admin", "super_admin"],
   },
   {
-    path: "/mezmur",
-    labelKey: "nav.Mezmur Ministry",
-    icon: Music,
-    roles: ["mezmur_office_admin", "super_admin"],
-  },
-  {
     path: "/reports",
     labelKey: "nav.Reports",
     icon: FileDown,
@@ -129,7 +122,7 @@ export default function Sidebar() {
     super_admin: "/dashboard",
     tmhrt_office_admin: "/students",
     teacher: "/assignments",
-    mezmur_office_admin: "/mezmur",
+    mezmur_office_admin: "/dashboard",
     gngnunet_office_admin: "/students",
   };
 

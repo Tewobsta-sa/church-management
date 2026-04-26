@@ -115,8 +115,17 @@ export default function Login() {
               )}
             </button>
           </form>
-          
-          <div className="mt-8 text-center">
+
+          <div className="mt-6 text-center">
+            <Link
+              to="/forgot-password"
+              className="text-sm font-semibold text-brand-600 hover:text-brand-700 transition-colors"
+            >
+              {t("auth.forgotPassword")}
+            </Link>
+          </div>
+
+          <div className="mt-6 text-center">
             <p className="text-xs text-slate-400">Restricted system. Authorized personnel only.</p>
           </div>
         </div>

@@ -19,7 +19,7 @@ import LiveAttendance from "./pages/academic/LiveAttendance";
 import Grades from "./pages/academic/Grades";
 import ResultsDashboard from "./pages/academic/ResultsDashboard";
 import ReportsHub from "./pages/academic/ReportsHub";
-import MezmurMinistry from "./pages/mezmur/MezmurMinistry";
+// Mezmur module hidden from frontend per request—files retained on disk for later re-enable
 import AppLayout from "./components/layout/AppLayout";
 import SectionsManagement from "./pages/sections/SectionsManagement";
 import SecuritySettings from "./pages/admin/SecuritySettings";
@@ -32,7 +32,7 @@ const getDefaultRouteForRole = (role) => {
   const roleRedirects = {
     super_admin: "/dashboard",
     gngnunet_office_admin: "/students",
-    mezmur_office_admin: "/mezmur",
+    mezmur_office_admin: "/dashboard",
     tmhrt_office_admin: "/students",
     distance_admin: "/students",
     teacher: "/assignments",
@@ -257,14 +257,6 @@ function App() {
               element={
                 <RoleRoute allowedRoles={["super_admin", "tmhrt_office_admin"]}>
                   <ResultsDashboard />
-                </RoleRoute>
-              }
-            />
-            <Route
-              path="/mezmur"
-              element={
-                <RoleRoute allowedRoles={["super_admin", "mezmur_office_admin"]}>
-                  <MezmurMinistry />
                 </RoleRoute>
               }
             />

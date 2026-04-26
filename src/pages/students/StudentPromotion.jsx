@@ -29,6 +29,21 @@ export default function StudentPromotion() {
 
   useEffect(() => {
     fetchCandidates();
+
+    // Near real-time refresh: re-fetch on focus and every 30s while the page is open.
+    const onFocus = () => fetchCandidates();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") fetchCandidates();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
+    const interval = setInterval(fetchCandidates, 30_000);
+
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
+      clearInterval(interval);
+    };
   }, []);
 
   const handleToggleSelect = (id) => {

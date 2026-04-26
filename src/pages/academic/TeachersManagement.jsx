@@ -18,6 +18,7 @@ export default function TeachersManagement() {
   const [formData, setFormData] = useState({
     name: '',
     username: '',
+    phone_number: '',
     password: '',
     password_confirmation: '',
     security_question: 'What was the name of your first school?',
@@ -54,6 +55,7 @@ export default function TeachersManagement() {
       setFormData({
         name: teacher.name,
         username: teacher.username,
+        phone_number: teacher.phone_number || '',
         password: '',
         password_confirmation: '',
         security_question: teacher.security_question || 'What was the name of your first school?',
@@ -65,6 +67,7 @@ export default function TeachersManagement() {
       setFormData({
         name: '',
         username: '',
+        phone_number: '',
         password: '',
         password_confirmation: '',
         security_question: 'What was the name of your first school?',
@@ -175,6 +178,9 @@ export default function TeachersManagement() {
                   <div className="overflow-hidden">
                     <h3 className="font-extrabold text-slate-800 text-lg truncate group-hover:text-brand-600 transition-colors">{teacher.name}</h3>
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">@{teacher.username}</p>
+                    {teacher.phone_number && (
+                      <p className="text-xs font-medium text-slate-500 mt-0.5">{teacher.phone_number}</p>
+                    )}
                   </div>
                </div>
 
@@ -243,6 +249,16 @@ export default function TeachersManagement() {
                             onChange={e => setFormData({...formData, username: e.target.value})}
                             placeholder="username"
                             disabled={selectedTeacher}
+                        />
+                        </div>
+                        <div>
+                        <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 ml-1">Phone Number</label>
+                        <input
+                            type="tel"
+                            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl outline-none focus:border-brand-500 transition-all font-bold text-slate-700 placeholder:font-medium placeholder:opacity-50 shadow-sm"
+                            value={formData.phone_number}
+                            onChange={e => setFormData({...formData, phone_number: e.target.value})}
+                            placeholder="+251 9XX XXX XXX"
                         />
                         </div>
                         <div>

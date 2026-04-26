@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, Save, BookOpen } from "lucide-react";
+import { Search, Save, BookOpen, Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../../context/AuthContext";
 import { courseService } from "../../services/courseService";
 import { gradeService } from "../../services/gradeService";
 import { translateTrack } from "../../i18n/tracks";
+import BulkImportGrades from "./BulkImportGrades";
 
 /**
  * Letter grade based on percentage (0-100).
@@ -46,6 +47,7 @@ export default function Grades() {
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
   const [search, setSearch] = useState("");
+  const [importOpen, setImportOpen] = useState(false);
 
   // Load the teacher's courses (or admin view: all courses with assessments)
   useEffect(() => {
@@ -207,14 +209,25 @@ export default function Grades() {
           <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">{t("grades.title")}</h1>
           <p className="text-slate-500 font-medium mt-1">{t("grades.subtitle")}</p>
         </div>
-        <button
-          onClick={handleSave}
-          disabled={saving || !selected || students.length === 0}
-          className="flex items-center gap-2 bg-gradient-to-r from-brand-600 to-brand-500 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-brand-500/30 hover:-translate-y-0.5 transition-all disabled:opacity-50"
-        >
-          <Save className="w-5 h-5" />
-          {saving ? t("common.saving") : t("grades.saveGrades")}
-        </button>
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={() => setImportOpen(true)}
+            disabled={!selected || assessments.length === 0}
+            className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-5 py-2.5 rounded-xl font-bold shadow-sm hover:bg-slate-50 transition-all disabled:opacity-50"
+          >
+            <Upload className="w-5 h-5" />
+            {t("grades.bulkImport.button")}
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving || !selected || students.length === 0}
+            className="flex items-center gap-2 bg-gradient-to-r from-brand-600 to-brand-500 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-brand-500/30 hover:-translate-y-0.5 transition-all disabled:opacity-50"
+          >
+            <Save className="w-5 h-5" />
+            {saving ? t("common.saving") : t("grades.saveGrades")}
+          </button>
+        </div>
       </div>
 
       <div className="glass-panel p-4 flex flex-wrap sm:flex-nowrap gap-4 items-center border-b-[3px] border-b-brand-500">
@@ -366,6 +379,19 @@ export default function Grades() {
           </table>
         </div>
       </div>
+
+      {importOpen && selected && (
+        <BulkImportGrades
+          courseId={selected.course_id}
+          courseName={activeCourse?.course_name}
+          sectionId={selected.section_id}
+          onClose={() => setImportOpen(false)}
+          onSuccess={() => {
+            setImportOpen(false);
+            setSelected({ ...selected });
+          }}
+        />
+      )}
     </div>
   );
 }

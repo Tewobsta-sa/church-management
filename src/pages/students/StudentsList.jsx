@@ -7,10 +7,10 @@ import StudentModal from "./StudentModal";
 import BulkImportModal from "./BulkImportModal";
 import clsx from "clsx";
 
+// Per request, only the Young track is exposed in the UI for now.
+// Backend continues to support all tracks; re-enable here when ready.
 const TABS = [
   { key: "young", i18n: "students.trackYoung" },
-  { key: "regular", i18n: "students.trackRegular" },
-  { key: "distance", i18n: "students.trackDistance" },
 ];
 
 export default function StudentsList() {
@@ -201,7 +201,7 @@ export default function StudentsList() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-slate-600 font-medium">
-                      {student.section_name || t("common.none")}
+                      {student.section?.name || student.section_name || t("common.none")}
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex gap-2 justify-end opacity-70 group-hover:opacity-100 transition-opacity">

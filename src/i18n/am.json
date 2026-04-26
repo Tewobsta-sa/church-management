@@ -111,7 +111,8 @@
     "fillAllFields": "እባክዎ ሁሉንም ቦታዎች ይሙሉ",
     "passwordsDontMatch": "የይለፍ ቃሎች አይዛመዱም",
     "setupFailed": "ማዋቀር አልተሳካም",
-    "initialize": "ጀምር"
+    "initialize": "ጀምር",
+    "forgotPassword": "የይለፍ ቃል ረሳዎት?"
   },
   "profile": {
     "title": "የእኔ መገለጫ",
@@ -252,7 +253,16 @@
     "searchStudent": "ተማሪ ይፈልጉ…",
     "weightWarning": "ማስታወሻ፦ የግምገማው ክብደቶች ድምር {{sum}}% ነው፣ 100% አይደለም። ጠቅላላ ድምሩ ከተዋቀሩት ክብደቶች አንጻር ነው የሚሰላው።",
     "teacherHeading": "የእኔ ክፍሎች",
-    "teacherEmpty": "ገና ምንም ኮርስ አልተመደበልዎትም።"
+    "teacherEmpty": "ገና ምንም ኮርስ አልተመደበልዎትም።",
+    "bulkImport": {
+      "button": "ከExcel አስገባ",
+      "title": "የተማሪዎች ውጤት በጅምላ አስገባ",
+      "downloadTemplate": "የCSV ፋይል ናሙና አውርድ",
+      "chooseFile": "ፋይል ይምረጡ",
+      "upload": "አስገባ",
+      "savedCount": "{{count}} ውጤት(ቶች) ተመዝግበዋል።",
+      "errorsHeading": "አንዳንድ ረድፎች አልተሳኩም፦"
+    }
   },
   "assignments": {
     "title": "መርሃ-ግብር እና ተግባራት",
