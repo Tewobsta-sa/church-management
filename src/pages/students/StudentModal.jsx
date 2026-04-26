@@ -20,6 +20,7 @@ export default function StudentModal({
     name: "",
     christian_name: "",
     age: "",
+    sex: "",
     educational_level: "",
     subcity: "",
     district: "",
@@ -44,6 +45,7 @@ export default function StudentModal({
         name: student.name || "",
         christian_name: student.christian_name || "",
         age: student.age || "",
+        sex: student.sex || "",
         educational_level: student.educational_level || "",
         subcity: student.address?.subcity || student.subcity || "",
         district: student.address?.district || student.district || "",
@@ -56,7 +58,7 @@ export default function StudentModal({
       });
     } else {
       setFormData({
-        name: "", christian_name: "", age: "", educational_level: "",
+        name: "", christian_name: "", age: "", sex: "", educational_level: "",
         subcity: "", district: "", special_place: "", house_number: "",
         parent_name: "", phone_number: "", parent_phone_number: "", section_id: "",
       });
@@ -194,43 +196,28 @@ export default function StudentModal({
                  </>
                )}
 
-               {/* Mezmur Admin Toggle Section */}
-               {(hasRole("mezmur_office_admin") || hasRole("super_admin")) && (
-                  <div className="sm:col-span-2 mt-4 pt-4 border-t border-slate-100">
-                     <h4 className="text-xs font-bold text-brand-600 uppercase tracking-widest mb-4">Mezmur Ministry</h4>
-                     <label className="flex items-center gap-3 p-4 border border-brand-200 bg-brand-50 rounded-xl cursor-pointer hover:bg-brand-100 transition-colors">
-                        <input 
-                           type="checkbox" 
-                           checked={student.is_mezmur} 
-                           onChange={async (e) => {
-                             const checked = e.target.checked;
-                             try {
-                               if (checked) {
-                                  await studentService.assignMezmur([student.id]);
-                               } else {
-                                  await studentService.unassignMezmur([student.id]);
-                               }
-                               onSuccess?.();
-                             } catch(err) {
-                               alert("Failed to toggle Mezmur membership");
-                             }
-                           }}
-                           className="w-5 h-5 text-brand-600 rounded focus:ring-brand-500 border-brand-300"
-                        />
-                        <div className="flex flex-col">
-                           <span className="font-bold text-slate-800">Assign to Mezmur Ministry</span>
-                           <span className="text-xs text-slate-500 font-medium">Includes this student in the Mezmur training and choir activities.</span>
-                        </div>
-                     </label>
-                  </div>
-               )}
+               {/* Mezmur ministry toggle hidden from frontend per request */}
              </div>
           ) : (
             <form id="student-form" onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
               <InputField label="Full Name" name="name" value={formData.name} onChange={handleChange} required />
               <InputField label="Christian Name" name="christian_name" value={formData.christian_name} onChange={handleChange} />
               
-              <InputField label="Age" name="age" type="number" value={formData.age} onChange={handleChange} />
+              <InputField label="Age" name="age" type="number" value={formData.age} onChange={handleChange} required />
+              <div className="space-y-1.5 flex flex-col justify-end">
+                <label className="text-xs font-bold text-slate-500 tracking-wide uppercase">Gender</label>
+                <select
+                  name="sex"
+                  value={formData.sex}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 transition-all font-medium text-slate-800"
+                >
+                  <option value="">Select gender</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                </select>
+              </div>
               <InputField label="Educational Level" name="educational_level" value={formData.educational_level} onChange={handleChange} />
               
               <InputField label="Student Phone" name="phone_number" value={formData.phone_number} onChange={handleChange} />

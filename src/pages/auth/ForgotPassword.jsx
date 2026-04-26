@@ -39,7 +39,7 @@ export default function ForgotPassword() {
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-brand-100 via-slate-50 to-white">
       <div className="w-full max-w-md animate-[slide-up_0.5s_ease-out]">
-        <Link to="/login" className="inline-flex items-center gap-2 text-sm font-black text-brand-600 uppercase tracking-widest mb-8 hover:translate-x-[-4px] transition-transform">
+        <Link to="/" className="inline-flex items-center gap-2 text-sm font-black text-brand-600 uppercase tracking-widest mb-8 hover:translate-x-[-4px] transition-transform">
           <ArrowLeft className="w-4 h-4" /> Back to Login
         </Link>
         

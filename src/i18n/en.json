@@ -111,7 +111,8 @@
     "fillAllFields": "Please fill all fields",
     "passwordsDontMatch": "Passwords do not match",
     "setupFailed": "Setup failed",
-    "initialize": "Initialize"
+    "initialize": "Initialize",
+    "forgotPassword": "Forgot password?"
   },
   "profile": {
     "title": "My Profile",
@@ -252,7 +253,16 @@
     "searchStudent": "Search student…",
     "weightWarning": "Warning: assessment weights total {{sum}}%, not 100%. The total column is normalized against the configured weights.",
     "teacherHeading": "My Classes",
-    "teacherEmpty": "You are not assigned to any courses yet."
+    "teacherEmpty": "You are not assigned to any courses yet.",
+    "bulkImport": {
+      "button": "Import from Excel",
+      "title": "Bulk Import Grades",
+      "downloadTemplate": "Download CSV template",
+      "chooseFile": "Click to choose a file",
+      "upload": "Upload",
+      "savedCount": "{{count}} grade(s) imported.",
+      "errorsHeading": "Some rows failed:"
+    }
   },
   "assignments": {
     "title": "Schedule & Tasks",
