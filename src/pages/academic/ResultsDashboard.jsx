@@ -9,9 +9,11 @@ import {
   Printer,
   BookOpen,
   Layers,
+  GraduationCap,
 } from "lucide-react";
 import { resultsService } from "../../services/resultsService";
 import { sectionService } from "../../services/sectionService";
+import BulkReportCardsModal from "./BulkReportCardsModal";
 
 export default function ResultsDashboard() {
   const [sections, setSections] = useState([]);
@@ -22,21 +24,19 @@ export default function ResultsDashboard() {
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [selectedStudentReport, setSelectedStudentReport] = useState(null);
   const [reportLoading, setReportLoading] = useState(false);
+  const [bulkReportModalOpen, setBulkReportModalOpen] = useState(false);
 
   const currentYear = new Date().getFullYear();
 
   useEffect(() => {
     const fetchSections = async () => {
       try {
-        const data = await sectionService.getSections(1, "", "");
+        const data = await sectionService.getSections({ all: true });
+        const list = Array.isArray(data) ? data : (data?.data || []);
+        setSections(list);
 
-        const youngSections =
-          data?.data?.filter((s) => s.program_type?.name === "Young") || [];
-
-        setSections(youngSections);
-
-        if (youngSections.length > 0) {
-          setSelectedSection(youngSections[0].id);
+        if (list.length > 0) {
+          setSelectedSection(list[0].id);
         }
       } catch (err) {
         console.error("Failed to load sections", err);
@@ -134,20 +134,30 @@ export default function ResultsDashboard() {
           </p>
         </div>
 
-        <div className="flex items-center gap-4 bg-white p-2 rounded-2xl shadow-sm border border-slate-200">
-          <Filter className="w-4 h-4 text-slate-400 ml-2" />
-          <select
-            value={selectedSection}
-            onChange={(e) => setSelectedSection(e.target.value)}
-            className="bg-transparent border-none outline-none font-bold text-slate-700 min-w-[180px] cursor-pointer"
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2 bg-white p-2 rounded-2xl shadow-sm border border-slate-200">
+            <Filter className="w-4 h-4 text-slate-400 ml-2" />
+            <select
+              value={selectedSection}
+              onChange={(e) => setSelectedSection(e.target.value)}
+              className="bg-transparent border-none outline-none font-bold text-slate-700 min-w-[180px] cursor-pointer text-sm"
+            >
+              <option value="">Select Section</option>
+              {sections.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} ({s.program_type?.name || "Regular"})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            onClick={() => setBulkReportModalOpen(true)}
+            className="flex items-center gap-2 px-5 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-2xl font-bold shadow-lg shadow-brand-500/20 text-xs uppercase tracking-wider transition-all cursor-pointer"
           >
-            <option value="">Select Section</option>
-            {sections.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+            <GraduationCap className="w-4 h-4" />
+            Bulk Report Cards (PDF)
+          </button>
         </div>
       </div>
 
@@ -378,6 +388,13 @@ export default function ResultsDashboard() {
           </div>
         </div>
       )}
+
+      {/* Bulk Report Cards Modal */}
+      <BulkReportCardsModal
+        isOpen={bulkReportModalOpen}
+        onClose={() => setBulkReportModalOpen(false)}
+        initialSectionId={selectedSection}
+      />
     </div>
   );
 }

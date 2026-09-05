@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { X, Save } from "lucide-react";
 
-// ✅ Match EXACT backend roles
+// ✅ Match EXACT 5 official backend roles
 const availableRoles = [
   { value: "super_admin", label: "Super Admin" },
-  { value: "gngnunet_office_admin", label: "Gngnunet Office Admin" },
-  { value: "tmhrt_office_admin", label: "Tmhrt Office Admin" },
-  { value: "mezmur_office_admin", label: "Mezmur Office Admin" }
+  { value: "yesew_habt", label: "Yesew Habt" },
+  { value: "mereja_kfl", label: "Mereja Kfl" },
+  { value: "mezmur_kfl", label: "Mezmur Kfl" },
+  { value: "tmhrt_kfl", label: "Tmhrt Kfl" },
 ];
 
 export default function UserModal({

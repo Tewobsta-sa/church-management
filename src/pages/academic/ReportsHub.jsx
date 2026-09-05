@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { FileDown, Users, CheckSquare, Award, ArrowRight, Download, FileSpreadsheet, AlertCircle } from 'lucide-react';
+import { FileDown, Users, CheckSquare, Award, ArrowRight, Download, FileSpreadsheet, AlertCircle, GraduationCap, Palette } from 'lucide-react';
 import { reportingService } from '../../services/reportingService';
+import BulkReportCardsModal from './BulkReportCardsModal';
 
 export default function ReportsHub() {
   const [loading, setLoading] = useState('');
+  const [bulkModalOpen, setBulkModalOpen] = useState(false);
   
   const handleExport = async (type) => {
     setLoading(type);
@@ -21,7 +23,7 @@ export default function ReportsHub() {
     {
       id: 'students',
       title: 'Student Roster',
-      desc: 'Complete list of students in the Young program with verification status and section assignments.',
+      desc: 'Complete list of students across PreKG, Regular, and Distance with status and contact details.',
       icon: Users,
       color: 'bg-blue-50 text-blue-600',
     },
@@ -47,11 +49,36 @@ export default function ReportsHub() {
         <div>
           <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Reports & Exports</h1>
           <p className="text-slate-500 font-medium mt-1 uppercase text-xs tracking-widest">
-            Generate archival data and administrative spreadsheets
+            Generate archival data, administrative spreadsheets, and printable PDF documents
           </p>
         </div>
         <div className="p-3 bg-white rounded-2xl shadow-sm border border-slate-100">
            <FileDown className="w-6 h-6 text-brand-600" />
+        </div>
+      </div>
+
+      {/* Featured: Official Section Report Cards PDF Generator */}
+      <div className="bg-gradient-to-br from-brand-900 via-slate-900 to-indigo-950 rounded-3xl p-8 text-white shadow-2xl relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="relative z-10 max-w-2xl">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-brand-500/20 text-brand-300 rounded-full text-xs font-black uppercase tracking-wider mb-4 border border-brand-500/30">
+            <Palette className="w-3.5 h-3.5" /> Customizable Section Themes
+          </div>
+          <h2 className="text-2xl font-black tracking-tight mb-2">
+            Section Student Academic Report Cards (PDF)
+          </h2>
+          <p className="text-slate-300 text-sm font-medium leading-relaxed">
+            Generate and download multi-page, print-ready student report cards in bulk for any section (PreKG, Regular, Distance). Customize color themes to match sections or grade levels, view live previews, and export with one click.
+          </p>
+        </div>
+
+        <div className="relative z-10 flex-shrink-0">
+          <button
+            onClick={() => setBulkModalOpen(true)}
+            className="flex items-center gap-3 px-6 py-4 bg-brand-500 hover:bg-brand-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-brand-900/50 hover:scale-105 transition-all cursor-pointer"
+          >
+            <GraduationCap className="w-5 h-5" />
+            Launch Bulk PDF Generator
+          </button>
         </div>
       </div>
 
@@ -84,6 +111,12 @@ export default function ReportsHub() {
           </div>
         ))}
       </div>
+
+      {/* Bulk Report Cards Modal */}
+      <BulkReportCardsModal
+        isOpen={bulkModalOpen}
+        onClose={() => setBulkModalOpen(false)}
+      />
 
       {/* Info Box */}
       <div className="bg-brand-50 border border-brand-100 rounded-[2rem] p-8 flex items-start gap-4">

@@ -30,6 +30,10 @@ const navItems = [
     labelKey: "nav.Students",
     icon: Users,
     roles: [
+      "yesew_habt",
+      "mereja_kfl",
+      "mezmur_kfl",
+      "tmhrt_kfl",
       "gngnunet_office_admin",
       "mezmur_office_admin",
       "tmhrt_office_admin",
@@ -40,31 +44,41 @@ const navItems = [
     path: "/teachers",
     labelKey: "nav.Teachers",
     icon: UserCheck,
-    roles: ["tmhrt_office_admin", "super_admin"],
+    roles: ["tmhrt_kfl", "tmhrt_office_admin", "mereja_kfl", "super_admin"],
   },
   {
     path: "/promotions",
     labelKey: "nav.Promotions",
     icon: Award,
-    roles: ["gngnunet_office_admin", "tmhrt_office_admin", "super_admin"],
+    roles: [
+      "yesew_habt",
+      "tmhrt_kfl",
+      "mereja_kfl",
+      "gngnunet_office_admin",
+      "tmhrt_office_admin",
+      "super_admin",
+    ],
   },
   {
     path: "/courses",
     labelKey: "nav.Courses",
     icon: BookOpen,
-    roles: ["tmhrt_office_admin", "super_admin"],
+    roles: ["tmhrt_kfl", "tmhrt_office_admin", "mereja_kfl", "super_admin"],
   },
   {
     path: "/sections",
     labelKey: "nav.Sections",
     icon: Layers,
-    roles: ["tmhrt_office_admin", "super_admin"],
+    roles: ["tmhrt_kfl", "tmhrt_office_admin", "mereja_kfl", "super_admin"],
   },
   {
     path: "/assignments",
     labelKey: "nav.Schedules",
     icon: Calendar,
     roles: [
+      "tmhrt_kfl",
+      "mezmur_kfl",
+      "mereja_kfl",
       "tmhrt_office_admin",
       "mezmur_office_admin",
       "teacher",
@@ -76,9 +90,14 @@ const navItems = [
     labelKey: "nav.Attendance",
     icon: CheckSquare,
     roles: [
+      "yesew_habt",
+      "tmhrt_kfl",
+      "mezmur_kfl",
+      "mereja_kfl",
       "teacher",
       "tmhrt_office_admin",
       "mezmur_office_admin",
+      "gngnunet_office_admin",
       "super_admin",
     ],
   },
@@ -86,25 +105,39 @@ const navItems = [
     path: "/grades",
     labelKey: "nav.Grading",
     icon: CheckSquare,
-    roles: ["teacher", "tmhrt_office_admin", "super_admin"],
+    roles: ["teacher", "tmhrt_kfl", "tmhrt_office_admin", "mereja_kfl", "super_admin"],
   },
   {
     path: "/results",
     labelKey: "nav.Results",
     icon: Award,
-    roles: ["tmhrt_office_admin", "super_admin"],
+    roles: ["tmhrt_kfl", "tmhrt_office_admin", "mereja_kfl", "super_admin"],
   },
   {
     path: "/mezmur",
     labelKey: "nav.Mezmur Ministry",
     icon: Music,
-    roles: ["mezmur_office_admin", "super_admin"],
+    roles: [
+      "mezmur_kfl",
+      "yesew_habt",
+      "mereja_kfl",
+      "mezmur_office_admin",
+      "gngnunet_office_admin",
+      "super_admin",
+    ],
   },
   {
     path: "/reports",
     labelKey: "nav.Reports",
     icon: FileDown,
-    roles: ["super_admin", "tmhrt_office_admin", "gngnunet_office_admin"],
+    roles: [
+      "super_admin",
+      "tmhrt_kfl",
+      "yesew_habt",
+      "mereja_kfl",
+      "tmhrt_office_admin",
+      "gngnunet_office_admin",
+    ],
   },
   {
     path: "/security",
@@ -127,6 +160,10 @@ export default function Sidebar() {
 
   const defaultRoutes = {
     super_admin: "/dashboard",
+    yesew_habt: "/students",
+    mereja_kfl: "/dashboard",
+    mezmur_kfl: "/mezmur",
+    tmhrt_kfl: "/students",
     tmhrt_office_admin: "/students",
     teacher: "/assignments",
     mezmur_office_admin: "/mezmur",
@@ -134,7 +171,8 @@ export default function Sidebar() {
   };
 
   const getDefaultRoute = () => {
-    const roles = user?.roles?.map((r) => r.name) || [];
+    const roles = user?.roles?.map((r) => (typeof r === "string" ? r : r?.name)) || [];
+    if (user?.role && !roles.includes(user.role)) roles.push(user.role);
 
     for (const role of roles) {
       if (defaultRoutes[role]) {
@@ -142,7 +180,7 @@ export default function Sidebar() {
       }
     }
 
-    return "/results"; // fallback default
+    return "/dashboard";
   };
 
   const logoPath = getDefaultRoute();
@@ -152,45 +190,37 @@ export default function Sidebar() {
         {/* Logo / Brand */}
         <NavLink
           to={logoPath}
-          className="px-8 py-8 flex items-center gap-4 border-b border-brand-800/50 hover:bg-brand-800/10 transition-colors"
+          className="px-5 py-6 flex items-center gap-3.5 border-b border-white/10 hover:bg-white/5 transition-all group"
         >
-          <div className="h-10 w-10 flex shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-brand-400 to-brand-600 shadow-lg shadow-brand-500/30">
-            <svg
-              className="h-6 w-6 text-white"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
-              />
-            </svg>
+          <div className="h-12 w-12 flex shrink-0 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-md p-1 border border-amber-400/40 shadow-lg shadow-brand-950/40 group-hover:scale-105 group-hover:border-amber-400 transition-all">
+            <img
+              src="/logo.png"
+              alt="Finote Semaetat Logo"
+              className="h-full w-full object-contain filter drop-shadow-md"
+            />
           </div>
-          <div>
-            <h1 className="text-xl font-bold tracking-tight text-brand-50 font-sans">
+          <div className="min-w-0">
+            <h1 className="text-lg font-black tracking-tight text-white font-sans truncate leading-tight group-hover:text-amber-300 transition-colors">
               {t("app.name")}
             </h1>
-            <p className="text-brand-300 text-[11px] uppercase tracking-wider font-semibold mt-0.5 opacity-80">
+            <p className="text-amber-200/90 text-[10px] uppercase tracking-wider font-bold mt-0.5 truncate">
               {t("app.subtitle")}
             </p>
           </div>
         </NavLink>
 
         {/* Navigation */}
-        <nav className="flex-1 px-4 py-8 space-y-2 overflow-y-auto custom-scrollbar">
+        <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto custom-scrollbar">
           {visibleItems.map((item) => (
             <NavLink
               key={item.path}
               to={item.path}
               className={({ isActive }) =>
                 clsx(
-                  "flex items-center px-4 py-3.5 rounded-2xl transition-all duration-300 group relative",
+                  "flex items-center px-4 py-3 rounded-2xl transition-all duration-300 group relative font-semibold text-sm",
                   isActive
-                    ? "bg-brand-600/30 font-medium text-white shadow-inner border border-brand-500/30"
-                    : "text-brand-200/80 hover:bg-brand-800/40 hover:text-white",
+                    ? "bg-gradient-to-r from-brand-800/80 to-brand-900/60 text-white shadow-lg shadow-brand-950/30 border border-amber-500/30"
+                    : "text-slate-300 hover:bg-white/5 hover:text-white",
                 )
               }
             >
@@ -198,21 +228,21 @@ export default function Sidebar() {
                 <>
                   <div
                     className={clsx(
-                      "absolute inset-y-0 left-0 w-1 rounded-r-full transition-all duration-300",
+                      "absolute inset-y-1.5 left-0 w-1 rounded-r-full transition-all duration-300",
                       isActive
-                        ? "bg-brand-400 scale-y-100 opacity-100"
-                        : "scale-y-0 opacity-0 group-hover:scale-y-50 group-hover:opacity-50 bg-brand-500",
+                        ? "bg-amber-400 scale-y-100 opacity-100 shadow-[0_0_8px_rgba(251,191,36,0.8)]"
+                        : "scale-y-0 opacity-0 group-hover:scale-y-75 group-hover:opacity-60 bg-amber-400/60",
                     )}
                   />
                   <item.icon
                     className={clsx(
-                      "w-5 h-5 mr-3 transition-colors",
+                      "w-4 h-4 mr-3 shrink-0 transition-all duration-200",
                       isActive
-                        ? "text-brand-300"
-                        : "text-brand-400/50 group-hover:text-brand-300",
+                        ? "text-amber-400 group-hover:scale-110"
+                        : "text-slate-400 group-hover:text-amber-300 group-hover:scale-110",
                     )}
                   />
-                  <span className="tracking-wide text-sm">
+                  <span className="tracking-wide truncate">
                     {t(item.labelKey)}
                   </span>
                 </>

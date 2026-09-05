@@ -26,11 +26,20 @@ import SecuritySettings from "./pages/admin/SecuritySettings";
 import ForgotPassword from "./pages/auth/ForgotPassword";
 import TeachersManagement from "./pages/academic/TeachersManagement";
 
-const getPrimaryRole = (user) => user?.roles?.[0]?.name || null;
+export const getPrimaryRole = (user) => {
+  if (user?.roles && Array.isArray(user.roles) && user.roles.length > 0) {
+    return typeof user.roles[0] === "string" ? user.roles[0] : user.roles[0]?.name;
+  }
+  return user?.role || null;
+};
 
-const getDefaultRouteForRole = (role) => {
+export const getDefaultRouteForRole = (role) => {
   const roleRedirects = {
     super_admin: "/dashboard",
+    yesew_habt: "/students",
+    mereja_kfl: "/dashboard",
+    mezmur_kfl: "/mezmur",
+    tmhrt_kfl: "/students",
     gngnunet_office_admin: "/students",
     mezmur_office_admin: "/mezmur",
     tmhrt_office_admin: "/students",
@@ -43,8 +52,17 @@ const getDefaultRouteForRole = (role) => {
 
 const hasAnyAllowedRole = (user, allowedRoles) => {
   if (!user) return false;
-  if (user?.roles?.some((r) => r.name === "super_admin")) return true;
-  return user?.roles?.some((r) => allowedRoles.includes(r.name));
+  const userRoles = [];
+  if (user.roles && Array.isArray(user.roles)) {
+    user.roles.forEach((r) => {
+      userRoles.push(typeof r === "string" ? r : r.name);
+    });
+  }
+  if (user.role && !userRoles.includes(user.role)) {
+    userRoles.push(user.role);
+  }
+  if (userRoles.includes("super_admin")) return true;
+  return userRoles.some((r) => allowedRoles.includes(r));
 };
 
 // Public Route (Login)
@@ -130,6 +148,14 @@ function App() {
             }
           />
           <Route
+            path="/login"
+            element={
+              <PublicRoute>
+                <Login />
+              </PublicRoute>
+            }
+          />
+          <Route
             path="/forgot-password"
             element={
               <PublicRoute>
@@ -171,6 +197,10 @@ function App() {
                 <RoleRoute
                   allowedRoles={[
                     "super_admin",
+                    "yesew_habt",
+                    "mereja_kfl",
+                    "mezmur_kfl",
+                    "tmhrt_kfl",
                     "gngnunet_office_admin",
                     "mezmur_office_admin",
                     "tmhrt_office_admin",
@@ -187,9 +217,14 @@ function App() {
                 <RoleRoute
                   allowedRoles={[
                     "super_admin",
+                    "yesew_habt",
+                    "mereja_kfl",
+                    "mezmur_kfl",
+                    "tmhrt_kfl",
                     "gngnunet_office_admin",
                     "mezmur_office_admin",
                     "tmhrt_office_admin",
+                    "distance_admin",
                   ]}
                 >
                   <StudentsList />
@@ -199,7 +234,16 @@ function App() {
             <Route
               path="/promotions"
               element={
-                <RoleRoute allowedRoles={["super_admin", "gngnunet_office_admin", "tmhrt_office_admin"]}>
+                <RoleRoute
+                  allowedRoles={[
+                    "super_admin",
+                    "yesew_habt",
+                    "tmhrt_kfl",
+                    "mereja_kfl",
+                    "gngnunet_office_admin",
+                    "tmhrt_office_admin",
+                  ]}
+                >
                   <StudentPromotion />
                 </RoleRoute>
               }
@@ -207,7 +251,14 @@ function App() {
             <Route
               path="/teachers"
               element={
-                <RoleRoute allowedRoles={["super_admin", "tmhrt_office_admin"]}>
+                <RoleRoute
+                  allowedRoles={[
+                    "super_admin",
+                    "tmhrt_kfl",
+                    "mereja_kfl",
+                    "tmhrt_office_admin",
+                  ]}
+                >
                   <TeachersManagement />
                 </RoleRoute>
               }
@@ -215,7 +266,14 @@ function App() {
             <Route
               path="/sections"
               element={
-                <RoleRoute allowedRoles={["super_admin", "tmhrt_office_admin"]}>
+                <RoleRoute
+                  allowedRoles={[
+                    "super_admin",
+                    "tmhrt_kfl",
+                    "mereja_kfl",
+                    "tmhrt_office_admin",
+                  ]}
+                >
                   <SectionsManagement />
                 </RoleRoute>
               }
@@ -223,7 +281,14 @@ function App() {
             <Route
               path="/courses"
               element={
-                <RoleRoute allowedRoles={["super_admin", "tmhrt_office_admin"]}>
+                <RoleRoute
+                  allowedRoles={[
+                    "super_admin",
+                    "tmhrt_kfl",
+                    "mereja_kfl",
+                    "tmhrt_office_admin",
+                  ]}
+                >
                   <CoursesManagement />
                 </RoleRoute>
               }
@@ -231,7 +296,17 @@ function App() {
             <Route
               path="/assignments"
               element={
-                <RoleRoute allowedRoles={["super_admin", "tmhrt_office_admin", "mezmur_office_admin", "teacher"]}>
+                <RoleRoute
+                  allowedRoles={[
+                    "super_admin",
+                    "tmhrt_kfl",
+                    "mezmur_kfl",
+                    "mereja_kfl",
+                    "tmhrt_office_admin",
+                    "mezmur_office_admin",
+                    "teacher",
+                  ]}
+                >
                   <AssignmentsTasks />
                 </RoleRoute>
               }
@@ -239,7 +314,19 @@ function App() {
             <Route
               path="/attendance"
               element={
-                <RoleRoute allowedRoles={["super_admin", "tmhrt_office_admin", "mezmur_office_admin", "teacher"]}>
+                <RoleRoute
+                  allowedRoles={[
+                    "super_admin",
+                    "yesew_habt",
+                    "tmhrt_kfl",
+                    "mezmur_kfl",
+                    "mereja_kfl",
+                    "teacher",
+                    "tmhrt_office_admin",
+                    "mezmur_office_admin",
+                    "gngnunet_office_admin",
+                  ]}
+                >
                   <LiveAttendance />
                 </RoleRoute>
               }
@@ -247,7 +334,15 @@ function App() {
             <Route
               path="/grades"
               element={
-                <RoleRoute allowedRoles={["super_admin", "teacher", "tmhrt_office_admin"]}>
+                <RoleRoute
+                  allowedRoles={[
+                    "super_admin",
+                    "tmhrt_kfl",
+                    "mereja_kfl",
+                    "teacher",
+                    "tmhrt_office_admin",
+                  ]}
+                >
                   <Grades />
                 </RoleRoute>
               }
@@ -255,7 +350,14 @@ function App() {
             <Route
               path="/results"
               element={
-                <RoleRoute allowedRoles={["super_admin", "tmhrt_office_admin"]}>
+                <RoleRoute
+                  allowedRoles={[
+                    "super_admin",
+                    "tmhrt_kfl",
+                    "mereja_kfl",
+                    "tmhrt_office_admin",
+                  ]}
+                >
                   <ResultsDashboard />
                 </RoleRoute>
               }
@@ -263,7 +365,16 @@ function App() {
             <Route
               path="/mezmur"
               element={
-                <RoleRoute allowedRoles={["super_admin", "mezmur_office_admin"]}>
+                <RoleRoute
+                  allowedRoles={[
+                    "super_admin",
+                    "mezmur_kfl",
+                    "yesew_habt",
+                    "mereja_kfl",
+                    "mezmur_office_admin",
+                    "gngnunet_office_admin",
+                  ]}
+                >
                   <MezmurMinistry />
                 </RoleRoute>
               }
@@ -279,7 +390,16 @@ function App() {
             <Route
               path="/reports"
               element={
-                <RoleRoute allowedRoles={["super_admin", "tmhrt_office_admin", "gngnunet_office_admin"]}>
+                <RoleRoute
+                  allowedRoles={[
+                    "super_admin",
+                    "tmhrt_kfl",
+                    "yesew_habt",
+                    "mereja_kfl",
+                    "tmhrt_office_admin",
+                    "gngnunet_office_admin",
+                  ]}
+                >
                   <ReportsHub />
                 </RoleRoute>
               }

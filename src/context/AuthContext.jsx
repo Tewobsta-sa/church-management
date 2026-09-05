@@ -76,7 +76,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem("refresh_token");
     localStorage.removeItem("user");
     setUser(null);
-    window.location.href = "/login";
+    window.location.href = "/";
   };
 
   const value = {
@@ -85,7 +85,14 @@ export const AuthProvider = ({ children }) => {
     isInitialized,
     login,
     logout,
-    hasRole: (role) => user?.roles?.some((r) => r.name === role) || false,
+    hasRole: (role) => {
+      if (!user) return false;
+      if (user.role === role) return true;
+      if (Array.isArray(user.roles)) {
+        return user.roles.some((r) => (typeof r === "string" ? r === role : r?.name === role));
+      }
+      return false;
+    },
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

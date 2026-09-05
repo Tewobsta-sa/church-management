@@ -8,11 +8,9 @@ export const sectionService = {
   },
 
   // Sections
-  getSections: async () => {
+  getSections: async (params = { all: true }) => {
     const res = await api.get("/sections", {
-      params: {
-        program_type: "Young", // 👈 tailored to your use case
-      },
+      params: typeof params === 'object' ? params : { all: true },
     });
 
     return res.data;
