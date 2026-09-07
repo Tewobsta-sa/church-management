@@ -328,7 +328,9 @@ export default function LiveAttendance() {
                       }
                     >
                       <td className="px-4 py-3 font-medium text-slate-700 whitespace-nowrap">
-                        {row.marked_at ? formatEthiopianDateTime(row.marked_at) : "—"}
+                        {row.marked_at
+                          ? formatEthiopianDateTime(row.marked_at)
+                          : "—"}
                       </td>
                       <td className="px-4 py-3">
                         <div className="font-bold text-slate-800">

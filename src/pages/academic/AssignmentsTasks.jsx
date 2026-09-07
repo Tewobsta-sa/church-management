@@ -64,12 +64,17 @@ const CalendarEvent = (props) => {
   return (
     <div className="flex flex-col h-full justify-between py-1 px-1 text-white">
       <div className="flex items-center gap-1 font-bold text-[11px] leading-tight truncate">
-        {isCourse ? <BookOpen className="w-3 h-3 shrink-0" /> : <Music className="w-3 h-3 shrink-0" />}
+        {isCourse ? (
+          <BookOpen className="w-3 h-3 shrink-0" />
+        ) : (
+          <Music className="w-3 h-3 shrink-0" />
+        )}
         <span className="truncate">{event.title}</span>
       </div>
       <div className="flex items-center justify-between text-[9px] opacity-90 font-medium">
         <span className="flex items-center gap-0.5 truncate">
-          <MapPin className="w-2.5 h-2.5 shrink-0" /> {event.location || "Sanctuary"}
+          <MapPin className="w-2.5 h-2.5 shrink-0" />{" "}
+          {event.location || "Sanctuary"}
         </span>
         <span className="truncate">{event.teacher}</span>
       </div>
@@ -87,10 +92,16 @@ export default function AssignmentsTasks() {
   const isTeacher = hasRole("teacher");
   const isMereja = hasRole("mereja_kfl");
 
-  const attendanceActionLabel = isSuperAdmin ? "View attendance" : "Mark attendance";
+  const attendanceActionLabel = isSuperAdmin
+    ? "View attendance"
+    : "Mark attendance";
 
   // Role locked assignment type
-  const lockedType = isSuperAdmin ? null : isMezmurAdmin ? "MezmurTraining" : "Course";
+  const lockedType = isSuperAdmin
+    ? null
+    : isMezmurAdmin
+      ? "MezmurTraining"
+      : "Course";
 
   // Active view: "board" (weekly columns) | "calendar" (BigCalendar) | "agenda" (detailed list)
   const [viewMode, setViewMode] = useState("board");
@@ -221,7 +232,9 @@ export default function AssignmentsTasks() {
     const requests = [
       sectionService.getSections({ all: true }),
       courseService.list(),
-      canAccessTeachers ? teacherService.getTeachers("", 1) : Promise.resolve({ data: [] }),
+      canAccessTeachers
+        ? teacherService.getTeachers("", 1)
+        : Promise.resolve({ data: [] }),
       canAccessTrainers ? trainerService.getTrainers() : Promise.resolve([]),
     ];
 
@@ -235,19 +248,24 @@ export default function AssignmentsTasks() {
     const trainerData = getValue(3, []);
 
     // All sections across PreKG, Regular (Htsanat, Maekelawyan, Wetatoch), Distance
-    const secList = Array.isArray(secData) ? secData : secData?.data ?? [];
+    const secList = Array.isArray(secData) ? secData : (secData?.data ?? []);
     setSections(secList);
 
     // All courses
-    const courseList = Array.isArray(courseData) ? courseData : courseData?.data ?? [];
+    const courseList = Array.isArray(courseData)
+      ? courseData
+      : (courseData?.data ?? []);
     setCourses(courseList);
 
     // Teachers
-    const teacherList = teacherData?.data ?? (Array.isArray(teacherData) ? teacherData : []);
+    const teacherList =
+      teacherData?.data ?? (Array.isArray(teacherData) ? teacherData : []);
     setTeachers(teacherList);
 
     // Trainers
-    const trainerList = Array.isArray(trainerData) ? trainerData : trainerData?.data ?? [];
+    const trainerList = Array.isArray(trainerData)
+      ? trainerData
+      : (trainerData?.data ?? []);
     setTrainers(trainerList);
   };
 
@@ -268,18 +286,28 @@ export default function AssignmentsTasks() {
       if (filterType !== "all" && item.type !== filterType) return false;
 
       // Filter by Section
-      if (filterSection !== "all" && String(item.section_id) !== String(filterSection)) return false;
+      if (
+        filterSection !== "all" &&
+        String(item.section_id) !== String(filterSection)
+      )
+        return false;
 
       // Filter by Day of Week
-      if (filterDay !== "all" && String(item.day_of_week) !== String(filterDay)) return false;
+      if (filterDay !== "all" && String(item.day_of_week) !== String(filterDay))
+        return false;
 
       // Search Query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        const courseName = item.assignment_courses?.[0]?.course?.name?.toLowerCase() || "";
+        const courseName =
+          item.assignment_courses?.[0]?.course?.name?.toLowerCase() || "";
         const mezmurTitle = item.mezmurs?.[0]?.title?.toLowerCase() || "";
         const sectionName = item.section?.name?.toLowerCase() || "";
-        const instructor = (item.teacher?.name || item.trainer?.name || "").toLowerCase();
+        const instructor = (
+          item.teacher?.name ||
+          item.trainer?.name ||
+          ""
+        ).toLowerCase();
         const location = (item.location || "").toLowerCase();
 
         return (
@@ -293,7 +321,17 @@ export default function AssignmentsTasks() {
 
       return true;
     });
-  }, [rawSchedule, isAcademicAdmin, isMezmurAdmin, isTeacher, user, filterType, filterSection, filterDay, searchQuery]);
+  }, [
+    rawSchedule,
+    isAcademicAdmin,
+    isMezmurAdmin,
+    isTeacher,
+    user,
+    filterType,
+    filterSection,
+    filterDay,
+    searchQuery,
+  ]);
 
   const visibleCalendarEvents = useMemo(() => {
     return calendarEvents.filter((ev) => {
@@ -302,7 +340,11 @@ export default function AssignmentsTasks() {
       if (isTeacher && ev.raw?.user_id !== user?.id) return false;
 
       if (filterType !== "all" && ev.type !== filterType) return false;
-      if (filterSection !== "all" && String(ev.raw?.section_id) !== String(filterSection)) return false;
+      if (
+        filterSection !== "all" &&
+        String(ev.raw?.section_id) !== String(filterSection)
+      )
+        return false;
 
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -314,14 +356,29 @@ export default function AssignmentsTasks() {
 
       return true;
     });
-  }, [calendarEvents, isAcademicAdmin, isMezmurAdmin, isTeacher, user, filterType, filterSection, searchQuery]);
+  }, [
+    calendarEvents,
+    isAcademicAdmin,
+    isMezmurAdmin,
+    isTeacher,
+    user,
+    filterType,
+    filterSection,
+    searchQuery,
+  ]);
 
   // Statistics
   const stats = useMemo(() => {
     const total = visibleRawAssignments.length;
-    const coursesCount = visibleRawAssignments.filter((a) => a.type === "Course").length;
-    const mezmurCount = visibleRawAssignments.filter((a) => a.type === "MezmurTraining").length;
-    const uniqueSections = new Set(visibleRawAssignments.map((a) => a.section_id).filter(Boolean)).size;
+    const coursesCount = visibleRawAssignments.filter(
+      (a) => a.type === "Course",
+    ).length;
+    const mezmurCount = visibleRawAssignments.filter(
+      (a) => a.type === "MezmurTraining",
+    ).length;
+    const uniqueSections = new Set(
+      visibleRawAssignments.map((a) => a.section_id).filter(Boolean),
+    ).size;
     return { total, coursesCount, mezmurCount, uniqueSections };
   }, [visibleRawAssignments]);
 
@@ -348,7 +405,9 @@ export default function AssignmentsTasks() {
   // Handle Delete Schedule
   const handleDeleteSchedule = async (assignmentId) => {
     if (!assignmentId || deletingId) return;
-    const confirmed = window.confirm("Delete this schedule entry? This action cannot be undone.");
+    const confirmed = window.confirm(
+      "Delete this schedule entry? This action cannot be undone.",
+    );
     if (!confirmed) return;
 
     setDeletingId(assignmentId);
@@ -369,7 +428,8 @@ export default function AssignmentsTasks() {
       borderRadius: "10px",
       opacity: 0.95,
       color: "white",
-      border: event.type === "Course" ? "1px solid #BE123C" : "1px solid #F59E0B",
+      border:
+        event.type === "Course" ? "1px solid #BE123C" : "1px solid #F59E0B",
       fontSize: "11px",
       fontWeight: "700",
       padding: "3px 6px",
@@ -387,7 +447,11 @@ export default function AssignmentsTasks() {
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-brand-900 via-brand-700 to-amber-500 p-0.5 shadow-lg shadow-brand-950/20 shrink-0">
             <div className="w-full h-full bg-white rounded-[14px] flex items-center justify-center p-1">
-              <img src="/logo.png" alt="Finote Semaetat" className="w-full h-full object-contain" />
+              <img
+                src="/logo.png"
+                alt="Finote Semaetat"
+                className="w-full h-full object-contain"
+              />
             </div>
           </div>
           <div>
@@ -403,8 +467,8 @@ export default function AssignmentsTasks() {
               {isAcademicAdmin
                 ? "Academic curriculum timetable and course schedules"
                 : isMezmurAdmin
-                ? "Mezmur training sessions and ministry timetable"
-                : "Comprehensive academic and ministerial timetable management"}
+                  ? "Mezmur training sessions and ministry timetable"
+                  : "Comprehensive academic and ministerial timetable management"}
             </p>
           </div>
         </div>
@@ -428,8 +492,12 @@ export default function AssignmentsTasks() {
             <CalendarDays className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Total Classes</p>
-            <p className="text-xl font-black text-slate-900 mt-1">{stats.total}</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
+              Total Classes
+            </p>
+            <p className="text-xl font-black text-slate-900 mt-1">
+              {stats.total}
+            </p>
           </div>
         </div>
 
@@ -438,8 +506,12 @@ export default function AssignmentsTasks() {
             <BookOpen className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Academic Blocks</p>
-            <p className="text-xl font-black text-slate-900 mt-1">{stats.coursesCount}</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
+              Academic Blocks
+            </p>
+            <p className="text-xl font-black text-slate-900 mt-1">
+              {stats.coursesCount}
+            </p>
           </div>
         </div>
 
@@ -448,8 +520,12 @@ export default function AssignmentsTasks() {
             <Music className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Mezmur Sessions</p>
-            <p className="text-xl font-black text-slate-900 mt-1">{stats.mezmurCount}</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
+              Mezmur Sessions
+            </p>
+            <p className="text-xl font-black text-slate-900 mt-1">
+              {stats.mezmurCount}
+            </p>
           </div>
         </div>
 
@@ -458,8 +534,12 @@ export default function AssignmentsTasks() {
             <GraduationCap className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Sections</p>
-            <p className="text-xl font-black text-slate-900 mt-1">{stats.uniqueSections}</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
+              Sections
+            </p>
+            <p className="text-xl font-black text-slate-900 mt-1">
+              {stats.uniqueSections}
+            </p>
           </div>
         </div>
       </div>
@@ -549,7 +629,9 @@ export default function AssignmentsTasks() {
         {loading ? (
           <div className="flex flex-col items-center justify-center py-32 text-slate-400 gap-3">
             <div className="w-8 h-8 border-3 border-brand-600 border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-xs font-bold uppercase tracking-widest">Loading timetable…</p>
+            <p className="text-xs font-bold uppercase tracking-widest">
+              Loading timetable…
+            </p>
           </div>
         ) : viewMode === "board" ? (
           /* ── WEEKLY BOARD VIEW ── */
@@ -558,7 +640,9 @@ export default function AssignmentsTasks() {
               {DAYS_OF_WEEK.map((day) => {
                 const dayAssignments = visibleRawAssignments
                   .filter((a) => String(a.day_of_week) === String(day.id))
-                  .sort((a, b) => (a.start_time || "").localeCompare(b.start_time || ""));
+                  .sort((a, b) =>
+                    (a.start_time || "").localeCompare(b.start_time || ""),
+                  );
 
                 return (
                   <div
@@ -568,9 +652,12 @@ export default function AssignmentsTasks() {
                     {/* Day Column Header */}
                     <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-200">
                       <div>
-                        <h3 className="font-black text-xs text-slate-800 uppercase tracking-wider">{day.label}</h3>
+                        <h3 className="font-black text-xs text-slate-800 uppercase tracking-wider">
+                          {day.label}
+                        </h3>
                         <p className="text-[10px] font-bold text-slate-400 uppercase">
-                          {dayAssignments.length} {dayAssignments.length === 1 ? "class" : "classes"}
+                          {dayAssignments.length}{" "}
+                          {dayAssignments.length === 1 ? "class" : "classes"}
                         </p>
                       </div>
                       <span className="w-2 h-2 rounded-full bg-brand-600/40"></span>
@@ -580,15 +667,21 @@ export default function AssignmentsTasks() {
                     <div className="space-y-2.5 flex-1 custom-scrollbar overflow-y-auto">
                       {dayAssignments.length === 0 ? (
                         <div className="h-full flex items-center justify-center text-center p-4">
-                          <p className="text-[11px] font-bold text-slate-300 uppercase tracking-widest">No classes</p>
+                          <p className="text-[11px] font-bold text-slate-300 uppercase tracking-widest">
+                            No classes
+                          </p>
                         </div>
                       ) : (
                         dayAssignments.map((item) => {
                           const isCourse = item.type === "Course";
                           const title = isCourse
-                            ? item.assignment_courses?.[0]?.course?.name || "Academic Block"
+                            ? item.assignment_courses?.[0]?.course?.name ||
+                              "Academic Block"
                             : item.mezmurs?.[0]?.title || "Mezmur Training";
-                          const instructor = item.teacher?.name || item.trainer?.name || "Unassigned";
+                          const instructor =
+                            item.teacher?.name ||
+                            item.trainer?.name ||
+                            "Unassigned";
 
                           return (
                             <div
@@ -609,19 +702,26 @@ export default function AssignmentsTasks() {
                                   </span>
                                   <span className="flex items-center gap-1 text-[10px] font-black text-slate-500">
                                     <Clock className="w-3 h-3 text-slate-400" />
-                                    {item.start_time?.slice(0, 5)} - {item.end_time?.slice(0, 5)}
+                                    {item.start_time?.slice(0, 5)} -{" "}
+                                    {item.end_time?.slice(0, 5)}
                                   </span>
                                 </div>
 
                                 {/* Title */}
-                                <h4 className="font-black text-slate-900 text-xs leading-snug truncate" title={title}>
+                                <h4
+                                  className="font-black text-slate-900 text-xs leading-snug truncate"
+                                  title={title}
+                                >
                                   {title}
                                 </h4>
 
                                 {/* Section chip */}
                                 {item.section && (
                                   <p className="text-[10px] font-bold text-amber-700 truncate mt-0.5">
-                                    📍 {item.section.name} ({item.section.program_type?.name || "Regular"})
+                                    📍 {item.section.name} (
+                                    {item.section.program_type?.name ||
+                                      "Regular"}
+                                    )
                                   </p>
                                 )}
 
@@ -629,11 +729,15 @@ export default function AssignmentsTasks() {
                                 <div className="text-[10px] font-medium text-slate-500 space-y-0.5 mt-1.5 pt-1.5 border-t border-slate-100">
                                   <p className="flex items-center gap-1 truncate font-semibold text-slate-700">
                                     <User className="w-3 h-3 text-slate-400 shrink-0" />
-                                    <span className="truncate">{instructor}</span>
+                                    <span className="truncate">
+                                      {instructor}
+                                    </span>
                                   </p>
                                   <p className="flex items-center gap-1 truncate text-slate-400">
                                     <MapPin className="w-3 h-3 shrink-0" />
-                                    <span className="truncate">{item.location || "Sanctuary"}</span>
+                                    <span className="truncate">
+                                      {item.location || "Sanctuary"}
+                                    </span>
                                   </p>
                                 </div>
                               </div>
@@ -641,16 +745,24 @@ export default function AssignmentsTasks() {
                               {/* Actions */}
                               <div className="flex items-center gap-1.5 pt-2 border-t border-slate-100">
                                 <button
-                                  onClick={() => navigate(`/attendance?assignment_id=${item.id}`)}
+                                  onClick={() =>
+                                    navigate(
+                                      `/attendance?assignment_id=${item.id}`,
+                                    )
+                                  }
                                   className="flex-1 py-1.5 px-2 bg-brand-800 hover:bg-brand-900 text-white rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1 shadow-xs transition-colors"
                                   title={attendanceActionLabel}
                                 >
                                   <CheckSquare className="w-3 h-3 text-amber-400" />
                                   Attendance
                                 </button>
-                                {(isSuperAdmin || isAcademicAdmin || isMezmurAdmin) && (
+                                {(isSuperAdmin ||
+                                  isAcademicAdmin ||
+                                  isMezmurAdmin) && (
                                   <button
-                                    onClick={() => handleDeleteSchedule(item.id)}
+                                    onClick={() =>
+                                      handleDeleteSchedule(item.id)
+                                    }
                                     disabled={deletingId === item.id}
                                     className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                                     title="Delete entry"
@@ -679,7 +791,8 @@ export default function AssignmentsTasks() {
                   onClick={() => {
                     const d = new Date(currentDate);
                     if (calendarView === "month") d.setMonth(d.getMonth() - 1);
-                    else if (calendarView === "week") d.setDate(d.getDate() - 7);
+                    else if (calendarView === "week")
+                      d.setDate(d.getDate() - 7);
                     else d.setDate(d.getDate() - 1);
                     setCurrentDate(d);
                   }}
@@ -697,7 +810,8 @@ export default function AssignmentsTasks() {
                   onClick={() => {
                     const d = new Date(currentDate);
                     if (calendarView === "month") d.setMonth(d.getMonth() + 1);
-                    else if (calendarView === "week") d.setDate(d.getDate() + 7);
+                    else if (calendarView === "week")
+                      d.setDate(d.getDate() + 7);
                     else d.setDate(d.getDate() + 1);
                     setCurrentDate(d);
                   }}
@@ -706,7 +820,10 @@ export default function AssignmentsTasks() {
                   <ChevronRight className="w-4 h-4" />
                 </button>
                 <span className="font-black text-slate-900 text-sm ml-2">
-                  {format(currentDate, calendarView === "month" ? "MMMM yyyy" : "MMM dd, yyyy")}
+                  {format(
+                    currentDate,
+                    calendarView === "month" ? "MMMM yyyy" : "MMM dd, yyyy",
+                  )}
                 </span>
               </div>
 
@@ -717,7 +834,9 @@ export default function AssignmentsTasks() {
                     key={v}
                     onClick={() => setCalendarView(v)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all ${
-                      calendarView === v ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-800"
+                      calendarView === v
+                        ? "bg-white text-slate-900 shadow-xs"
+                        : "text-slate-500 hover:text-slate-800"
                     }`}
                   >
                     {v}
@@ -741,7 +860,9 @@ export default function AssignmentsTasks() {
                 toolbar={false}
                 eventPropGetter={eventStyleGetter}
                 onSelectEvent={(event) =>
-                  navigate(`/attendance?assignment_id=${event.raw?.id || event.id}`)
+                  navigate(
+                    `/attendance?assignment_id=${event.raw?.id || event.id}`,
+                  )
                 }
                 components={{ event: CalendarEvent }}
               />
@@ -760,10 +881,14 @@ export default function AssignmentsTasks() {
               visibleRawAssignments.map((item) => {
                 const isCourse = item.type === "Course";
                 const title = isCourse
-                  ? item.assignment_courses?.[0]?.course?.name || "Academic Block"
+                  ? item.assignment_courses?.[0]?.course?.name ||
+                    "Academic Block"
                   : item.mezmurs?.[0]?.title || "Mezmur Training Session";
-                const instructor = item.teacher?.name || item.trainer?.name || "Unassigned";
-                const dayObj = DAYS_OF_WEEK.find((d) => String(d.id) === String(item.day_of_week));
+                const instructor =
+                  item.teacher?.name || item.trainer?.name || "Unassigned";
+                const dayObj = DAYS_OF_WEEK.find(
+                  (d) => String(d.id) === String(item.day_of_week),
+                );
 
                 return (
                   <div
@@ -773,25 +898,38 @@ export default function AssignmentsTasks() {
                     <div className="flex items-start gap-3.5">
                       <div
                         className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-xs ${
-                          isCourse ? "bg-brand-50 text-brand-700 border border-brand-200/60" : "bg-amber-50 text-amber-700 border border-amber-200/60"
+                          isCourse
+                            ? "bg-brand-50 text-brand-700 border border-brand-200/60"
+                            : "bg-amber-50 text-amber-700 border border-amber-200/60"
                         }`}
                       >
-                        {isCourse ? <BookOpen className="w-5 h-5" /> : <Music className="w-5 h-5" />}
+                        {isCourse ? (
+                          <BookOpen className="w-5 h-5" />
+                        ) : (
+                          <Music className="w-5 h-5" />
+                        )}
                       </div>
 
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-extrabold text-slate-900 text-base">{title}</h3>
+                          <h3 className="font-extrabold text-slate-900 text-base">
+                            {title}
+                          </h3>
                           <span
                             className={`px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${
-                              isCourse ? "bg-brand-50 text-brand-700" : "bg-amber-50 text-amber-700"
+                              isCourse
+                                ? "bg-brand-50 text-brand-700"
+                                : "bg-amber-50 text-amber-700"
                             }`}
                           >
                             {isCourse ? "Course" : "Mezmur Training"}
                           </span>
                           {item.scheduled_date ? (
                             <span className="px-2 py-0.5 rounded-md bg-sky-100 text-sky-800 text-[10px] font-bold">
-                              One-time: {formatEthiopianDate(`${item.scheduled_date}T00:00:00`)}
+                              One-time:{" "}
+                              {formatEthiopianDate(
+                                `${item.scheduled_date}T00:00:00`,
+                              )}
                             </span>
                           ) : (
                             <span className="px-2 py-0.5 rounded-md bg-slate-200/70 text-slate-700 text-[10px] font-black uppercase">
@@ -803,7 +941,8 @@ export default function AssignmentsTasks() {
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-bold text-slate-500 mt-1.5">
                           <span className="flex items-center gap-1 text-slate-700">
                             <Clock className="w-3.5 h-3.5 text-slate-400" />
-                            {item.start_time?.slice(0, 5)} - {item.end_time?.slice(0, 5)}
+                            {item.start_time?.slice(0, 5)} -{" "}
+                            {item.end_time?.slice(0, 5)}
                           </span>
                           <span className="flex items-center gap-1 text-slate-700">
                             <User className="w-3.5 h-3.5 text-slate-400" />
@@ -812,7 +951,8 @@ export default function AssignmentsTasks() {
                           {item.section && (
                             <span className="flex items-center gap-1 text-amber-800">
                               <GraduationCap className="w-3.5 h-3.5 text-amber-600" />
-                              {item.section.name} ({item.section.program_type?.name || "Regular"})
+                              {item.section.name} (
+                              {item.section.program_type?.name || "Regular"})
                             </span>
                           )}
                           <span className="flex items-center gap-1 text-brand-700">
@@ -825,7 +965,9 @@ export default function AssignmentsTasks() {
 
                     <div className="flex items-center gap-2 shrink-0">
                       <button
-                        onClick={() => navigate(`/attendance?assignment_id=${item.id}`)}
+                        onClick={() =>
+                          navigate(`/attendance?assignment_id=${item.id}`)
+                        }
                         className="flex items-center gap-1.5 px-4 py-2 bg-brand-800 hover:bg-brand-900 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-xs transition-colors"
                       >
                         <CheckSquare className="w-3.5 h-3.5 text-amber-400" />
@@ -859,11 +1001,17 @@ export default function AssignmentsTasks() {
             <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-linear-to-r from-brand-900 via-brand-800 to-brand-950 text-white rounded-t-3xl sticky top-0 z-20">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-white p-1 flex items-center justify-center shadow-md shrink-0">
-                  <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" />
+                  <img
+                    src="/logo.png"
+                    alt="Logo"
+                    className="w-full h-full object-contain"
+                  />
                 </div>
                 <div>
                   <h2 className="text-xl font-black uppercase tracking-wide text-white">
-                    {isMezmurAdmin ? "New Mezmur Training Schedule" : "New Schedule Assignment"}
+                    {isMezmurAdmin
+                      ? "New Mezmur Training Schedule"
+                      : "New Schedule Assignment"}
                   </h2>
                   <p className="text-amber-300 text-xs font-bold uppercase tracking-widest mt-0.5">
                     ቅድስት ኪዳነ ምሕረት &bull; Timetable Management
@@ -888,7 +1036,9 @@ export default function AssignmentsTasks() {
                   <div className="grid grid-cols-2 gap-3">
                     <button
                       type="button"
-                      onClick={() => setFormData({ ...formData, type: "Course" })}
+                      onClick={() =>
+                        setFormData({ ...formData, type: "Course" })
+                      }
                       className={`p-3.5 rounded-2xl border-2 font-black uppercase text-xs tracking-wider flex items-center justify-center gap-2.5 transition-all ${
                         formData.type === "Course"
                           ? "border-brand-700 bg-brand-50 text-brand-900 shadow-xs"
@@ -900,7 +1050,9 @@ export default function AssignmentsTasks() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setFormData({ ...formData, type: "MezmurTraining" })}
+                      onClick={() =>
+                        setFormData({ ...formData, type: "MezmurTraining" })
+                      }
                       className={`p-3.5 rounded-2xl border-2 font-black uppercase text-xs tracking-wider flex items-center justify-center gap-2.5 transition-all ${
                         formData.type === "MezmurTraining"
                           ? "border-amber-500 bg-amber-50 text-amber-900 shadow-xs"
@@ -946,7 +1098,9 @@ export default function AssignmentsTasks() {
                         ...formData,
                         recurrence_type: "one-time",
                         day_of_week: "",
-                        scheduled_date: formData.scheduled_date || new Date().toISOString().split("T")[0],
+                        scheduled_date:
+                          formData.scheduled_date ||
+                          new Date().toISOString().split("T")[0],
                       })
                     }
                     className={`py-2.5 px-4 rounded-xl font-black uppercase text-xs tracking-wider flex items-center justify-center gap-2 transition-all ${
@@ -966,12 +1120,19 @@ export default function AssignmentsTasks() {
                 <div className="space-y-4 p-5 bg-slate-50 rounded-2xl border border-slate-200/80">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-700">Target Section *</label>
+                      <label className="text-xs font-bold text-slate-700">
+                        Target Section *
+                      </label>
                       <select
                         required
                         className={inputCls}
                         value={formData.section_id}
-                        onChange={(e) => setFormData({ ...formData, section_id: e.target.value })}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            section_id: e.target.value,
+                          })
+                        }
                       >
                         <option value="">Select Section</option>
                         {sections.map((s) => (
@@ -983,12 +1144,19 @@ export default function AssignmentsTasks() {
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-700">Course / Subject *</label>
+                      <label className="text-xs font-bold text-slate-700">
+                        Course / Subject *
+                      </label>
                       <select
                         required
                         className={inputCls}
                         value={formData.course_id}
-                        onChange={(e) => setFormData({ ...formData, course_id: e.target.value })}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            course_id: e.target.value,
+                          })
+                        }
                       >
                         <option value="">Select Course</option>
                         {courses.map((c) => (
@@ -1001,12 +1169,16 @@ export default function AssignmentsTasks() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700">Assigned Teacher *</label>
+                    <label className="text-xs font-bold text-slate-700">
+                      Assigned Teacher *
+                    </label>
                     <select
                       required
                       className={inputCls}
                       value={formData.user_id}
-                      onChange={(e) => setFormData({ ...formData, user_id: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, user_id: e.target.value })
+                      }
                     >
                       <option value="">Select Teacher</option>
                       {teachers.map((t) => (
@@ -1024,12 +1196,19 @@ export default function AssignmentsTasks() {
                 <div className="space-y-4 p-5 bg-slate-50 rounded-2xl border border-slate-200/80">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-700">Lead Trainer *</label>
+                      <label className="text-xs font-bold text-slate-700">
+                        Lead Trainer *
+                      </label>
                       <select
                         required
                         className={inputCls}
                         value={formData.trainer_id}
-                        onChange={(e) => setFormData({ ...formData, trainer_id: e.target.value })}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            trainer_id: e.target.value,
+                          })
+                        }
                       >
                         <option value="">Select Trainer</option>
                         {trainers.map((t) => (
@@ -1041,11 +1220,18 @@ export default function AssignmentsTasks() {
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-700">Target Section (Optional)</label>
+                      <label className="text-xs font-bold text-slate-700">
+                        Target Section (Optional)
+                      </label>
                       <select
                         className={inputCls}
                         value={formData.section_id}
-                        onChange={(e) => setFormData({ ...formData, section_id: e.target.value })}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            section_id: e.target.value,
+                          })
+                        }
                       >
                         <option value="">General Sunday School / Open</option>
                         {sections.map((s) => (
@@ -1064,11 +1250,18 @@ export default function AssignmentsTasks() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {formData.recurrence_type === "periodic" ? (
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-700">Day of Week *</label>
+                      <label className="text-xs font-bold text-slate-700">
+                        Day of Week *
+                      </label>
                       <select
                         className={inputCls}
                         value={formData.day_of_week}
-                        onChange={(e) => setFormData({ ...formData, day_of_week: e.target.value })}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            day_of_week: e.target.value,
+                          })
+                        }
                       >
                         {DAYS_OF_WEEK.map((d) => (
                           <option key={d.id} value={d.id}>
@@ -1082,41 +1275,58 @@ export default function AssignmentsTasks() {
                       label="Date"
                       required
                       value={formData.scheduled_date}
-                      onChange={(e) => setFormData({ ...formData, scheduled_date: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          scheduled_date: e.target.value,
+                        })
+                      }
                       className={inputCls}
                     />
                   )}
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700">Start Time *</label>
+                    <label className="text-xs font-bold text-slate-700">
+                      Start Time *
+                    </label>
                     <input
                       type="time"
                       required
                       className={inputCls}
                       value={formData.start_time}
-                      onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, start_time: e.target.value })
+                      }
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700">End Time *</label>
+                    <label className="text-xs font-bold text-slate-700">
+                      End Time *
+                    </label>
                     <input
                       type="time"
                       required
                       className={inputCls}
                       value={formData.end_time}
-                      onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, end_time: e.target.value })
+                      }
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Venue / Classroom / Hall</label>
+                  <label className="text-xs font-bold text-slate-700">
+                    Venue / Classroom / Hall
+                  </label>
                   <input
                     placeholder="e.g. Main Church Hall, Room 204, Choir Stage"
                     className={inputCls}
                     value={formData.location}
-                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, location: e.target.value })
+                    }
                   />
                 </div>
               </div>

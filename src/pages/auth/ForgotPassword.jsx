@@ -107,19 +107,33 @@ export default function ForgotPassword() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2 mb-8" aria-label="Password recovery progress">
+          <div
+            className="flex items-center gap-2 mb-8"
+            aria-label="Password recovery progress"
+          >
             {["Username", "Verify answer", "Complete"].map((label, index) => {
               const itemStep = index + 1;
               const active = step >= itemStep;
               return (
-                <div key={label} className="flex items-center gap-2 flex-1 min-w-0">
-                  <div className={`w-7 h-7 shrink-0 rounded-full flex items-center justify-center text-xs font-black ${active ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-400"}`}>
+                <div
+                  key={label}
+                  className="flex items-center gap-2 flex-1 min-w-0"
+                >
+                  <div
+                    className={`w-7 h-7 shrink-0 rounded-full flex items-center justify-center text-xs font-black ${active ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-400"}`}
+                  >
                     {itemStep}
                   </div>
-                  <span className={`text-[10px] font-black uppercase tracking-wide truncate ${active ? "text-brand-700" : "text-slate-400"}`}>
+                  <span
+                    className={`text-[10px] font-black uppercase tracking-wide truncate ${active ? "text-brand-700" : "text-slate-400"}`}
+                  >
                     {label}
                   </span>
-                  {itemStep < 3 && <div className={`h-px flex-1 ${step > itemStep ? "bg-brand-300" : "bg-slate-200"}`} />}
+                  {itemStep < 3 && (
+                    <div
+                      className={`h-px flex-1 ${step > itemStep ? "bg-brand-300" : "bg-slate-200"}`}
+                    />
+                  )}
                 </div>
               );
             })}
@@ -166,7 +180,8 @@ export default function ForgotPassword() {
                 }}
                 className="text-xs font-black uppercase tracking-widest text-brand-600 hover:text-brand-800"
               >
-                <ArrowLeft className="w-3.5 h-3.5 inline mr-1" /> Change username
+                <ArrowLeft className="w-3.5 h-3.5 inline mr-1" /> Change
+                username
               </button>
               <div className="rounded-2xl bg-brand-50 border border-brand-100 p-4">
                 <p className="text-[10px] font-black text-brand-600 uppercase tracking-widest mb-2">

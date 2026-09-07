@@ -91,23 +91,34 @@ export default function StudentModal({
   useEffect(() => {
     if (student) {
       const addr = student.address || {};
-      const guardian = student.contacts?.find((c) => c.type === "Guardian" || c.type === "Parent");
-      const emerg = student.contacts?.find((c) => c.type === "Emergency" || c.relationship === "Emergency Responder");
+      const guardian = student.contacts?.find(
+        (c) => c.type === "Guardian" || c.type === "Parent",
+      );
+      const emerg = student.contacts?.find(
+        (c) =>
+          c.type === "Emergency" || c.relationship === "Emergency Responder",
+      );
 
       setFormData({
         name: student.name || "",
         christian_name: student.christian_name || "",
-        birth_date: student.birth_date ? student.birth_date.substring(0, 10) : "",
+        birth_date: student.birth_date
+          ? student.birth_date.substring(0, 10)
+          : "",
         sex: student.sex || "Male",
         educational_level: student.educational_level || "elementary",
         grade_level: student.grade_level || "",
         occupation_type: student.occupation_type || "student",
         current_school: student.current_school || "",
         current_office: student.current_office || "",
-        family_guardian_name: student.family_guardian_name || guardian?.name || "",
-        family_guardian_phone: student.family_guardian_phone || guardian?.phone_number || "",
-        emergency_contact_name: student.emergency_contact_name || emerg?.name || "",
-        emergency_contact_phone: student.emergency_contact_phone || emerg?.phone_number || "",
+        family_guardian_name:
+          student.family_guardian_name || guardian?.name || "",
+        family_guardian_phone:
+          student.family_guardian_phone || guardian?.phone_number || "",
+        emergency_contact_name:
+          student.emergency_contact_name || emerg?.name || "",
+        emergency_contact_phone:
+          student.emergency_contact_phone || emerg?.phone_number || "",
         phone_number: student.phone_number || "",
         email_address: student.email_address || "",
         telegram_user_name: student.telegram_user_name || "",
@@ -118,14 +129,25 @@ export default function StudentModal({
         house_no: addr.house_no || addr.house_number || "",
         classification: student.classification || "htsanat",
         is_night: Boolean(student.is_night),
-        track: student.section?.programType?.name || (track === "prekg" ? "PreKG" : track === "distance" ? "Distance" : "Regular"),
+        track:
+          student.section?.programType?.name ||
+          (track === "prekg"
+            ? "PreKG"
+            : track === "distance"
+              ? "Distance"
+              : "Regular"),
         section_id: student.section_id || "",
         status: student.status || "new",
       });
 
       setPicturePreview(student.picture_url || null);
     } else {
-      const initialTrack = track === "prekg" ? "PreKG" : track === "distance" ? "Distance" : "Regular";
+      const initialTrack =
+        track === "prekg"
+          ? "PreKG"
+          : track === "distance"
+            ? "Distance"
+            : "Regular";
       setFormData({
         name: "",
         christian_name: "",
@@ -148,7 +170,12 @@ export default function StudentModal({
         woreda: "",
         kebele: "",
         house_no: "",
-        classification: initialTrack === "PreKG" ? "prekg" : initialTrack === "Distance" ? "distance" : "htsanat",
+        classification:
+          initialTrack === "PreKG"
+            ? "prekg"
+            : initialTrack === "Distance"
+              ? "distance"
+              : "htsanat",
         is_night: false,
         track: initialTrack,
         section_id: "",
@@ -243,7 +270,8 @@ export default function StudentModal({
   };
 
   const handleDelete = async () => {
-    if (!confirm("Are you sure you want to permanently remove this student?")) return;
+    if (!confirm("Are you sure you want to permanently remove this student?"))
+      return;
     try {
       await studentService.deleteStudent(student.id);
       onSuccess?.();
@@ -265,30 +293,51 @@ export default function StudentModal({
     const chosenTrack = formData.track.toLowerCase();
 
     if (chosenTrack === "prekg") {
-      return progName.includes("prekg") || secName.includes("prekg") || secName.includes("pre kg");
+      return (
+        progName.includes("prekg") ||
+        secName.includes("prekg") ||
+        secName.includes("pre kg")
+      );
     }
     if (chosenTrack === "distance") {
-      return progName.includes("distance") || secName.includes("distance") || secName.startsWith("d");
+      return (
+        progName.includes("distance") ||
+        secName.includes("distance") ||
+        secName.startsWith("d")
+      );
     }
 
     // Regular track: filter strictly by classification
-    const isRegularProg = progName.includes("regular") || progName.includes("young") || !progName;
+    const isRegularProg =
+      progName.includes("regular") || progName.includes("young") || !progName;
     if (!isRegularProg) return false;
 
     const classification = formData.classification?.toLowerCase() || "htsanat";
 
     // Extract any grade number or number from section name or order_no
     const match = secName.match(/grade\s*([0-9]+)|([0-9]+)/i);
-    const gradeNum = match ? parseInt(match[1] || match[2], 10) : (s.order_no || 0);
+    const gradeNum = match
+      ? parseInt(match[1] || match[2], 10)
+      : s.order_no || 0;
 
     if (classification === "htsanat") {
-      if (secName.includes("htsanat") || secName.includes("ህፃናት") || secName.includes("ህጻናት")) return true;
+      if (
+        secName.includes("htsanat") ||
+        secName.includes("ህፃናት") ||
+        secName.includes("ህጻናት")
+      )
+        return true;
       if (gradeNum >= 1 && gradeNum <= 4) return true;
       return false;
     }
 
     if (classification === "maekelawyan") {
-      if (secName.includes("maekelawyan") || secName.includes("ማዕከላውያን") || secName.includes("ማእከላውያን")) return true;
+      if (
+        secName.includes("maekelawyan") ||
+        secName.includes("ማዕከላውያን") ||
+        secName.includes("ማእከላውያን")
+      )
+        return true;
       if (gradeNum >= 5 && gradeNum <= 8) return true;
       return false;
     }
@@ -314,7 +363,6 @@ export default function StudentModal({
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-[fade-in_0.2s_ease-out]">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col transform transition-all animate-[slide-up_0.3s_ease-out] overflow-hidden">
-        
         {/* Modal Header */}
         <div className="flex items-center justify-between border-b border-slate-100 px-8 py-5 bg-gradient-to-r from-slate-50 to-white">
           <div className="flex items-center gap-3">
@@ -323,7 +371,11 @@ export default function StudentModal({
             </div>
             <div>
               <h2 className="text-2xl font-black text-slate-800 tracking-tight">
-                {isCreate ? "Register New Student" : mode === "view" ? "Student Profile" : "Edit Student Information"}
+                {isCreate
+                  ? "Register New Student"
+                  : mode === "view"
+                    ? "Student Profile"
+                    : "Edit Student Information"}
               </h2>
               <div className="flex items-center gap-2 mt-0.5">
                 <span className="text-xs font-bold text-brand-600 uppercase tracking-wider">
@@ -410,22 +462,64 @@ export default function StudentModal({
               {/* Data Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 pt-2">
                 <ViewData label="Gender / Sex" value={student.sex} />
-                <ViewData label="Birth Date" value={student.birth_date ? student.birth_date.substring(0, 10) : "-"} />
-                <ViewData label="Age" value={student.age ? `${student.age} yrs` : "-"} />
-                
-                <ViewData label="Education Level" value={student.educational_level} />
-                <ViewData label="Occupation Status" value={student.occupation_type ? (student.occupation_type === "working" ? "Working" : "Student") : "-"} />
                 <ViewData
-                  label={student.occupation_type === "working" ? "Current Office" : "Current School"}
-                  value={student.occupation_type === "working" ? student.current_office : student.current_school}
+                  label="Birth Date"
+                  value={
+                    student.birth_date
+                      ? student.birth_date.substring(0, 10)
+                      : "-"
+                  }
+                />
+                <ViewData
+                  label="Age"
+                  value={student.age ? `${student.age} yrs` : "-"}
+                />
+
+                <ViewData
+                  label="Education Level"
+                  value={student.educational_level}
+                />
+                <ViewData
+                  label="Occupation Status"
+                  value={
+                    student.occupation_type
+                      ? student.occupation_type === "working"
+                        ? "Working"
+                        : "Student"
+                      : "-"
+                  }
+                />
+                <ViewData
+                  label={
+                    student.occupation_type === "working"
+                      ? "Current Office"
+                      : "Current School"
+                  }
+                  value={
+                    student.occupation_type === "working"
+                      ? student.current_office
+                      : student.current_school
+                  }
                 />
 
                 <ViewData label="Student Phone" value={student.phone_number} />
-                <ViewData label="Family / Guardian Name" value={student.family_guardian_name} />
-                <ViewData label="Guardian Phone" value={student.family_guardian_phone} />
+                <ViewData
+                  label="Family / Guardian Name"
+                  value={student.family_guardian_name}
+                />
+                <ViewData
+                  label="Guardian Phone"
+                  value={student.family_guardian_phone}
+                />
 
-                <ViewData label="Emergency Contact Name" value={student.emergency_contact_name} />
-                <ViewData label="Emergency Contact Phone" value={student.emergency_contact_phone} />
+                <ViewData
+                  label="Emergency Contact Name"
+                  value={student.emergency_contact_name}
+                />
+                <ViewData
+                  label="Emergency Contact Phone"
+                  value={student.emergency_contact_phone}
+                />
                 <ViewData label="Status" value={student.status || "new"} />
               </div>
 
@@ -435,15 +529,25 @@ export default function StudentModal({
                   <Home className="w-3.5 h-3.5" /> Living Address
                 </h4>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  <ViewData label="City" value={student.address?.city || "Addis Ababa"} />
+                  <ViewData
+                    label="City"
+                    value={student.address?.city || "Addis Ababa"}
+                  />
                   <ViewData label="Subcity" value={student.address?.subcity} />
-                  <ViewData label="Woreda" value={student.address?.woreda || student.address?.district} />
-                  <ViewData label="Kebele / House No" value={`${student.address?.kebele || "-"} / ${student.address?.house_no || student.address?.house_number || "-"}`} />
+                  <ViewData
+                    label="Woreda"
+                    value={student.address?.woreda || student.address?.district}
+                  />
+                  <ViewData
+                    label="Kebele / House No"
+                    value={`${student.address?.kebele || "-"} / ${student.address?.house_no || student.address?.house_number || "-"}`}
+                  />
                 </div>
               </div>
 
               {/* Documents & Certificates */}
-              {(student.birth_certificates_urls?.length > 0 || student.educational_certificates_urls?.length > 0) && (
+              {(student.birth_certificates_urls?.length > 0 ||
+                student.educational_certificates_urls?.length > 0) && (
                 <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/70">
                   <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
                     <Paperclip className="w-3.5 h-3.5" /> Uploaded Documents
@@ -451,7 +555,9 @@ export default function StudentModal({
                   <div className="space-y-3">
                     {student.birth_certificates_urls?.length > 0 && (
                       <div>
-                        <p className="text-xs font-bold text-slate-500 mb-1">Birth Certificate(s):</p>
+                        <p className="text-xs font-bold text-slate-500 mb-1">
+                          Birth Certificate(s):
+                        </p>
                         <div className="flex flex-wrap gap-2">
                           {student.birth_certificates_urls.map((url, i) => (
                             <a
@@ -461,7 +567,8 @@ export default function StudentModal({
                               rel="noreferrer"
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-brand-700 hover:bg-brand-50"
                             >
-                              <FileText className="w-3.5 h-3.5" /> Certificate #{i + 1}
+                              <FileText className="w-3.5 h-3.5" /> Certificate #
+                              {i + 1}
                               <ExternalLink className="w-3 h-3 ml-0.5" />
                             </a>
                           ))}
@@ -471,20 +578,25 @@ export default function StudentModal({
 
                     {student.educational_certificates_urls?.length > 0 && (
                       <div className="mt-2">
-                        <p className="text-xs font-bold text-slate-500 mb-1">Educational Certificate(s):</p>
+                        <p className="text-xs font-bold text-slate-500 mb-1">
+                          Educational Certificate(s):
+                        </p>
                         <div className="flex flex-wrap gap-2">
-                          {student.educational_certificates_urls.map((url, i) => (
-                            <a
-                              key={i}
-                              href={url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-brand-700 hover:bg-brand-50"
-                            >
-                              <FileText className="w-3.5 h-3.5" /> Certificate #{i + 1}
-                              <ExternalLink className="w-3 h-3 ml-0.5" />
-                            </a>
-                          ))}
+                          {student.educational_certificates_urls.map(
+                            (url, i) => (
+                              <a
+                                key={i}
+                                href={url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-brand-700 hover:bg-brand-50"
+                              >
+                                <FileText className="w-3.5 h-3.5" /> Certificate
+                                #{i + 1}
+                                <ExternalLink className="w-3 h-3 ml-0.5" />
+                              </a>
+                            ),
+                          )}
                         </div>
                       </div>
                     )}
@@ -494,8 +606,11 @@ export default function StudentModal({
             </div>
           ) : (
             /* CREATE / EDIT FORM */
-            <form id="student-form" onSubmit={handleSubmit} className="space-y-8">
-              
+            <form
+              id="student-form"
+              onSubmit={handleSubmit}
+              className="space-y-8"
+            >
               {/* SECTION 1: Personal Information */}
               <div>
                 <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
@@ -517,7 +632,9 @@ export default function StudentModal({
                     ) : (
                       <div className="w-24 h-24 rounded-2xl bg-white border border-slate-200 flex flex-col items-center justify-center text-slate-400 mb-2">
                         <Upload className="w-6 h-6 mb-1" />
-                        <span className="text-[10px] font-bold">Upload Photo</span>
+                        <span className="text-[10px] font-bold">
+                          Upload Photo
+                        </span>
                       </div>
                     )}
                     <label className="cursor-pointer text-xs font-black text-brand-600 hover:text-brand-700 bg-white px-3 py-1.5 rounded-xl border border-brand-200 shadow-sm transition-all">
@@ -550,7 +667,11 @@ export default function StudentModal({
                     <EthiopianDateInput
                       label="Birth Date"
                       value={formData.birth_date}
-                      onChange={(e) => handleChange({ target: { name: "birth_date", value: e.target.value } })}
+                      onChange={(e) =>
+                        handleChange({
+                          target: { name: "birth_date", value: e.target.value },
+                        })
+                      }
                     />
 
                     <div>
@@ -621,7 +742,10 @@ export default function StudentModal({
                       <button
                         type="button"
                         onClick={() =>
-                          setFormData((p) => ({ ...p, occupation_type: "student" }))
+                          setFormData((p) => ({
+                            ...p,
+                            occupation_type: "student",
+                          }))
                         }
                         className={`flex-1 py-2.5 px-3 rounded-xl font-bold text-xs border transition-all ${
                           formData.occupation_type === "student"
@@ -634,7 +758,10 @@ export default function StudentModal({
                       <button
                         type="button"
                         onClick={() =>
-                          setFormData((p) => ({ ...p, occupation_type: "working" }))
+                          setFormData((p) => ({
+                            ...p,
+                            occupation_type: "working",
+                          }))
                         }
                         className={`flex-1 py-2.5 px-3 rounded-xl font-bold text-xs border transition-all ${
                           formData.occupation_type === "working"
@@ -794,8 +921,8 @@ export default function StudentModal({
                             trk === "PreKG"
                               ? "prekg"
                               : trk === "Distance"
-                              ? "distance"
-                              : "htsanat",
+                                ? "distance"
+                                : "htsanat",
                         }));
                       }}
                       required
@@ -810,7 +937,8 @@ export default function StudentModal({
                   {formData.track === "Regular" && (
                     <div>
                       <label className="text-xs font-bold text-slate-500 tracking-wide uppercase">
-                        Regular Classification <span className="text-red-500">*</span>
+                        Regular Classification{" "}
+                        <span className="text-red-500">*</span>
                       </label>
                       <select
                         name="classification"
@@ -839,13 +967,18 @@ export default function StudentModal({
                           name="is_night"
                           checked={Boolean(formData.is_night)}
                           onChange={(e) =>
-                            setFormData((p) => ({ ...p, is_night: e.target.checked }))
+                            setFormData((p) => ({
+                              ...p,
+                              is_night: e.target.checked,
+                            }))
                           }
                           className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
                         />
                         <span className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
                           <span>🌙 የማታ ተማሪ</span>
-                          <span className="text-[10px] text-indigo-600 font-medium">(Night Shift)</span>
+                          <span className="text-[10px] text-indigo-600 font-medium">
+                            (Night Shift)
+                          </span>
                         </span>
                       </label>
                     </div>
@@ -968,7 +1101,11 @@ export default function StudentModal({
                 className="flex items-center gap-2 px-7 py-2.5 bg-gradient-to-r from-brand-600 to-brand-500 text-white rounded-xl font-bold shadow-lg shadow-brand-500/20 hover:-translate-y-0.5 transition-all disabled:opacity-50"
               >
                 <Save className="w-4 h-4" />
-                {isSubmitting ? "Saving..." : isCreate ? "Enroll Student" : "Save Changes"}
+                {isSubmitting
+                  ? "Saving..."
+                  : isCreate
+                    ? "Enroll Student"
+                    : "Save Changes"}
               </button>
             )}
           </div>
@@ -1008,8 +1145,12 @@ function InputField({
 function ViewData({ label, value }) {
   return (
     <div>
-      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{label}</p>
-      <p className="text-sm font-semibold text-slate-800 mt-0.5">{value || "-"}</p>
+      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+        {label}
+      </p>
+      <p className="text-sm font-semibold text-slate-800 mt-0.5">
+        {value || "-"}
+      </p>
     </div>
   );
 }

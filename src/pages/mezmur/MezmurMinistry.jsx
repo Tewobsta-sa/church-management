@@ -141,7 +141,10 @@ export default function MezmurMinistry() {
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100, 116, 139);
       doc.text(
-        "Ministry Date: " + (ministry.ministry_date ? formatEthiopianDate(`${ministry.ministry_date}T00:00:00`) : "Continuous Active"),
+        "Ministry Date: " +
+          (ministry.ministry_date
+            ? formatEthiopianDate(`${ministry.ministry_date}T00:00:00`)
+            : "Continuous Active"),
         18,
         49,
       );
@@ -974,8 +977,12 @@ export default function MezmurMinistry() {
                       )}
                     </div>
                     <p className="text-xs font-semibold text-brand-600 mt-1">
-                      Exam Date: {formatEthiopianDate(`${selectedExam.exam_date}T00:00:00`)} &bull; Evaluate
-                      Candidates &bull; Direct Bulk Ministry Assignment
+                      Exam Date:{" "}
+                      {formatEthiopianDate(
+                        `${selectedExam.exam_date}T00:00:00`,
+                      )}{" "}
+                      &bull; Evaluate Candidates &bull; Direct Bulk Ministry
+                      Assignment
                     </p>
                   </div>
 

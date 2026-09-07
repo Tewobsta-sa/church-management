@@ -27,7 +27,10 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { academicService } from "../../services/academicService";
-import { formatEthiopianDate, formatEthiopianDateTime } from "../../utils/ethiopianDate";
+import {
+  formatEthiopianDate,
+  formatEthiopianDateTime,
+} from "../../utils/ethiopianDate";
 
 export default function StudentPromotion() {
   const { user, hasRole } = useAuth();
@@ -1230,7 +1233,13 @@ export default function StudentPromotion() {
                               : "መደበኛ ትምህርት"}
                           </p>
                           <p className="text-[10px] text-slate-400">
-                            ቀን: {s.date ? formatEthiopianDate(`${s.date}T00:00:00`) : "—"} {s.marked_at ? `(${formatEthiopianDateTime(s.marked_at)})` : ""}
+                            ቀን:{" "}
+                            {s.date
+                              ? formatEthiopianDate(`${s.date}T00:00:00`)
+                              : "—"}{" "}
+                            {s.marked_at
+                              ? `(${formatEthiopianDateTime(s.marked_at)})`
+                              : ""}
                           </p>
                         </div>
                         <span
