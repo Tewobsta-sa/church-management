@@ -1,7 +1,7 @@
 {
   "app": {
-    "name": "St. Kidane Mehret",
-    "subtitle": "Sunday School Administration",
+    "name": "Jate Kidane Mehret",
+    "subtitle": "Fnote Semaetat Sunday School",
     "welcomeBack": "Welcome back, {{name}}"
   },
   "common": {
@@ -89,7 +89,9 @@
     "Teachers": "Teachers",
     "Grading": "Grading",
     "Reports": "Reports",
-    "Security": "Security"
+    "Security": "Security",
+    "MobileScanner": "Mobile Attendance Scanner",
+    "AttendanceViewer": "Attendance Viewer"
   },
   "auth": {
     "login": "Sign In",

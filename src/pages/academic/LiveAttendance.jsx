@@ -17,6 +17,7 @@ import { attendanceService } from "../../services/attendanceService";
 import { assignmentService } from "../../services/assignmentService";
 import { sectionService } from "../../services/sectionService";
 import { useAuth } from "../../context/AuthContext";
+import { formatEthiopianDateTime } from "../../utils/ethiopianDate";
 
 function assignmentLabel(a) {
   if (!a) return "—";
@@ -37,20 +38,21 @@ export default function LiveAttendance() {
   const assignmentId = queryParams.get("assignment_id");
 
   const isSuperAdmin = hasRole("super_admin");
-  const isTmhrt = hasRole("tmhrt_office_admin");
+  const isTmhrt = hasRole("tmhrt_kfl") || hasRole("tmhrt_office_admin");
+  const isYesewHabt = hasRole("yesew_habt");
   const isMezmur = hasRole("mezmur_office_admin");
   const isTeacher = hasRole("teacher");
 
-  const canTakeLive = !isSuperAdmin && (isTmhrt || isMezmur || isTeacher);
+  const canTakeLive = isYesewHabt;
 
   const canLiveForAssignment = (assign) => {
     if (!assign || !canTakeLive) return false;
 
-    if ((isTmhrt || isTeacher) && assign.type === 'Course') {
+    if (isYesewHabt) {
       return true;
     }
 
-    if (isMezmur && assign.type === 'MezmurTraining') {
+    if (isMezmur && assign.type === "MezmurTraining") {
       return true;
     }
 
@@ -326,9 +328,7 @@ export default function LiveAttendance() {
                       }
                     >
                       <td className="px-4 py-3 font-medium text-slate-700 whitespace-nowrap">
-                        {row.marked_at
-                          ? new Date(row.marked_at).toLocaleString()
-                          : "—"}
+                        {row.marked_at ? formatEthiopianDateTime(row.marked_at) : "—"}
                       </td>
                       <td className="px-4 py-3">
                         <div className="font-bold text-slate-800">

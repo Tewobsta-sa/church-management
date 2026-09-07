@@ -36,6 +36,14 @@ export const academicService = {
     return response.data;
   },
 
+  endorsePromotion: async (studentIds, notes = "") => {
+    const response = await api.post('/promotions/endorse', {
+      student_ids: studentIds,
+      notes: notes,
+    });
+    return response.data;
+  },
+
   approvePromotion: async (studentIds, notes = "") => {
     const response = await api.post('/promotions/approve', {
       student_ids: studentIds,

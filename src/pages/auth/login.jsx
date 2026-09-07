@@ -1,7 +1,17 @@
 import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
-import { Crown, KeyRound, UserCircle2, ArrowRight, Eye, EyeOff, X, HelpCircle, CheckCircle2 } from "lucide-react";
+import {
+  Crown,
+  KeyRound,
+  UserCircle2,
+  ArrowRight,
+  Eye,
+  EyeOff,
+  X,
+  HelpCircle,
+  CheckCircle2,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { getDefaultRouteForRole, getPrimaryRole } from "../../App";
 
@@ -50,7 +60,6 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-surface-50 flex items-center justify-center relative overflow-hidden font-sans selection:bg-brand-200">
-      
       {/* Immersive Background */}
       <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-25%] right-[-15%] w-[65vw] h-[65vw] rounded-full bg-brand-500/15 filter blur-[120px] animate-pulse"></div>
@@ -85,14 +94,16 @@ export default function Login() {
         <div className="glass-panel p-8 md:p-10 border border-white/80 shadow-2xl shadow-brand-950/10">
           {error && (
             <div className="mb-6 p-4 rounded-xl bg-red-50 text-red-600 text-sm font-medium border border-red-100 flex items-start animate-[fade-in_0.3s]">
-               <span className="shrink-0 mt-0.5 mr-2">⚠️</span>
-               <span>{error}</span>
+              <span className="shrink-0 mt-0.5 mr-2">⚠️</span>
+              <span>{error}</span>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <label className="text-sm font-semibold tracking-wide text-slate-700">{t("auth.username")}</label>
+              <label className="text-sm font-semibold tracking-wide text-slate-700">
+                {t("auth.username")}
+              </label>
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-brand-600 transition-colors">
                   <UserCircle2 className="h-5 w-5" />
@@ -115,11 +126,7 @@ export default function Login() {
                 <span>{t("auth.password")}</span>
                 <button
                   type="button"
-                  onClick={() => {
-                    setForgotPasswordModal(true);
-                    setResetSubmitted(false);
-                    setResetAccount(username || "");
-                  }}
+                  onClick={() => navigate("/forgot-password")}
                   className="text-xs text-brand-700 hover:text-brand-800 hover:underline font-bold transition-all focus:outline-none"
                 >
                   {t("auth.forgotPassword")}
@@ -143,7 +150,11 @@ export default function Login() {
                   onClick={() => setShowPassword((prev) => !prev)}
                   className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-brand-600 focus:outline-none transition-colors"
                   tabIndex={-1}
-                  aria-label={showPassword ? t("auth.hidePassword") : t("auth.showPassword")}
+                  aria-label={
+                    showPassword
+                      ? t("auth.hidePassword")
+                      : t("auth.showPassword")
+                  }
                 >
                   {showPassword ? (
                     <EyeOff className="h-5 w-5 text-brand-600" />
@@ -160,7 +171,7 @@ export default function Login() {
               className="w-full relative flex items-center justify-center gap-2 py-4 mt-2 font-bold text-white rounded-xl bg-gradient-to-r from-brand-600 to-brand-800 hover:from-brand-500 hover:to-brand-700 shadow-lg shadow-brand-500/30 hover:shadow-brand-500/50 hover:-translate-y-0.5 transition-all outline-none focus:ring-4 focus:ring-brand-500/30 overflow-hidden group disabled:opacity-70 disabled:hover:translate-y-0 disabled:hover:shadow-brand-500/30"
             >
               {isLoading ? (
-                 <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
               ) : (
                 <>
                   <span className="tracking-wide">{t("auth.signIn")}</span>
@@ -169,9 +180,11 @@ export default function Login() {
               )}
             </button>
           </form>
-          
+
           <div className="mt-8 text-center">
-            <p className="text-xs text-slate-400">Restricted system. Authorized personnel only.</p>
+            <p className="text-xs text-slate-400">
+              Restricted system. Authorized personnel only.
+            </p>
           </div>
         </div>
       </div>
@@ -184,7 +197,11 @@ export default function Login() {
             <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-brand-900 via-brand-800 to-brand-950 text-white">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-white p-1 flex items-center justify-center shadow-xs shrink-0">
-                  <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" />
+                  <img
+                    src="/logo.png"
+                    alt="Logo"
+                    className="w-full h-full object-contain"
+                  />
                 </div>
                 <div>
                   <h3 className="font-black text-sm uppercase tracking-wide text-white">
@@ -211,7 +228,9 @@ export default function Login() {
                     <CheckCircle2 className="w-8 h-8" />
                   </div>
                   <div>
-                    <h4 className="font-black text-slate-900 text-base">Request Submitted</h4>
+                    <h4 className="font-black text-slate-900 text-base">
+                      Request Submitted
+                    </h4>
                     <p className="text-xs text-slate-600 mt-2 leading-relaxed">
                       {t("auth.requestSubmitted")}
                     </p>
@@ -249,9 +268,17 @@ export default function Login() {
                   </div>
 
                   <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-[11px] text-slate-500 space-y-1 font-medium">
-                    <p className="font-bold text-slate-700">📌 Password Reset Policy:</p>
-                    <p>• Only Sunday School Super Administrators have authorization to reset personnel passwords.</p>
-                    <p>• A temporary password will be provided upon verification of identity.</p>
+                    <p className="font-bold text-slate-700">
+                      📌 Password Reset Policy:
+                    </p>
+                    <p>
+                      • Only Sunday School Super Administrators have
+                      authorization to reset personnel passwords.
+                    </p>
+                    <p>
+                      • A temporary password will be provided upon verification
+                      of identity.
+                    </p>
                   </div>
 
                   <div className="flex gap-2 pt-2">
@@ -278,4 +305,3 @@ export default function Login() {
     </div>
   );
 }
-

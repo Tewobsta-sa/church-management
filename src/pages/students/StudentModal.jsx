@@ -18,6 +18,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { studentService } from "../../services/studentService";
 import { sectionService } from "../../services/sectionService";
 import { useAuth } from "../../context/AuthContext";
+import EthiopianDateInput from "../../components/common/EthiopianDateInput";
 
 const EDUCATION_LEVELS = [
   { value: "elementary", label: "Elementary School (1-8)" },
@@ -69,6 +70,7 @@ export default function StudentModal({
     kebele: "",
     house_no: "",
     classification: "htsanat",
+    is_night: false,
     track: "Regular",
     section_id: "",
     status: "new",
@@ -115,6 +117,7 @@ export default function StudentModal({
         kebele: addr.kebele || "",
         house_no: addr.house_no || addr.house_number || "",
         classification: student.classification || "htsanat",
+        is_night: Boolean(student.is_night),
         track: student.section?.programType?.name || (track === "prekg" ? "PreKG" : track === "distance" ? "Distance" : "Regular"),
         section_id: student.section_id || "",
         status: student.status || "new",
@@ -146,6 +149,7 @@ export default function StudentModal({
         kebele: "",
         house_no: "",
         classification: initialTrack === "PreKG" ? "prekg" : initialTrack === "Distance" ? "distance" : "htsanat",
+        is_night: false,
         track: initialTrack,
         section_id: "",
         status: "new",
@@ -204,7 +208,7 @@ export default function StudentModal({
       const data = new FormData();
       Object.entries(formData).forEach(([key, val]) => {
         if (val !== null && val !== undefined) {
-          data.append(key, val);
+          data.append(key, typeof val === "boolean" ? (val ? 1 : 0) : val);
         }
       });
 
@@ -257,14 +261,45 @@ export default function StudentModal({
 
   const filteredSections = sections.filter((s) => {
     const progName = s.program_type?.name?.toLowerCase() || "";
+    const secName = s.name?.toLowerCase() || "";
     const chosenTrack = formData.track.toLowerCase();
+
     if (chosenTrack === "prekg") {
-      return progName.includes("prekg") || s.name?.toLowerCase().includes("prekg") || s.name?.toLowerCase().includes("pre kg");
+      return progName.includes("prekg") || secName.includes("prekg") || secName.includes("pre kg");
     }
     if (chosenTrack === "distance") {
-      return progName.includes("distance");
+      return progName.includes("distance") || secName.includes("distance") || secName.startsWith("d");
     }
-    return progName.includes("regular") || progName.includes("young");
+
+    // Regular track: filter strictly by classification
+    const isRegularProg = progName.includes("regular") || progName.includes("young") || !progName;
+    if (!isRegularProg) return false;
+
+    const classification = formData.classification?.toLowerCase() || "htsanat";
+
+    // Extract any grade number or number from section name or order_no
+    const match = secName.match(/grade\s*([0-9]+)|([0-9]+)/i);
+    const gradeNum = match ? parseInt(match[1] || match[2], 10) : (s.order_no || 0);
+
+    if (classification === "htsanat") {
+      if (secName.includes("htsanat") || secName.includes("ህፃናት") || secName.includes("ህጻናት")) return true;
+      if (gradeNum >= 1 && gradeNum <= 4) return true;
+      return false;
+    }
+
+    if (classification === "maekelawyan") {
+      if (secName.includes("maekelawyan") || secName.includes("ማዕከላውያን") || secName.includes("ማእከላውያን")) return true;
+      if (gradeNum >= 5 && gradeNum <= 8) return true;
+      return false;
+    }
+
+    if (classification === "wetatoch") {
+      if (secName.includes("wetatoch") || secName.includes("ወጣቶች")) return true;
+      if (gradeNum >= 9 && gradeNum <= 12) return true;
+      return false;
+    }
+
+    return true;
   });
 
   const qrData = student
@@ -512,18 +547,11 @@ export default function StudentModal({
                       onChange={handleChange}
                     />
 
-                    <div>
-                      <label className="text-xs font-bold text-slate-500 tracking-wide uppercase">
-                        Birth Date
-                      </label>
-                      <input
-                        type="date"
-                        name="birth_date"
-                        value={formData.birth_date}
-                        onChange={handleChange}
-                        className="w-full mt-1.5 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-brand-500 focus:bg-white transition-all font-medium text-slate-800"
-                      />
-                    </div>
+                    <EthiopianDateInput
+                      label="Birth Date"
+                      value={formData.birth_date}
+                      onChange={(e) => handleChange({ target: { name: "birth_date", value: e.target.value } })}
+                    />
 
                     <div>
                       <label className="text-xs font-bold text-slate-500 tracking-wide uppercase">
@@ -797,6 +825,29 @@ export default function StudentModal({
                           </option>
                         ))}
                       </select>
+                    </div>
+                  )}
+
+                  {formData.track === "Regular" && (
+                    <div className="flex flex-col justify-end">
+                      <label className="text-xs font-bold text-slate-500 tracking-wide uppercase mb-1.5">
+                        የመማሪያ ሰዓት / Shift
+                      </label>
+                      <label className="flex items-center gap-2.5 px-4 py-2.5 bg-indigo-50/80 border border-indigo-200 rounded-xl cursor-pointer hover:bg-indigo-100/70 transition-all select-none">
+                        <input
+                          type="checkbox"
+                          name="is_night"
+                          checked={Boolean(formData.is_night)}
+                          onChange={(e) =>
+                            setFormData((p) => ({ ...p, is_night: e.target.checked }))
+                          }
+                          className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                        />
+                        <span className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+                          <span>🌙 የማታ ተማሪ</span>
+                          <span className="text-[10px] text-indigo-600 font-medium">(Night Shift)</span>
+                        </span>
+                      </label>
                     </div>
                   )}
 

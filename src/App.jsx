@@ -25,10 +25,15 @@ import SectionsManagement from "./pages/sections/SectionsManagement";
 import SecuritySettings from "./pages/admin/SecuritySettings";
 import ForgotPassword from "./pages/auth/ForgotPassword";
 import TeachersManagement from "./pages/academic/TeachersManagement";
+import MobileAttendanceScanner from "./pages/academic/MobileAttendanceScanner";
+import MobileAttendanceViewer from "./pages/academic/MobileAttendanceViewer";
+import PwaInstallPrompt from "./components/common/PwaInstallPrompt";
 
 export const getPrimaryRole = (user) => {
   if (user?.roles && Array.isArray(user.roles) && user.roles.length > 0) {
-    return typeof user.roles[0] === "string" ? user.roles[0] : user.roles[0]?.name;
+    return typeof user.roles[0] === "string"
+      ? user.roles[0]
+      : user.roles[0]?.name;
   }
   return user?.role || null;
 };
@@ -76,7 +81,9 @@ function PublicRoute({ children }) {
   }
 
   if (user) {
-    return <Navigate to={getDefaultRouteForRole(getPrimaryRole(user))} replace />;
+    return (
+      <Navigate to={getDefaultRouteForRole(getPrimaryRole(user))} replace />
+    );
   }
 
   return children;
@@ -114,7 +121,9 @@ function RoleRoute({ children, allowedRoles }) {
   }
 
   if (!hasAnyAllowedRole(user, allowedRoles)) {
-    return <Navigate to={getDefaultRouteForRole(getPrimaryRole(user))} replace />;
+    return (
+      <Navigate to={getDefaultRouteForRole(getPrimaryRole(user))} replace />
+    );
   }
 
   return children;
@@ -186,7 +195,7 @@ function App() {
             <Route
               path="/users"
               element={
-                <RoleRoute allowedRoles={["super_admin"]}>
+                <RoleRoute allowedRoles={["super_admin", "tmhrt_office_admin"]}>
                   <UsersManagement />
                 </RoleRoute>
               }
@@ -254,6 +263,7 @@ function App() {
                 <RoleRoute
                   allowedRoles={[
                     "super_admin",
+                    "yesew_habt",
                     "tmhrt_kfl",
                     "mereja_kfl",
                     "tmhrt_office_admin",
@@ -299,6 +309,7 @@ function App() {
                 <RoleRoute
                   allowedRoles={[
                     "super_admin",
+                    "yesew_habt",
                     "tmhrt_kfl",
                     "mezmur_kfl",
                     "mereja_kfl",
@@ -404,11 +415,46 @@ function App() {
                 </RoleRoute>
               }
             />
+            <Route
+              path="/attendance/scanner"
+              element={
+                <ProtectedRoute>
+                  <MobileAttendanceScanner />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/attendance/mobile-viewer"
+              element={
+                <ProtectedRoute>
+                  <MobileAttendanceViewer />
+                </ProtectedRoute>
+              }
+            />
           </Route>
+
+          {/* Standalone Fullscreen Mobile App Routes (Optimized for Phones & PWAs) */}
+          <Route
+            path="/mobile/scanner"
+            element={
+              <ProtectedRoute>
+                <MobileAttendanceScanner />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/mobile/viewer"
+            element={
+              <ProtectedRoute>
+                <MobileAttendanceViewer />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Catch-all */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        <PwaInstallPrompt />
       </Router>
     </AuthProvider>
   );

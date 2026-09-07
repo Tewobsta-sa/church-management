@@ -1,7 +1,7 @@
 {
   "app": {
-    "name": "ቅድስት ኪዳነ ምሕረት",
-    "subtitle": "የሰንበት ት/ቤት አስተዳደር",
+    "name": "ጃቴ ኪዳነ ምሕረት",
+    "subtitle": "ፍኖተ ሰማዕታት ሰንበት ትምህርት ቤት",
     "welcomeBack": "እንኳን ደህና መጡ፣ {{name}}"
   },
   "common": {
@@ -89,7 +89,9 @@
     "Teachers": "መምህራን",
     "Grading": "ውጤት መዝግብ",
     "Reports": "ሪፖርቶች",
-    "Security": "ደህንነት"
+    "Security": "ደህንነት",
+    "MobileScanner": "የሞባይል QR ስካነር",
+    "AttendanceViewer": "የመገኘት መመልከቻ"
   },
   "auth": {
     "login": "ግባ",
@@ -132,7 +134,7 @@
   },
   "dashboard": {
     "title": "ዳሽቦርድ",
-    "welcome": "ወደ ቅድስት ኪዳነ ምሕረት ሰንበት ት/ቤት ሲስተም እንኳን ደህና መጡ",
+    "welcome": "ወደ ጃቴ ኪዳነ ምሕረት ፍኖተ ሰማዕታት ሰንበት ት/ቤት ሲስተም እንኳን ደህና መጡ",
     "loginSuccess": "መግባት ተሳክቷል!",
     "loggedInAs": "የአሁኑ ሚና:"
   },

@@ -19,6 +19,11 @@ export const mezmurService = {
     return response.data;
   },
 
+  getMinistryMembers: async (id) => {
+    const response = await api.get(`/ministries/${id}/members`);
+    return response.data;
+  },
+
   createMinistry: async (data) => {
     const response = await api.post("/ministries", data);
     return response.data;

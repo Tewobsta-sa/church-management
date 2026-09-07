@@ -1,14 +1,14 @@
-import api from './api';
+import api from "./api";
 
 export const userService = {
-  getUsers: async (page = 1, search = '') => {
+  getUsers: async (page = 1, search = "") => {
     const params = { page, search };
-    const res = await api.get('/users', { params });
+    const res = await api.get("/users", { params });
     return res.data;
   },
 
   createUser: async (userData) => {
-    const res = await api.post('/register', userData);
+    const res = await api.post("/register", userData);
     return res.data;
   },
 
@@ -23,17 +23,24 @@ export const userService = {
   },
 
   getStats: async () => {
-    const res = await api.get('/admin/stats');
+    const res = await api.get("/admin/stats");
     return res.data.stats;
   },
 
   updateProfile: async (userData) => {
-    const res = await api.put('/user/update', userData);
+    const res = await api.put("/user/update", userData);
     return res.data;
   },
 
   forgotPassword: async (data) => {
-    const res = await api.post('/forgot-password', data);
+    const res = await api.post("/forgot-password", data);
     return res.data;
-  }
+  },
+
+  getSecurityQuestion: async (username) => {
+    const res = await api.get("/forgot-password/question", {
+      params: { username },
+    });
+    return res.data;
+  },
 };

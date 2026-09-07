@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { 
   Users, CheckCircle2, Music, Layers, Clock, ArrowUpRight, 
-  TrendingUp, Calendar, ArrowRight, Activity, AlertCircle
+  TrendingUp, Calendar, ArrowRight, Activity, AlertCircle,
+  QrCode, Smartphone, Sparkles
 } from 'lucide-react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, 
@@ -50,18 +51,45 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8 animate-[fade-in_0.4s_ease-out]">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Executive Dashboard</h1>
-          <p className="text-slate-500 font-medium mt-1 uppercase text-xs tracking-widest">
-            Welcome back, <span className="text-brand-600 font-black">{user?.name}</span> • Young Program Track
-          </p>
+      {/* Hero Church Header Banner */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-brand-950 via-brand-900 to-slate-950 p-6 sm:p-8 text-white shadow-sacred border border-brand-800/40">
+        <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-md p-1.5 border border-gold-400/40 shadow-xl shrink-0 flex items-center justify-center">
+              <img src="/logo.png" alt="Finote Semaetat Logo" className="w-full h-full object-contain filter drop-shadow" />
+            </div>
+            <div className="space-y-1">
+              <div className="inline-flex items-center gap-2 px-3 py-0.5 rounded-full bg-brand-800/60 border border-brand-700/50 text-[11px] font-black tracking-widest text-gold-300 uppercase">
+                <Sparkles className="w-3.5 h-3.5 text-gold-400" />
+                ጃቴ ኪዳነ ምሕረት ፍኖተ ሰማዕታት ሰንበት ትምህርት ቤት
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+                Jate Kidane Mehret Fnote Semaetat
+              </h1>
+              <p className="text-xs sm:text-sm text-brand-200/90 font-medium">
+                የሰንበት ት/ቤት አስተዳደር ዋና ዳሽቦርድ · Welcome back, <strong className="text-gold-300 font-black">{user?.name}</strong>
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/15 text-xs font-bold text-slate-200 shadow-sm">
+              <Calendar className="w-4 h-4 text-gold-400" />
+              <span>{new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+            </div>
+            <button
+              onClick={() => navigate('/attendance/scanner')}
+              className="flex items-center gap-2 bg-gradient-to-r from-gold-500 to-amber-500 hover:from-gold-400 hover:to-amber-400 text-slate-950 font-black px-5 py-2.5 rounded-2xl shadow-lg shadow-gold-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all text-xs"
+            >
+              <QrCode className="w-4 h-4 text-slate-950" />
+              <span>የሞባይል QR ስካነር (Open Scanner)</span>
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl shadow-sm border border-slate-100">
-           <Calendar className="w-4 h-4 text-brand-600" />
-           <span className="text-sm font-bold text-slate-600">{new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
-        </div>
+
+        {/* Decorative background glow */}
+        <div className="absolute top-0 right-0 -mr-20 -mt-20 w-80 h-80 bg-brand-600/20 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute bottom-0 left-1/3 -mb-20 w-72 h-72 bg-gold-500/10 rounded-full blur-3xl pointer-events-none"></div>
       </div>
 
       {/* KPI Grid */}

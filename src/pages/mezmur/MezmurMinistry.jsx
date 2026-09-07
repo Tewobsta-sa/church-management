@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import {
   Music,
   Users,
-  Star,
   Plus,
   Settings,
   Trash2,
@@ -23,27 +22,29 @@ import {
   Calendar,
   UserCheck,
   Building2,
+  Download,
 } from "lucide-react";
+import jsPDF from "jspdf";
 import { mezmurService } from "../../services/mezmurService";
 import { useAuth } from "../../context/AuthContext";
+import EthiopianDateInput from "../../components/common/EthiopianDateInput";
+import { formatEthiopianDate } from "../../utils/ethiopianDate";
 
 export default function MezmurMinistry() {
   const { hasRole } = useAuth();
 
   const isSuperAdmin = hasRole("super_admin");
   const isMezmurAdmin = hasRole("mezmur_kfl") || hasRole("mezmur_office_admin");
-  const isYesewHabt = hasRole("yesew_habt") || hasRole("gngnunet_office_admin");
+  const isYesewHabt = hasRole("yesew_habt");
   const isMereja = hasRole("mereja_kfl");
 
   const canManageMezmur = (isMezmurAdmin || isSuperAdmin) && !isMereja;
-  const canManageMinistry = (isYesewHabt || isSuperAdmin || isMezmurAdmin) && !isMereja;
+  const canManageMinistry = (isSuperAdmin || isMezmurAdmin) && !isMereja;
 
   const [activeMainTab, setActiveMainTab] = useState("groups"); // groups | exams | passed_queue
   const [loading, setLoading] = useState(true);
 
   // Data
-  const [trainers, setTrainers] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [ministries, setMinistries] = useState([]);
 
@@ -72,29 +73,207 @@ export default function MezmurMinistry() {
   // Modals
   const [createExamModal, setCreateExamModal] = useState(false);
   const [examTitle, setExamTitle] = useState("");
-  const [examDate, setExamDate] = useState(new Date().toISOString().slice(0, 10));
+  const [examDate, setExamDate] = useState(
+    new Date().toISOString().slice(0, 10),
+  );
   const [examDesc, setExamDesc] = useState("");
   const [examMinistryId, setExamMinistryId] = useState("");
 
   const [createMinistryModal, setCreateMinistryModal] = useState(false);
   const [ministryName, setMinistryName] = useState("");
-  const [ministryDate, setMinistryDate] = useState(new Date().toISOString().slice(0, 10));
+  const [ministryDate, setMinistryDate] = useState(
+    new Date().toISOString().slice(0, 10),
+  );
   const [ministryLocation, setMinistryLocation] = useState("");
   const [ministryNotes, setMinistryNotes] = useState("");
   const [creatingMinistry, setCreatingMinistry] = useState(false);
+  const [exportingPdfId, setExportingPdfId] = useState(null);
+
+  const handleExportMinistryPDF = async (ministry) => {
+    try {
+      setExportingPdfId(ministry.id);
+      const res = await mezmurService.getMinistryMembers(ministry.id);
+      const members = res.members || [];
+
+      const doc = new jsPDF("p", "mm", "a4");
+      const pageWidth = doc.internal.pageSize.getWidth();
+
+      // Top Header Church Branding
+      doc.setFillColor(69, 26, 3);
+      doc.rect(0, 0, pageWidth, 28, "F");
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text(
+        "JATE KIDANE MEHRET FNOTE SEMAETAT SUNDAY SCHOOL",
+        pageWidth / 2,
+        11,
+        { align: "center" },
+      );
+
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.text(
+        "MINISTRY OF SERVICE & CHOIR DEPARTMENT • OFFICIAL ROSTER",
+        pageWidth / 2,
+        18,
+        { align: "center" },
+      );
+      doc.text(
+        "Date Generated: " + formatEthiopianDate(new Date()),
+        pageWidth / 2,
+        23,
+        { align: "center" },
+      );
+
+      // Ministry Information Box
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(226, 232, 240);
+      doc.roundedRect(14, 34, pageWidth - 28, 26, 3, 3, "FD");
+
+      doc.setTextColor(30, 41, 59);
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text("Ministry: " + (ministry.name || "N/A"), 18, 42);
+
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(100, 116, 139);
+      doc.text(
+        "Ministry Date: " + (ministry.ministry_date ? formatEthiopianDate(`${ministry.ministry_date}T00:00:00`) : "Continuous Active"),
+        18,
+        49,
+      );
+      doc.text(
+        "Location: " + (ministry.location || "Addis Ababa, Jate"),
+        18,
+        55,
+      );
+
+      doc.text("Total Assigned Members: " + members.length, pageWidth - 70, 49);
+      doc.text(
+        "Notes: " + (ministry.notes ? ministry.notes.slice(0, 30) : "None"),
+        pageWidth - 70,
+        55,
+      );
+
+      // Members Table Header
+      let y = 68;
+      doc.setFillColor(241, 245, 249);
+      doc.setDrawColor(203, 213, 225);
+      doc.rect(14, y, pageWidth - 28, 8, "FD");
+
+      doc.setTextColor(15, 23, 42);
+      doc.setFontSize(8.5);
+      doc.setFont("helvetica", "bold");
+      doc.text("#", 17, y + 5.5);
+      doc.text("STUDENT NAME", 26, y + 5.5);
+      doc.text("STUDENT ID", 86, y + 5.5);
+      doc.text("SECTION / CLASS", 120, y + 5.5);
+      doc.text("PHONE / CONTACT", 160, y + 5.5);
+
+      y += 8;
+
+      if (members.length === 0) {
+        doc.setFont("helvetica", "italic");
+        doc.setTextColor(148, 163, 184);
+        doc.text(
+          "No members assigned to this ministry yet.",
+          pageWidth / 2,
+          y + 10,
+          { align: "center" },
+        );
+        y += 20;
+      } else {
+        doc.setFont("helvetica", "normal");
+        members.forEach((m, idx) => {
+          if (y > 265) {
+            doc.addPage();
+            y = 20;
+            // Repeat table header on new page
+            doc.setFillColor(241, 245, 249);
+            doc.rect(14, y, pageWidth - 28, 8, "FD");
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(15, 23, 42);
+            doc.text("#", 17, y + 5.5);
+            doc.text("STUDENT NAME", 26, y + 5.5);
+            doc.text("STUDENT ID", 86, y + 5.5);
+            doc.text("SECTION / CLASS", 120, y + 5.5);
+            doc.text("PHONE / CONTACT", 160, y + 5.5);
+            doc.setFont("helvetica", "normal");
+            y += 8;
+          }
+
+          if (idx % 2 === 1) {
+            doc.setFillColor(248, 250, 252);
+            doc.rect(14, y, pageWidth - 28, 7.5, "F");
+          }
+
+          doc.setDrawColor(241, 245, 249);
+          doc.line(14, y + 7.5, pageWidth - 14, y + 7.5);
+
+          doc.setTextColor(51, 65, 85);
+          doc.text(String(idx + 1), 17, y + 5);
+          doc.text(
+            String(m.name || m.first_name || "").slice(0, 32),
+            26,
+            y + 5,
+          );
+          doc.text(String(m.student_id || "N/A"), 86, y + 5);
+          doc.text(
+            String(m.section?.name || m.section_name || "-").slice(0, 20),
+            120,
+            y + 5,
+          );
+          doc.text(
+            String(m.phone_number || m.family_guardian_phone || "-"),
+            160,
+            y + 5,
+          );
+
+          y += 7.5;
+        });
+      }
+
+      // Verification / Signature blocks at bottom
+      y = Math.max(y + 12, 255);
+      if (y > 270) {
+        doc.addPage();
+        y = 30;
+      }
+
+      doc.setDrawColor(203, 213, 225);
+      doc.line(18, y, 75, y);
+      doc.line(pageWidth - 75, y, pageWidth - 18, y);
+
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139);
+      doc.setFont("helvetica", "bold");
+      doc.text("Mezmur Department Head", 18, y + 5);
+      doc.text("Ye Sew Habt Department", pageWidth - 75, y + 5);
+
+      doc.save(
+        `Ministry_Roster_${(ministry.name || "export").replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`,
+      );
+    } catch (err) {
+      console.error("PDF generation failed", err);
+      alert(
+        "Failed to export ministry PDF: " + (err.message || "Server error"),
+      );
+    } finally {
+      setExportingPdfId(null);
+    }
+  };
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [tr, cat, assign, exList, minList] = await Promise.all([
-        mezmurService.getTrainers(),
-        mezmurService.getCategories(),
+      const [assign, exList, minList] = await Promise.all([
         mezmurService.getAssignments(),
         mezmurService.getExams(),
         mezmurService.getMinistries(),
       ]);
-      setTrainers(tr.data || []);
-      setCategories(cat.data || []);
       setAssignments(assign.data || []);
       setExams(exList.data || []);
       setMinistries(minList || []);
@@ -243,12 +422,15 @@ export default function MezmurMinistry() {
     if (!selectedExam) return;
     setSavingResults(true);
 
-    const payloadResults = Object.entries(examResults).map(([studentId, data]) => ({
-      student_id: Number(studentId),
-      score: data.score !== "" && data.score !== null ? Number(data.score) : null,
-      status: data.status || "pending",
-      notes: data.notes || null,
-    }));
+    const payloadResults = Object.entries(examResults).map(
+      ([studentId, data]) => ({
+        student_id: Number(studentId),
+        score:
+          data.score !== "" && data.score !== null ? Number(data.score) : null,
+        status: data.status || "pending",
+        notes: data.notes || null,
+      }),
+    );
 
     try {
       await mezmurService.bulkSaveExamResults({
@@ -280,7 +462,7 @@ export default function MezmurMinistry() {
 
     if (
       !confirm(
-        `Send ${passedStudentIds.length} passed student(s) to Yesew Habt for ministry assignment?`
+        `Send ${passedStudentIds.length} passed student(s) to Yesew Habt for ministry assignment?`,
       )
     ) {
       return;
@@ -292,7 +474,9 @@ export default function MezmurMinistry() {
         mezmur_exam_id: selectedExam.id,
         student_ids: passedStudentIds,
       });
-      alert(res.message || "Passed students successfully forwarded to Yesew Habt!");
+      alert(
+        res.message || "Passed students successfully forwarded to Yesew Habt!",
+      );
       loadExamDetails(selectedExam);
       fetchData();
       if (isYesewHabt || isSuperAdmin) {
@@ -311,16 +495,27 @@ export default function MezmurMinistry() {
       return;
     }
 
-    const targetId = examTargetMinistryId || selectedExam?.ministry_id || (ministries.length > 0 ? ministries[0].id : null);
+    const targetId =
+      examTargetMinistryId ||
+      selectedExam?.ministry_id ||
+      (ministries.length > 0 ? ministries[0].id : null);
     if (!targetId) {
-      alert("No ministry selected or available. Please create a ministry first.");
+      alert(
+        "No ministry selected or available. Please create a ministry first.",
+      );
       return;
     }
 
-    const ministryObj = ministries.find((m) => String(m.id) === String(targetId));
+    const ministryObj = ministries.find(
+      (m) => String(m.id) === String(targetId),
+    );
     const mName = ministryObj?.name || "the selected ministry";
 
-    if (!confirm(`Assign ${selectedExamStudents.length} student(s) directly to ministry '${mName}'?`)) {
+    if (
+      !confirm(
+        `Assign ${selectedExamStudents.length} student(s) directly to ministry '${mName}'?`,
+      )
+    ) {
       return;
     }
 
@@ -339,7 +534,9 @@ export default function MezmurMinistry() {
         fetchPassedQueue();
       }
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to assign students to ministry.");
+      alert(
+        err.response?.data?.message || "Failed to assign students to ministry.",
+      );
     } finally {
       setBulkAssigningExam(false);
     }
@@ -351,16 +548,22 @@ export default function MezmurMinistry() {
       return;
     }
 
-    const targetId = queueTargetMinistryId || (ministries.length > 0 ? ministries[0].id : null);
+    const targetId =
+      queueTargetMinistryId ||
+      (ministries.length > 0 ? ministries[0].id : null);
     if (!targetId) {
       alert("Please choose or create a target ministry.");
       return;
     }
 
-    const ministryObj = ministries.find((m) => String(m.id) === String(targetId));
+    const ministryObj = ministries.find(
+      (m) => String(m.id) === String(targetId),
+    );
     const mName = ministryObj?.name || "the chosen ministry";
 
-    if (!confirm(`Assign ${selectedQueueIds.length} candidate(s) to '${mName}'?`)) {
+    if (
+      !confirm(`Assign ${selectedQueueIds.length} candidate(s) to '${mName}'?`)
+    ) {
       return;
     }
 
@@ -391,11 +594,14 @@ export default function MezmurMinistry() {
   });
 
   const passedStudentCandidates = filteredCandidates.filter(
-    (st) => examResults[st.id]?.status === "passed"
+    (st) => examResults[st.id]?.status === "passed",
   );
 
   const toggleSelectAllPassed = () => {
-    if (selectedExamStudents.length === passedStudentCandidates.length && passedStudentCandidates.length > 0) {
+    if (
+      selectedExamStudents.length === passedStudentCandidates.length &&
+      passedStudentCandidates.length > 0
+    ) {
       setSelectedExamStudents([]);
     } else {
       setSelectedExamStudents(passedStudentCandidates.map((st) => st.id));
@@ -403,15 +609,30 @@ export default function MezmurMinistry() {
   };
 
   const toggleSelectAllQueue = () => {
-    if (selectedQueueIds.length === passedQueue.length && passedQueue.length > 0) {
+    if (
+      selectedQueueIds.length === passedQueue.length &&
+      passedQueue.length > 0
+    ) {
       setSelectedQueueIds([]);
     } else {
-      setSelectedQueueIds(passedQueue.map((item) => item.student?.id).filter(Boolean));
+      setSelectedQueueIds(
+        passedQueue.map((item) => item.student?.id).filter(Boolean),
+      );
     }
   };
 
+  const selectedQueueMinistryIds = [
+    ...new Set(
+      passedQueue
+        .filter((item) => selectedQueueIds.includes(item.student?.id))
+        .map((item) => item.exam?.ministry?.id)
+        .filter(Boolean)
+        .map(String),
+    ),
+  ];
+
   return (
-    <div className="space-y-8 animate-[fade-in_0.3s_ease-out]">
+    <div className="space-y-8 animate-fade-in">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
@@ -420,7 +641,8 @@ export default function MezmurMinistry() {
             Mezmur Department &amp; Ministry
           </h1>
           <p className="text-slate-500 font-medium mt-0.5">
-            Choir training, student examinations linked to ministries, and bulk assignments
+            Choir training, student examinations linked to ministries, and bulk
+            assignments
           </p>
         </div>
 
@@ -428,7 +650,7 @@ export default function MezmurMinistry() {
           {canManageMinistry && (
             <button
               onClick={() => setCreateMinistryModal(true)}
-              className="flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-emerald-500/20 hover:-translate-y-0.5 transition-all text-xs uppercase tracking-wider cursor-pointer"
+              className="flex items-center gap-2 bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-emerald-500/20 hover:-translate-y-0.5 transition-all text-xs uppercase tracking-wider cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               Create Ministry
@@ -438,7 +660,7 @@ export default function MezmurMinistry() {
           {canManageMezmur && (
             <button
               onClick={() => setCreateExamModal(true)}
-              className="flex items-center gap-2 bg-gradient-to-r from-brand-700 to-brand-500 hover:from-brand-800 hover:to-brand-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-brand-500/30 hover:-translate-y-0.5 transition-all text-xs uppercase tracking-wider cursor-pointer"
+              className="flex items-center gap-2 bg-linear-to-r from-brand-700 to-brand-500 hover:from-brand-800 hover:to-brand-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-brand-500/30 hover:-translate-y-0.5 transition-all text-xs uppercase tracking-wider cursor-pointer"
             >
               <Award className="w-4 h-4" />
               New Mezmur Exam
@@ -491,71 +713,19 @@ export default function MezmurMinistry() {
       {/* TAB 1: MINISTRIES & MINISTRY GROUPS */}
       {activeMainTab === "groups" && (
         <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
-          {/* Left Panel: Categories & Trainers */}
-          <div className="xl:col-span-1 space-y-6">
-            <div className="glass-panel p-6 border-t-4 border-t-brand-500">
-              <h3 className="font-extrabold text-slate-800 uppercase tracking-widest text-[11px] mb-4 flex items-center gap-2">
-                <Music className="w-4 h-4 text-brand-600" /> Hymn Categories
-              </h3>
-              <div className="space-y-2.5">
-                {categories.map((cat) => (
-                  <div
-                    key={cat.id}
-                    className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex justify-between items-center"
-                  >
-                    <span className="font-bold text-slate-700 text-sm">
-                      {cat.name}
-                    </span>
-                    <span className="text-[10px] font-black text-brand-600 uppercase bg-white px-2 py-0.5 rounded border border-slate-200">
-                      {cat.type}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="glass-panel p-6 border-t-4 border-t-amber-500">
-              <h3 className="font-extrabold text-slate-800 uppercase tracking-widest text-[11px] mb-4 flex items-center gap-2">
-                <Star className="w-4 h-4 text-amber-500" /> Instructors &amp; Trainers
-              </h3>
-              <div className="space-y-3">
-                {trainers.map((t) => (
-                  <div key={t.id} className="flex items-center gap-3">
-                    <div className="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center font-black text-slate-400 text-xs">
-                      {t.user?.name?.charAt(0) || "T"}
-                    </div>
-                    <div>
-                      <p className="font-bold text-slate-800 text-xs">
-                        {t.user?.name}
-                      </p>
-                      <div className="flex gap-1 flex-wrap mt-0.5">
-                        {t.specialties?.map((s) => (
-                          <span
-                            key={s}
-                            className="text-[9px] font-bold uppercase text-amber-600 px-1 bg-amber-50 rounded"
-                          >
-                            {s}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Right Panel: Established Ministries Directory & Assignments */}
-          <div className="xl:col-span-3 space-y-8">
+          {/* Established Ministries Directory & Assignments */}
+          <div className="xl:col-span-4 space-y-8">
             {/* Established Ministries Card */}
             <div className="glass-panel overflow-hidden border-slate-200">
               <div className="px-8 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                 <div>
                   <h3 className="font-black text-slate-800 uppercase tracking-widest text-xs flex items-center gap-2">
-                    <Landmark className="w-4 h-4 text-emerald-600" /> Established Ministries ({ministries.length})
+                    <Landmark className="w-4 h-4 text-emerald-600" />{" "}
+                    Established Ministries ({ministries.length})
                   </h3>
                   <p className="text-[11px] font-semibold text-slate-500 mt-0.5">
-                    Ministries and choirs available for examinations and student assignments
+                    Ministries and choirs available for examinations and student
+                    assignments
                   </p>
                 </div>
 
@@ -578,7 +748,8 @@ export default function MezmurMinistry() {
                       No ministries created yet
                     </p>
                     <p className="text-[11px] text-slate-400 mt-1">
-                      Click "Create Ministry" to set up your first church choir or service ministry.
+                      Click "Create Ministry" to set up your first church choir
+                      or service ministry.
                     </p>
                     {canManageMinistry && (
                       <button
@@ -597,19 +768,23 @@ export default function MezmurMinistry() {
                     >
                       <div>
                         <div className="flex items-start justify-between gap-2">
-                          <h4 className="font-black text-slate-800 text-sm">{m.name}</h4>
+                          <h4 className="font-black text-slate-800 text-sm">
+                            {m.name}
+                          </h4>
                           <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 shrink-0">
                             #{m.id}
                           </span>
                         </div>
                         {m.location && (
                           <p className="text-xs text-slate-500 flex items-center gap-1 mt-2 font-medium">
-                            <MapPin className="w-3 h-3 text-slate-400" /> {m.location}
+                            <MapPin className="w-3 h-3 text-slate-400" />{" "}
+                            {m.location}
                           </p>
                         )}
                         {m.ministry_date && (
                           <p className="text-xs text-slate-500 flex items-center gap-1 mt-1 font-medium">
-                            <Calendar className="w-3 h-3 text-slate-400" /> {m.ministry_date}
+                            <Calendar className="w-3 h-3 text-slate-400" />{" "}
+                            {formatEthiopianDate(`${m.ministry_date}T00:00:00`)}
                           </p>
                         )}
                         {m.notes && (
@@ -619,13 +794,25 @@ export default function MezmurMinistry() {
                         )}
                       </div>
 
-                      <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between text-xs">
-                        <span className="font-bold text-slate-600">
-                          {m.total_students_count || 0} assigned
-                        </span>
-                        <span className="text-[10px] font-bold text-brand-600 bg-brand-50 px-2 py-0.5 rounded">
-                          {m.exams_count || 0} exam(s)
-                        </span>
+                      <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between text-xs gap-2">
+                        <div>
+                          <span className="font-bold text-slate-700 block">
+                            {m.total_students_count || 0} assigned
+                          </span>
+                          <span className="text-[10px] font-bold text-brand-600 bg-brand-50 px-2 py-0.5 rounded inline-block mt-0.5">
+                            {m.exams_count || 0} exam(s)
+                          </span>
+                        </div>
+
+                        <button
+                          onClick={() => handleExportMinistryPDF(m)}
+                          disabled={exportingPdfId === m.id}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-[11px] font-black transition-all shadow-sm disabled:opacity-50 cursor-pointer"
+                          title="የአገልግሎት ዘርፍ አባላትን በፒዲኤፍ አውርድ"
+                        >
+                          <Download className="w-3.5 h-3.5 text-emerald-700" />
+                          {exportingPdfId === m.id ? "ፒዲኤፍ..." : "Export PDF"}
+                        </button>
                       </div>
                     </div>
                   ))
@@ -637,7 +824,8 @@ export default function MezmurMinistry() {
             <div className="glass-panel overflow-hidden border-slate-200">
               <div className="px-8 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                 <h3 className="font-black text-slate-800 uppercase tracking-widest text-xs flex items-center gap-2">
-                  <Users className="w-4 h-4 text-brand-600" /> Active Ministry Groups &amp; Squads
+                  <Users className="w-4 h-4 text-brand-600" /> Active Ministry
+                  Groups &amp; Squads
                 </h3>
               </div>
 
@@ -645,7 +833,6 @@ export default function MezmurMinistry() {
                 <thead>
                   <tr className="bg-slate-50/50 border-b border-slate-200/60 text-slate-400 text-xs tracking-wider uppercase font-bold">
                     <th className="px-8 py-4">Ministry Squad</th>
-                    <th className="px-8 py-4">Trainer / Mentor</th>
                     <th className="px-8 py-4">Total Students</th>
                     <th className="px-8 py-4">Start / End Dates</th>
                   </tr>
@@ -653,23 +840,27 @@ export default function MezmurMinistry() {
                 <tbody className="divide-y divide-slate-100 text-sm">
                   {assignments.length === 0 ? (
                     <tr>
-                      <td colSpan="4" className="px-8 py-12 text-center text-slate-400 font-bold text-xs uppercase tracking-widest">
+                      <td
+                        colSpan="3"
+                        className="px-8 py-12 text-center text-slate-400 font-bold text-xs uppercase tracking-widest"
+                      >
                         No active squad assignments established
                       </td>
                     </tr>
                   ) : (
                     assignments.map((a) => (
-                      <tr key={a.id} className="hover:bg-slate-50/60 transition-colors">
+                      <tr
+                        key={a.id}
+                        className="hover:bg-slate-50/60 transition-colors"
+                      >
                         <td className="px-8 py-5">
                           <p className="font-extrabold text-slate-800">
                             {a.ministry?.name || `Ministry Group #${a.id}`}
                           </p>
                           <p className="text-[11px] text-brand-600 font-semibold mt-0.5">
-                            {a.mezmurs?.map((m) => m.title).join(", ") || "Hymn Practice"}
+                            {a.mezmurs?.map((m) => m.title).join(", ") ||
+                              "Hymn Practice"}
                           </p>
-                        </td>
-                        <td className="px-8 py-5 font-bold text-slate-700 text-xs">
-                          {a.creator?.name || "Appointed Trainer"}
                         </td>
                         <td className="px-8 py-5">
                           <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-brand-50 text-brand-700">
@@ -733,14 +924,17 @@ export default function MezmurMinistry() {
                           </h4>
                           {ex.ministry && (
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded mt-1">
-                              <Landmark className="w-2.5 h-2.5" /> {ex.ministry.name}
+                              <Landmark className="w-2.5 h-2.5" />{" "}
+                              {ex.ministry.name}
                             </span>
                           )}
                         </div>
-                        <ChevronRight className={`w-4 h-4 transition-transform ${isSelected ? "text-brand-600 translate-x-1" : "text-slate-300"}`} />
+                        <ChevronRight
+                          className={`w-4 h-4 transition-transform ${isSelected ? "text-brand-600 translate-x-1" : "text-slate-300"}`}
+                        />
                       </div>
                       <p className="text-[11px] font-bold text-slate-400 mt-2">
-                        Date: {ex.exam_date}
+                        Date: {formatEthiopianDate(`${ex.exam_date}T00:00:00`)}
                       </p>
                       <div className="flex gap-2 mt-3 pt-2 border-t border-slate-100 text-[10px] font-black uppercase">
                         <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
@@ -770,7 +964,8 @@ export default function MezmurMinistry() {
                       </h3>
                       {selectedExam.ministry ? (
                         <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full font-black text-xs">
-                          <Landmark className="w-3.5 h-3.5" /> For: {selectedExam.ministry.name}
+                          <Landmark className="w-3.5 h-3.5" /> For:{" "}
+                          {selectedExam.ministry.name}
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-200 text-slate-600 rounded-full font-bold text-[10px]">
@@ -779,7 +974,8 @@ export default function MezmurMinistry() {
                       )}
                     </div>
                     <p className="text-xs font-semibold text-brand-600 mt-1">
-                      Exam Date: {selectedExam.exam_date} &bull; Evaluate Candidates &bull; Direct Bulk Ministry Assignment
+                      Exam Date: {formatEthiopianDate(`${selectedExam.exam_date}T00:00:00`)} &bull; Evaluate
+                      Candidates &bull; Direct Bulk Ministry Assignment
                     </p>
                   </div>
 
@@ -801,7 +997,9 @@ export default function MezmurMinistry() {
                           className="flex items-center gap-1.5 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer"
                         >
                           <Send className="w-3.5 h-3.5 text-emerald-600" />
-                          {sendingPassed ? "Sending..." : "Forward to Yesew Habt"}
+                          {sendingPassed
+                            ? "Sending..."
+                            : "Forward to Yesew Habt"}
                         </button>
                       </>
                     )}
@@ -809,48 +1007,58 @@ export default function MezmurMinistry() {
                 </div>
 
                 {/* Bulk Assignment Bar */}
-                <div className="px-6 py-3.5 bg-gradient-to-r from-emerald-50 via-teal-50 to-slate-50 border-b border-emerald-100 flex flex-wrap items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={toggleSelectAllPassed}
-                      className="text-xs font-black uppercase tracking-wider px-3 py-1.5 bg-white border border-emerald-200 text-emerald-800 rounded-lg hover:bg-emerald-100 transition-colors cursor-pointer"
-                    >
-                      {selectedExamStudents.length === passedStudentCandidates.length && passedStudentCandidates.length > 0
-                        ? "Deselect All"
-                        : `Select All Passed (${passedStudentCandidates.length})`}
-                    </button>
-                    <span className="text-xs font-bold text-slate-600">
-                      {selectedExamStudents.length} candidate(s) selected
-                    </span>
-                  </div>
+                {isSuperAdmin && (
+                  <div className="px-6 py-3.5 bg-linear-to-r from-emerald-50 via-teal-50 to-slate-50 border-b border-emerald-100 flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={toggleSelectAllPassed}
+                        className="text-xs font-black uppercase tracking-wider px-3 py-1.5 bg-white border border-emerald-200 text-emerald-800 rounded-lg hover:bg-emerald-100 transition-colors cursor-pointer"
+                      >
+                        {selectedExamStudents.length ===
+                          passedStudentCandidates.length &&
+                        passedStudentCandidates.length > 0
+                          ? "Deselect All"
+                          : `Select All Passed (${passedStudentCandidates.length})`}
+                      </button>
+                      <span className="text-xs font-bold text-slate-600">
+                        {selectedExamStudents.length} candidate(s) selected
+                      </span>
+                    </div>
 
-                  <div className="flex items-center gap-2">
-                    <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
-                      Assign To:
-                    </label>
-                    <select
-                      value={examTargetMinistryId}
-                      onChange={(e) => setExamTargetMinistryId(e.target.value)}
-                      className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none"
-                    >
-                      <option value="">-- Choose Ministry --</option>
-                      {ministries.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.name} {m.location ? `(${m.location})` : ""}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                        Assign To:
+                      </label>
+                      <select
+                        value={examTargetMinistryId}
+                        onChange={(e) =>
+                          setExamTargetMinistryId(e.target.value)
+                        }
+                        className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none"
+                      >
+                        <option value="">-- Choose Ministry --</option>
+                        {ministries.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.name} {m.location ? `(${m.location})` : ""}
+                          </option>
+                        ))}
+                      </select>
 
-                    <button
-                      onClick={handleBulkAssignFromExam}
-                      disabled={bulkAssigningExam || selectedExamStudents.length === 0}
-                      className="flex items-center gap-2 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md shadow-emerald-600/20 transition-all disabled:opacity-40 cursor-pointer"
-                    >
-                      <UserCheck className="w-3.5 h-3.5" />
-                      {bulkAssigningExam ? "Assigning..." : "Bulk Assign to Ministry"}
-                    </button>
+                      <button
+                        onClick={handleBulkAssignFromExam}
+                        disabled={
+                          bulkAssigningExam || selectedExamStudents.length === 0
+                        }
+                        className="flex items-center gap-2 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md shadow-emerald-600/20 transition-all disabled:opacity-40 cursor-pointer"
+                      >
+                        <UserCheck className="w-3.5 h-3.5" />
+                        {bulkAssigningExam
+                          ? "Assigning..."
+                          : "Bulk Assign to Ministry"}
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Search Bar */}
                 <div className="p-4 border-b border-slate-100 bg-white flex items-center gap-4">
@@ -875,22 +1083,25 @@ export default function MezmurMinistry() {
                 </div>
 
                 {/* Evaluation Table */}
-                <div className="overflow-x-auto max-h-[550px] custom-scrollbar">
+                <div className="overflow-x-auto max-h-137.5 custom-scrollbar">
                   <table className="w-full text-left">
                     <thead>
-                      <tr className="bg-slate-50/70 text-[10px] uppercase font-bold text-slate-400 tracking-wider sticky top-0 bg-white z-10 border-b border-slate-200">
-                        <th className="px-4 py-3.5 w-10 text-center">
-                          <input
-                            type="checkbox"
-                            checked={
-                              passedStudentCandidates.length > 0 &&
-                              selectedExamStudents.length === passedStudentCandidates.length
-                            }
-                            onChange={toggleSelectAllPassed}
-                            className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                            title="Select/Deselect All Passed"
-                          />
-                        </th>
+                      <tr className="bg-white text-[10px] uppercase font-bold text-slate-400 tracking-wider sticky top-0 z-10 border-b border-slate-200">
+                        {isSuperAdmin && (
+                          <th className="px-4 py-3.5 w-10 text-center">
+                            <input
+                              type="checkbox"
+                              checked={
+                                passedStudentCandidates.length > 0 &&
+                                selectedExamStudents.length ===
+                                  passedStudentCandidates.length
+                              }
+                              onChange={toggleSelectAllPassed}
+                              className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                              title="Select/Deselect All Passed"
+                            />
+                          </th>
+                        )}
                         <th className="px-6 py-3.5">Student</th>
                         <th className="px-6 py-3.5">Section</th>
                         <th className="px-6 py-3.5 w-24">Score (0-100)</th>
@@ -901,13 +1112,19 @@ export default function MezmurMinistry() {
                     <tbody className="divide-y divide-slate-100 text-xs">
                       {examLoading ? (
                         <tr>
-                          <td colSpan="6" className="px-6 py-12 text-center text-slate-400">
+                          <td
+                            colSpan="6"
+                            className="px-6 py-12 text-center text-slate-400"
+                          >
                             Loading exam candidates...
                           </td>
                         </tr>
                       ) : filteredCandidates.length === 0 ? (
                         <tr>
-                          <td colSpan="6" className="px-6 py-12 text-center text-slate-400 font-bold">
+                          <td
+                            colSpan="6"
+                            className="px-6 py-12 text-center text-slate-400 font-bold"
+                          >
                             No student candidates found
                           </td>
                         </tr>
@@ -919,24 +1136,36 @@ export default function MezmurMinistry() {
                             sent_to_yesew_habt: false,
                           };
 
-                          const isSelected = selectedExamStudents.includes(st.id);
+                          const isSelected = selectedExamStudents.includes(
+                            st.id,
+                          );
 
                           return (
-                            <tr key={st.id} className="hover:bg-slate-50/60 transition-colors">
-                              <td className="px-4 py-4 text-center">
-                                <input
-                                  type="checkbox"
-                                  checked={isSelected}
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      setSelectedExamStudents((prev) => [...prev, st.id]);
-                                    } else {
-                                      setSelectedExamStudents((prev) => prev.filter((id) => id !== st.id));
-                                    }
-                                  }}
-                                  className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                                />
-                              </td>
+                            <tr
+                              key={st.id}
+                              className="hover:bg-slate-50/60 transition-colors"
+                            >
+                              {isSuperAdmin && (
+                                <td className="px-4 py-4 text-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setSelectedExamStudents((prev) => [
+                                          ...prev,
+                                          st.id,
+                                        ]);
+                                      } else {
+                                        setSelectedExamStudents((prev) =>
+                                          prev.filter((id) => id !== st.id),
+                                        );
+                                      }
+                                    }}
+                                    className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                  />
+                                </td>
+                              )}
 
                               <td className="px-6 py-4">
                                 <p className="font-extrabold text-slate-900">
@@ -963,8 +1192,15 @@ export default function MezmurMinistry() {
                                   onChange={(e) => {
                                     const val = e.target.value;
                                     handleResultChange(st.id, "score", val);
-                                    if (Number(val) >= 50 && res.status === "pending") {
-                                      handleResultChange(st.id, "status", "passed");
+                                    if (
+                                      Number(val) >= 50 &&
+                                      res.status === "pending"
+                                    ) {
+                                      handleResultChange(
+                                        st.id,
+                                        "status",
+                                        "passed",
+                                      );
                                     }
                                   }}
                                   className="w-16 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-center font-bold text-slate-800 outline-none focus:border-brand-500 text-xs"
@@ -978,7 +1214,11 @@ export default function MezmurMinistry() {
                                     type="button"
                                     disabled={!canManageMezmur}
                                     onClick={() =>
-                                      handleResultChange(st.id, "status", "passed")
+                                      handleResultChange(
+                                        st.id,
+                                        "status",
+                                        "passed",
+                                      )
                                     }
                                     className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase transition-all cursor-pointer ${
                                       res.status === "passed"
@@ -993,7 +1233,11 @@ export default function MezmurMinistry() {
                                     type="button"
                                     disabled={!canManageMezmur}
                                     onClick={() =>
-                                      handleResultChange(st.id, "status", "failed")
+                                      handleResultChange(
+                                        st.id,
+                                        "status",
+                                        "failed",
+                                      )
                                     }
                                     className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase transition-all cursor-pointer ${
                                       res.status === "failed"
@@ -1016,7 +1260,8 @@ export default function MezmurMinistry() {
                               <td className="px-6 py-4">
                                 {res.sent_to_yesew_habt ? (
                                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                    <Check className="w-3 h-3" /> Assigned / Sent
+                                    <Check className="w-3 h-3" /> Assigned /
+                                    Sent
                                   </span>
                                 ) : res.status === "passed" ? (
                                   <span className="text-[10px] font-bold text-brand-600">
@@ -1055,7 +1300,8 @@ export default function MezmurMinistry() {
                 Passed Mezmur Students Awaiting Ministry Assignment
               </h3>
               <p className="text-xs font-semibold text-slate-500 mt-0.5">
-                Students forwarded from Mezmur examinations ready to be assigned to ministries in bulk
+                Students forwarded from Mezmur examinations ready to be assigned
+                to ministries in bulk
               </p>
             </div>
             <span className="px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full font-bold text-xs">
@@ -1064,13 +1310,14 @@ export default function MezmurMinistry() {
           </div>
 
           {/* Bulk Action Controls */}
-          <div className="px-6 py-3.5 bg-gradient-to-r from-emerald-50 via-teal-50 to-slate-50 border-b border-emerald-100 flex flex-wrap items-center justify-between gap-4">
+          <div className="px-6 py-3.5 bg-linear-to-r from-emerald-50 via-teal-50 to-slate-50 border-b border-emerald-100 flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <button
                 onClick={toggleSelectAllQueue}
                 className="text-xs font-black uppercase tracking-wider px-3 py-1.5 bg-white border border-emerald-200 text-emerald-800 rounded-lg hover:bg-emerald-100 transition-colors cursor-pointer"
               >
-                {selectedQueueIds.length === passedQueue.length && passedQueue.length > 0
+                {selectedQueueIds.length === passedQueue.length &&
+                passedQueue.length > 0
                   ? "Deselect All"
                   : `Select All (${passedQueue.length})`}
               </button>
@@ -1089,20 +1336,32 @@ export default function MezmurMinistry() {
                 className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none"
               >
                 <option value="">-- Select Target Ministry --</option>
-                {ministries.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name} {m.location ? `(${m.location})` : ""}
-                  </option>
-                ))}
+                {ministries
+                  .filter(
+                    (m) =>
+                      selectedQueueMinistryIds.length === 0 ||
+                      selectedQueueMinistryIds.includes(String(m.id)),
+                  )
+                  .map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name} {m.location ? `(${m.location})` : ""}
+                    </option>
+                  ))}
               </select>
 
               <button
                 onClick={handleBulkAssignFromQueue}
-                disabled={bulkAssigningQueue || selectedQueueIds.length === 0}
+                disabled={
+                  bulkAssigningQueue ||
+                  selectedQueueIds.length === 0 ||
+                  selectedQueueMinistryIds.length !== 1
+                }
                 className="flex items-center gap-2 px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md shadow-emerald-600/20 transition-all disabled:opacity-40 cursor-pointer"
               >
                 <UserCheck className="w-4 h-4" />
-                {bulkAssigningQueue ? "Assigning..." : "Bulk Assign to Ministry"}
+                {bulkAssigningQueue
+                  ? "Assigning..."
+                  : "Bulk Assign to Ministry"}
               </button>
             </div>
           </div>
@@ -1133,23 +1392,35 @@ export default function MezmurMinistry() {
               <tbody className="divide-y divide-slate-100 text-xs">
                 {queueLoading ? (
                   <tr>
-                    <td colSpan="7" className="px-8 py-12 text-center text-slate-400">
+                    <td
+                      colSpan="7"
+                      className="px-8 py-12 text-center text-slate-400"
+                    >
                       Loading queue...
                     </td>
                   </tr>
                 ) : passedQueue.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="px-8 py-16 text-center text-slate-400 font-bold uppercase tracking-widest text-xs">
-                      No passed candidates awaiting assignment. Candidates appear here after passing Mezmur exams.
+                    <td
+                      colSpan="7"
+                      className="px-8 py-16 text-center text-slate-400 font-bold uppercase tracking-widest text-xs"
+                    >
+                      No passed candidates awaiting assignment. Candidates
+                      appear here after passing Mezmur exams.
                     </td>
                   </tr>
                 ) : (
                   passedQueue.map((item) => {
-                    const isSelected = selectedQueueIds.includes(item.student?.id);
+                    const isSelected = selectedQueueIds.includes(
+                      item.student?.id,
+                    );
                     const examMinistry = item.exam?.ministry;
 
                     return (
-                      <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
+                      <tr
+                        key={item.id}
+                        className="hover:bg-slate-50/60 transition-colors"
+                      >
                         <td className="px-4 py-5 text-center">
                           <input
                             type="checkbox"
@@ -1160,7 +1431,9 @@ export default function MezmurMinistry() {
                               if (e.target.checked) {
                                 setSelectedQueueIds((prev) => [...prev, sid]);
                               } else {
-                                setSelectedQueueIds((prev) => prev.filter((id) => id !== sid));
+                                setSelectedQueueIds((prev) =>
+                                  prev.filter((id) => id !== sid),
+                                );
                               }
                             }}
                             className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
@@ -1183,7 +1456,8 @@ export default function MezmurMinistry() {
                         <td className="px-6 py-5">
                           {examMinistry ? (
                             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                              <Landmark className="w-3 h-3" /> {examMinistry.name}
+                              <Landmark className="w-3 h-3" />{" "}
+                              {examMinistry.name}
                             </span>
                           ) : (
                             <span className="text-[10px] text-slate-400 italic">
@@ -1205,20 +1479,31 @@ export default function MezmurMinistry() {
                         <td className="px-6 py-5 text-right">
                           <button
                             onClick={async () => {
-                              const targetId = examMinistry?.id || queueTargetMinistryId || (ministries.length > 0 ? ministries[0].id : null);
+                              const targetId =
+                                examMinistry?.id ||
+                                queueTargetMinistryId ||
+                                (ministries.length > 0
+                                  ? ministries[0].id
+                                  : null);
                               if (!targetId) {
-                                alert("Please select or create a ministry first.");
+                                alert(
+                                  "Please select or create a ministry first.",
+                                );
                                 return;
                               }
                               const sid = item.student?.id;
                               if (!sid) return;
 
                               try {
-                                const res = await mezmurService.bulkAssignToMinistry({
-                                  ministry_id: Number(targetId),
-                                  student_ids: [sid],
-                                });
-                                alert(res.message || "Student assigned successfully!");
+                                const res =
+                                  await mezmurService.bulkAssignToMinistry({
+                                    ministry_id: Number(targetId),
+                                    student_ids: [sid],
+                                  });
+                                alert(
+                                  res.message ||
+                                    "Student assigned successfully!",
+                                );
                                 fetchPassedQueue();
                                 fetchData();
                               } catch (err) {
@@ -1273,17 +1558,12 @@ export default function MezmurMinistry() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1.5">
-                    Ministry / Service Date
-                  </label>
-                  <input
-                    type="date"
-                    value={ministryDate}
-                    onChange={(e) => setMinistryDate(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none focus:border-emerald-500 text-xs"
-                  />
-                </div>
+                <EthiopianDateInput
+                  label="Ministry / Service Date"
+                  value={ministryDate}
+                  onChange={(e) => setMinistryDate(e.target.value)}
+                  className="text-xs"
+                />
 
                 <div>
                   <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1.5">
@@ -1372,7 +1652,9 @@ export default function MezmurMinistry() {
                   onChange={(e) => setExamMinistryId(e.target.value)}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 outline-none focus:border-brand-500 text-sm"
                 >
-                  <option value="">-- General Exam (No specific ministry) --</option>
+                  <option value="">
+                    -- General Exam (No specific ministry) --
+                  </option>
                   {ministries.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.name} {m.location ? `(${m.location})` : ""}
@@ -1380,7 +1662,8 @@ export default function MezmurMinistry() {
                   ))}
                 </select>
                 <p className="text-[11px] text-slate-400 mt-1">
-                  Linking this exam to a ministry allows direct bulk assignment of passed candidates to this ministry.
+                  Linking this exam to a ministry allows direct bulk assignment
+                  of passed candidates to this ministry.
                 </p>
               </div>
 
@@ -1399,15 +1682,11 @@ export default function MezmurMinistry() {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1.5">
-                  Examination Date <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
+                <EthiopianDateInput
+                  label="Examination Date"
                   value={examDate}
                   onChange={(e) => setExamDate(e.target.value)}
                   required
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none focus:border-brand-500"
                 />
               </div>
 

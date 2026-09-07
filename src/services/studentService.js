@@ -106,4 +106,14 @@ export const studentService = {
     });
     return response.data;
   },
+
+  flagStudent: async (id, reason) => {
+    const response = await api.post(`/students/${id}/flag`, { reason });
+    return response.data;
+  },
+
+  unflagStudent: async (id) => {
+    const response = await api.post(`/students/${id}/unflag`);
+    return response.data;
+  },
 };

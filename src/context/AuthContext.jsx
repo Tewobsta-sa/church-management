@@ -79,6 +79,35 @@ export const AuthProvider = ({ children }) => {
     window.location.href = "/";
   };
 
+  // Inactivity auto-logout: 2 minutes of idle time without user interaction
+  useEffect(() => {
+    if (!user) return;
+
+    const INACTIVITY_LIMIT_MS = 2 * 60 * 1000; // 2 minutes
+    let lastActive = Date.now();
+
+    const updateActivity = () => {
+      lastActive = Date.now();
+    };
+
+    const events = ["mousedown", "mousemove", "keydown", "touchstart", "scroll", "click"];
+    events.forEach((evt) => window.addEventListener(evt, updateActivity, { passive: true }));
+
+    const intervalId = setInterval(() => {
+      if (Date.now() - lastActive >= INACTIVITY_LIMIT_MS) {
+        clearInterval(intervalId);
+        events.forEach((evt) => window.removeEventListener(evt, updateActivity));
+        alert("የእርስዎ የይለፍ ቃል ክፍለ-ጊዜ በ2 ደቂቃ ባለመንቀሳቀስ ምክንያት ተዘግቷል። እባክዎ እንደገና ይግቡ።\n(Session expired due to 2 minutes of inactivity. Please log in again.)");
+        logout();
+      }
+    }, 10000); // check every 10 seconds
+
+    return () => {
+      clearInterval(intervalId);
+      events.forEach((evt) => window.removeEventListener(evt, updateActivity));
+    };
+  }, [user]);
+
   const value = {
     user,
     loading,

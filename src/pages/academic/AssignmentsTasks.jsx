@@ -32,6 +32,8 @@ import { trainerService } from "../../services/trainerService";
 import { teacherService } from "../../services/teacherService";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import EthiopianDateInput from "../../components/common/EthiopianDateInput";
+import { formatEthiopianDate } from "../../utils/ethiopianDate";
 
 const locales = { "en-US": enUS };
 
@@ -789,7 +791,7 @@ export default function AssignmentsTasks() {
                           </span>
                           {item.scheduled_date ? (
                             <span className="px-2 py-0.5 rounded-md bg-sky-100 text-sky-800 text-[10px] font-bold">
-                              One-time: {item.scheduled_date}
+                              One-time: {formatEthiopianDate(`${item.scheduled_date}T00:00:00`)}
                             </span>
                           ) : (
                             <span className="px-2 py-0.5 rounded-md bg-slate-200/70 text-slate-700 text-[10px] font-black uppercase">
@@ -1076,16 +1078,13 @@ export default function AssignmentsTasks() {
                       </select>
                     </div>
                   ) : (
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-700">Date *</label>
-                      <input
-                        type="date"
-                        required
-                        className={inputCls}
-                        value={formData.scheduled_date}
-                        onChange={(e) => setFormData({ ...formData, scheduled_date: e.target.value })}
-                      />
-                    </div>
+                    <EthiopianDateInput
+                      label="Date"
+                      required
+                      value={formData.scheduled_date}
+                      onChange={(e) => setFormData({ ...formData, scheduled_date: e.target.value })}
+                      className={inputCls}
+                    />
                   )}
 
                   <div className="space-y-1.5">

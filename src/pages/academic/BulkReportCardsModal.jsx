@@ -15,7 +15,7 @@ import {
   GraduationCap
 } from "lucide-react";
 import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
+import { captureElement } from "../../utils/pdfCapture";
 import { resultsService } from "../../services/resultsService";
 import { sectionService } from "../../services/sectionService";
 
@@ -103,28 +103,40 @@ export default function BulkReportCardsModal({ isOpen, onClose, initialSectionId
     setDownloadProgress({ current: 0, total: reportCards.length });
 
     try {
+      // Give the off-screen print layout a frame to paint before capture
+      await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+
       const pdf = new jsPDF("p", "mm", "a4");
-      const cardElements = printContainerRef.current.querySelectorAll(".report-card-page");
+      const cardElements = Array.from(
+        printContainerRef.current.querySelectorAll(".report-card-page")
+      );
+
+      if (cardElements.length === 0) {
+        throw new Error("No report cards found to export");
+      }
+
+      let renderedCount = 0;
 
       for (let i = 0; i < cardElements.length; i++) {
         setDownloadProgress({ current: i + 1, total: cardElements.length });
         const el = cardElements[i];
 
-        const canvas = await html2canvas(el, {
-          scale: 2,
-          useCORS: true,
-          logging: false,
-        });
+        const canvas = await captureElement(el, { scale: 2 });
+
+        if (!canvas.width || !canvas.height) {
+          throw new Error(`Report card ${i + 1} captured as empty canvas`);
+        }
 
         const imgData = canvas.toDataURL("image/jpeg", 0.95);
         const pdfWidth = 210; // A4 width in mm
-        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+        const pdfHeight = Math.min(297, (canvas.height * pdfWidth) / canvas.width);
 
-        if (i > 0) {
+        if (renderedCount > 0) {
           pdf.addPage();
         }
 
         pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
+        renderedCount += 1;
       }
 
       const sectionNameClean = (selectedSection?.name || "Section").replace(/[^a-zA-Z0-9]/g, "_");
@@ -335,8 +347,18 @@ export default function BulkReportCardsModal({ isOpen, onClose, initialSectionId
           )}
         </div>
 
-        {/* Hidden Container containing ALL student cards for PDF Generation */}
-        <div className="hidden">
+        {/* Off-screen print layout (must NOT use display:none — html2canvas needs real dimensions) */}
+        <div
+          aria-hidden="true"
+          style={{
+            position: "fixed",
+            left: "-10000px",
+            top: 0,
+            width: "210mm",
+            pointerEvents: "none",
+            zIndex: -1,
+          }}
+        >
           <div ref={printContainerRef}>
             {reportCards.map((student) => (
               <div
@@ -348,6 +370,7 @@ export default function BulkReportCardsModal({ isOpen, onClose, initialSectionId
                   boxSizing: "border-box",
                   padding: "16mm 18mm",
                   pageBreakAfter: "always",
+                  backgroundColor: "#ffffff",
                 }}
               >
                 <ReportCardTemplate student={student} theme={currentTheme} year={currentYear} />

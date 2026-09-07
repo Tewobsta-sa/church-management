@@ -1,8 +1,9 @@
-import { Menu, Bell, UserCircle, Globe } from "lucide-react";
+import { Menu, Bell, UserCircle, Globe, Calendar } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import ProfileModal from "./ProfileModal";
+import { formatEthiopianDate } from "../../utils/ethiopianDate";
 
 export default function Topbar() {
   const { user } = useAuth();
@@ -13,6 +14,14 @@ export default function Topbar() {
     const newLang = i18n.language === 'en' ? 'am' : 'en';
     i18n.changeLanguage(newLang);
   };
+
+  const today = new Date();
+  const ethDateStr = formatEthiopianDate(today, i18n.language);
+  const gregDateStr = today.toLocaleDateString(i18n.language === 'am' ? 'am-ET' : 'en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
 
   return (
     <>
@@ -37,7 +46,18 @@ export default function Topbar() {
         </div>
 
         {/* Right side: Actions & User Info */}
-        <div className="flex items-center gap-5">
+        <div className="flex items-center gap-3 sm:gap-5">
+          {/* Ethiopian Calendar Badge */}
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-amber-50/80 border border-amber-200/80 rounded-xl text-amber-900 shadow-xs">
+            <div className="w-7 h-7 rounded-lg bg-amber-100 flex items-center justify-center text-amber-700">
+              <Calendar className="w-4 h-4" />
+            </div>
+            <div className="text-left leading-tight">
+              <p className="text-xs font-bold text-amber-900">{ethDateStr}</p>
+              <p className="text-[10px] text-amber-600 font-medium">{gregDateStr}</p>
+            </div>
+          </div>
+
           <button 
             onClick={toggleLanguage}
             className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-lg transition-colors border border-brand-200"

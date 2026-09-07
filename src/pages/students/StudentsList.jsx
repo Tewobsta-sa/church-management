@@ -15,6 +15,10 @@ import {
   Square,
   ArrowRight,
   Sparkles,
+  Flag,
+  FlagOff,
+  AlertTriangle,
+  Moon,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useTranslation } from "react-i18next";
@@ -74,6 +78,13 @@ export default function StudentsList() {
   const canDelete = canCreate;
   const canImport = canCreate;
   const canBulkUpdate = canCreate;
+  const canFlag = isYesewHabt || isSuperAdmin;
+
+  // Flagging modal state (Ye Sew Habt mandatory reason)
+  const [flagModalOpen, setFlagModalOpen] = useState(false);
+  const [studentToFlag, setStudentToFlag] = useState(null);
+  const [flagReason, setFlagReason] = useState("");
+  const [flagLoading, setFlagLoading] = useState(false);
 
   const fetchStudents = async () => {
     try {
@@ -175,6 +186,47 @@ export default function StudentsList() {
       fetchStudents();
     } catch (err) {
       alert("Failed to delete student");
+    }
+  };
+
+  const handleOpenFlagModal = (student) => {
+    setStudentToFlag(student);
+    setFlagReason("");
+    setFlagModalOpen(true);
+  };
+
+  const handleConfirmFlag = async () => {
+    if (!studentToFlag) return;
+    if (!flagReason.trim()) {
+      alert("Please provide a mandatory reason for flagging the student.");
+      return;
+    }
+    try {
+      setFlagLoading(true);
+      await studentService.flagStudent(studentToFlag.id, flagReason.trim());
+      setFlagModalOpen(false);
+      setStudentToFlag(null);
+      setFlagReason("");
+      fetchStudents();
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to flag student.");
+    } finally {
+      setFlagLoading(false);
+    }
+  };
+
+  const handleUnflag = async (student) => {
+    if (!window.confirm(`Are you sure you want to lift the flag / suspension for ${student.name}?`)) {
+      return;
+    }
+    try {
+      setFlagLoading(true);
+      await studentService.unflagStudent(student.id);
+      fetchStudents();
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to unflag student.");
+    } finally {
+      setFlagLoading(false);
     }
   };
 
@@ -454,6 +506,12 @@ export default function StudentsList() {
                           <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-600">
                             {student.classification || student.section?.programType?.name || activeTab}
                           </span>
+                          {student.is_night && (
+                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1">
+                              <Moon className="w-2.5 h-2.5 text-indigo-500" />
+                              ማታ
+                            </span>
+                          )}
                           {student.grade_level && (
                             <span className="text-[10px] font-bold text-slate-400">
                               {student.grade_level}
@@ -474,21 +532,59 @@ export default function StudentsList() {
 
                       {/* Status */}
                       <td className="px-4 py-4">
-                        <span
-                          className={clsx(
-                            "inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
-                            student.status === "regular"
-                              ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20"
-                              : "bg-amber-50 text-amber-700 ring-1 ring-amber-600/20"
-                          )}
-                        >
-                          {student.status || "new"}
-                        </span>
+                        {student.is_flagged ? (
+                          <div>
+                            <span
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-100 text-rose-800 ring-1 ring-rose-600/30"
+                              title={student.flag_reason || "Flagged by Ye Sew Habt"}
+                            >
+                              <Flag className="w-3 h-3 text-rose-600 fill-rose-600" />
+                              ታግዷል (Flagged)
+                            </span>
+                            {student.flag_reason && (
+                              <p className="text-[10px] text-rose-600 font-medium truncate max-w-[130px] mt-0.5" title={student.flag_reason}>
+                                {student.flag_reason}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <span
+                            className={clsx(
+                              "inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
+                              student.status === "regular"
+                                ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20"
+                                : "bg-amber-50 text-amber-700 ring-1 ring-amber-600/20"
+                            )}
+                          >
+                            {student.status || "new"}
+                          </span>
+                        )}
                       </td>
 
                       {/* Actions */}
                       <td className="px-6 py-4 text-right">
                         <div className="flex gap-1.5 justify-end opacity-80 group-hover:opacity-100 transition-opacity">
+                          {canFlag && (
+                            student.is_flagged ? (
+                              <button
+                                onClick={() => handleUnflag(student)}
+                                disabled={flagLoading}
+                                className="p-2 hover:bg-emerald-50 hover:text-emerald-700 rounded-lg text-rose-600 transition-colors"
+                                title="እገዳ አንሳ (Unflag Student)"
+                              >
+                                <FlagOff className="w-4 h-4 text-rose-600" />
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleOpenFlagModal(student)}
+                                disabled={flagLoading}
+                                className="p-2 hover:bg-rose-50 hover:text-rose-700 rounded-lg text-slate-400 transition-colors"
+                                title="እገድ / Flag Student (Ye Sew Habt)"
+                              >
+                                <Flag className="w-4 h-4 text-slate-400 hover:text-rose-600" />
+                              </button>
+                            )
+                          )}
                           <button
                             onClick={() => openModal(student, "view")}
                             className="p-2 hover:bg-brand-50 hover:text-brand-700 rounded-lg text-slate-400 transition-colors"
@@ -577,6 +673,77 @@ export default function StudentsList() {
         onClose={() => setIdCardModalOpen(false)}
         students={studentsForIdCards}
       />
+
+      {/* Ye Sew Habt Student Flagging Modal (Mandatory Reason) */}
+      {flagModalOpen && studentToFlag && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-rose-100 animate-scale-in">
+            <div className="p-6 bg-gradient-to-r from-rose-900 to-slate-950 text-white flex justify-between items-start">
+              <div>
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-800/80 text-rose-200 text-[10px] font-black uppercase tracking-wider mb-2">
+                  <Flag className="w-3 h-3 text-rose-300 fill-rose-300" />
+                  የሰው ሀብት ክፍል / Ye Sew Habt
+                </div>
+                <h3 className="text-xl font-black">ተማሪውን እገድ (Flag Student)</h3>
+                <p className="text-xs text-rose-200 mt-1">
+                  {studentToFlag.name} ({studentToFlag.student_id})
+                </p>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4 text-xs font-bold">
+              <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-medium space-y-1">
+                <p className="font-extrabold flex items-center gap-1 text-amber-950">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  ማስጠንቀቂያ፡
+                </p>
+                <p>
+                  የታገደ ተማሪ በመዝሙርና በትምህርት ክፍል ፈተናዎች፣ የኮርስ ተሳትፎዎች እና የአገልግሎት ዘርፍ ምደባዎች ላይ በራስ-ሰር አይታይም።
+                </p>
+              </div>
+
+              <div>
+                <label className="text-slate-700 block mb-1 font-extrabold">
+                  የእገዳው ምክንያት <span className="text-rose-500">* (ግዴታ / Mandatory)</span>:
+                </label>
+                <textarea
+                  rows="4"
+                  value={flagReason}
+                  onChange={(e) => setFlagReason(e.target.value)}
+                  placeholder="እባክዎ ተማሪው የታገደበትን በቂ የሥነ-ምግባር ወይም የአስተዳደር ምክንያት በግልጽ ይግለጹ..."
+                  className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:ring-2 focus:ring-rose-500 focus:outline-none font-normal text-xs"
+                ></textarea>
+                <p className="text-[10px] text-slate-400 font-normal mt-1">
+                  የተፃፈው ምክንያት በሰው ሀብት ክፍል እና በበላይ አስተዳዳሪ ሪፖርቶች ላይ ይመዘገባል።
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setFlagModalOpen(false);
+                  setStudentToFlag(null);
+                  setFlagReason("");
+                }}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-200 rounded-xl transition-colors"
+              >
+                ይቅር (Cancel)
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmFlag}
+                disabled={flagLoading || !flagReason.trim()}
+                className="px-6 py-2.5 bg-gradient-to-r from-rose-700 to-rose-600 hover:from-rose-600 hover:to-rose-500 text-white font-black text-xs rounded-xl shadow-md transition-all disabled:opacity-50 flex items-center gap-1.5"
+              >
+                <Flag className="w-3.5 h-3.5 fill-white" />
+                {flagLoading ? "እየታገደ ነው..." : "እገድ (Confirm Flag)"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

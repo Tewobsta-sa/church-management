@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   Layers,
   UserCheck,
+  QrCode,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import clsx from "clsx";
@@ -76,6 +77,7 @@ const navItems = [
     labelKey: "nav.Schedules",
     icon: Calendar,
     roles: [
+      "yesew_habt",
       "tmhrt_kfl",
       "mezmur_kfl",
       "mereja_kfl",
@@ -102,10 +104,32 @@ const navItems = [
     ],
   },
   {
+    path: "/attendance/scanner",
+    labelKey: "nav.MobileScanner",
+    icon: QrCode,
+    roles: [
+      "yesew_habt",
+      "tmhrt_kfl",
+      "mezmur_kfl",
+      "mereja_kfl",
+      "teacher",
+      "tmhrt_office_admin",
+      "mezmur_office_admin",
+      "gngnunet_office_admin",
+      "super_admin",
+    ],
+  },
+  {
     path: "/grades",
     labelKey: "nav.Grading",
     icon: CheckSquare,
-    roles: ["teacher", "tmhrt_kfl", "tmhrt_office_admin", "mereja_kfl", "super_admin"],
+    roles: [
+      "teacher",
+      "tmhrt_kfl",
+      "tmhrt_office_admin",
+      "mereja_kfl",
+      "super_admin",
+    ],
   },
   {
     path: "/results",
@@ -171,7 +195,8 @@ export default function Sidebar() {
   };
 
   const getDefaultRoute = () => {
-    const roles = user?.roles?.map((r) => (typeof r === "string" ? r : r?.name)) || [];
+    const roles =
+      user?.roles?.map((r) => (typeof r === "string" ? r : r?.name)) || [];
     if (user?.role && !roles.includes(user.role)) roles.push(user.role);
 
     for (const role of roles) {
