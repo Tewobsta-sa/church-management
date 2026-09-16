@@ -26,13 +26,17 @@ export default function SystemLogsViewer() {
     fetchLogs();
   }, [currentPage]);
 
-  const getMethodColor = (method) => {
-    switch (method?.toUpperCase()) {
-      case "POST": return "bg-green-100 text-green-700 border-green-200";
-      case "PUT":
-      case "PATCH": return "bg-amber-100 text-amber-700 border-amber-200";
-      case "DELETE": return "bg-red-100 text-red-700 border-red-200";
-      default: return "bg-blue-100 text-blue-700 border-blue-200";
+  const getCategoryBadgeStyle = (badgeType) => {
+    switch (badgeType) {
+      case "create": return "bg-emerald-50 text-emerald-700 border-emerald-200";
+      case "update": return "bg-amber-50 text-amber-700 border-amber-200";
+      case "delete": return "bg-rose-50 text-rose-700 border-rose-200";
+      case "attendance": return "bg-blue-50 text-blue-700 border-blue-200";
+      case "promotion": return "bg-purple-50 text-purple-700 border-purple-200";
+      case "grade": return "bg-indigo-50 text-indigo-700 border-indigo-200";
+      case "schedule": return "bg-cyan-50 text-cyan-700 border-cyan-200";
+      case "mezmur": return "bg-violet-50 text-violet-700 border-violet-200";
+      default: return "bg-slate-100 text-slate-700 border-slate-200";
     }
   };
 
@@ -45,39 +49,41 @@ export default function SystemLogsViewer() {
       <div className="overflow-x-auto">
         <table className="w-full text-left">
           <thead>
-            <tr className="bg-slate-50/50 border-b border-slate-200/60 text-slate-500 text-sm tracking-wide">
-              <th className="px-6 py-4 font-semibold">User</th>
-              <th className="px-6 py-4 font-semibold">Action</th>
-              <th className="px-6 py-4 font-semibold">Method</th>
-              <th className="px-6 py-4 font-semibold">Endpoint</th>
-              <th className="px-6 py-4 font-semibold text-right">Timestamp</th>
+            <tr className="bg-slate-50/50 border-b border-slate-200/60 text-slate-500 text-xs uppercase tracking-wider">
+              <th className="px-6 py-4 font-bold">ተጠቃሚ (User)</th>
+              <th className="px-6 py-4 font-bold">ዘርፍ (Category)</th>
+              <th className="px-6 py-4 font-bold">የተከናወነ ተግባር (Action)</th>
+              <th className="px-6 py-4 font-bold">ኢላማ (Target Path)</th>
+              <th className="px-6 py-4 font-bold text-right">ቀንና ሰዓት (Timestamp)</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {logs.map((log) => (
               <tr key={log.id} className="hover:bg-slate-50/50 transition-colors">
                 <td className="px-6 py-4">
-                  <div className="font-semibold text-slate-800">
+                  <div className="font-bold text-slate-800 text-sm">
                     {log.user?.name || "System"}
                   </div>
-                  <div className="text-xs text-slate-500">ID: {log.user_id}</div>
+                  <div className="text-xs text-slate-400">@{log.user?.username || `ID: ${log.user_id || 'sys'}`}</div>
                 </td>
                 <td className="px-6 py-4">
-                  <span className="text-sm font-medium text-slate-700">{log.action || "N/A"}</span>
-                </td>
-                <td className="px-6 py-4">
-                  <span className={`inline-flex px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider border ${getMethodColor(log.details?.method || log.action)}`}>
-                    {log.details?.method || (['POST', 'PUT', 'PATCH', 'DELETE', 'GET'].includes(log.action) ? log.action : 'INFO')}
+                  <span className={`inline-flex px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider border ${getCategoryBadgeStyle(log.badge_type)}`}>
+                    {log.category || "ስርዓት (System)"}
                   </span>
                 </td>
                 <td className="px-6 py-4">
-                  <div className="font-mono text-[11px] text-slate-500 font-bold tracking-tight bg-slate-100/50 px-2 py-1 rounded border border-slate-200/50 max-w-[300px] truncate" title={log.details?.url}>
+                  <span className="text-sm font-semibold text-slate-800">
+                    {log.formatted_action || log.action || "ክንውን (Action)"}
+                  </span>
+                </td>
+                <td className="px-6 py-4">
+                  <div className="font-mono text-[11px] text-slate-600 font-medium bg-slate-100/70 px-2 py-1 rounded border border-slate-200/50 max-w-[260px] truncate" title={log.details?.url}>
                     {log.details?.url ? new URL(log.details.url).pathname : "---"}
                   </div>
                 </td>
-                <td className="px-6 py-4 text-right text-sm text-slate-500">
-                  <div className="flex items-center justify-end gap-1">
-                    <Clock className="w-3 h-3" />
+                <td className="px-6 py-4 text-right text-xs text-slate-500 font-medium">
+                  <div className="flex items-center justify-end gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-slate-400" />
                     {log.created_at ? format(new Date(log.created_at), "MMM d, yyyy HH:mm:ss") : "N/A"}
                   </div>
                 </td>

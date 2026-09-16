@@ -103,8 +103,9 @@ export default function BulkReportCardsModal({ isOpen, onClose, initialSectionId
     setDownloadProgress({ current: 0, total: reportCards.length });
 
     try {
-      // Give the off-screen print layout a frame to paint before capture
-      await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+      // Give the off-screen print layout time to settle and fonts to load
+      await document.fonts?.ready;
+      await new Promise((resolve) => setTimeout(resolve, 150));
 
       const pdf = new jsPDF("p", "mm", "a4");
       const cardElements = Array.from(
@@ -347,16 +348,17 @@ export default function BulkReportCardsModal({ isOpen, onClose, initialSectionId
           )}
         </div>
 
-        {/* Off-screen print layout (must NOT use display:none — html2canvas needs real dimensions) */}
+        {/* Off-screen print layout (placed at top:0, left:0 behind modal backdrop z-50 so html2canvas computes true positive coordinates) */}
         <div
           aria-hidden="true"
           style={{
             position: "fixed",
-            left: "-10000px",
+            left: 0,
             top: 0,
             width: "210mm",
             pointerEvents: "none",
-            zIndex: -1,
+            zIndex: -20,
+            backgroundColor: "#ffffff",
           }}
         >
           <div ref={printContainerRef}>
@@ -407,10 +409,10 @@ function ReportCardTemplate({ student, theme, year }) {
           </div>
           <div>
             <h1 className="text-xl font-black uppercase tracking-wider text-slate-900">
-              ቅድስት ኪዳነ ምሕረት ሰንበት ት/ቤት
+              ጃቴ ኪዳነ ምሕረት ፍኖተ ሰማዕታት ሰንበት ት/ቤት
             </h1>
             <p className="text-xs font-bold uppercase tracking-widest" style={{ color: theme.secondary }}>
-              St. Kidane Mehret Sunday School &bull; Academic Report
+              Jate Kidane Mehret Fnote Semaetat Sunday School &bull; Academic Report
             </p>
             <p className="text-[11px] text-slate-400 font-medium">
               Academic Year {year} &bull; Section: {student.section_name} ({student.classification})

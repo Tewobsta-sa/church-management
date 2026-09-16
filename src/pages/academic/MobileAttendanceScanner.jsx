@@ -93,7 +93,7 @@ export default function MobileAttendanceScanner() {
     const loadAssignments = async () => {
       setLoadingAssignments(true);
       try {
-        const res = await assignmentService.getAssignments();
+        const res = await assignmentService.getAssignments({ per_page: 100 });
         const list = Array.isArray(res) ? res : res?.data || [];
         setAssignments(list);
         if (list.length > 0) {
@@ -333,10 +333,11 @@ export default function MobileAttendanceScanner() {
                   a.type === "Course"
                     ? `${a.assignment_courses?.[0]?.course?.name || "ኮርስ"} (${a.section?.name || "ክፍል"})`
                     : `${a.mezmurs?.[0]?.title || "የመዝሙር ስልጠና"}`;
+                const nightFlag = a.is_night ? " 🌙 [ማታ]" : "";
                 const time = a.start_time ? ` · ${a.start_time.slice(0, 5)}` : "";
                 return (
                   <option key={a.id} value={a.id}>
-                    {title} {time}
+                    {title} {nightFlag} {time}
                   </option>
                 );
               })}
@@ -447,7 +448,9 @@ export default function MobileAttendanceScanner() {
             className={`p-4 rounded-3xl border shadow-2xl transition-all animate-[slide-up_0.2s_ease-out] ${
               lastScannedStudent.error
                 ? "bg-rose-950/90 border-rose-700/80 text-rose-100"
-                : "bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-950 border-emerald-500/60 text-white"
+                : lastScannedStudent.status === "Late"
+                  ? "bg-gradient-to-r from-amber-950 via-slate-900 to-amber-950 border-amber-500/60 text-white"
+                  : "bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-950 border-emerald-500/60 text-white"
             }`}
           >
             {lastScannedStudent.error ? (
@@ -465,34 +468,74 @@ export default function MobileAttendanceScanner() {
                     <img
                       src={lastScannedStudent.picture_url}
                       alt={lastScannedStudent.name}
-                      className="w-14 h-14 rounded-2xl object-cover border-2 border-emerald-400 shadow-md shrink-0"
+                      className={`w-14 h-14 rounded-2xl object-cover border-2 shadow-md shrink-0 ${
+                        lastScannedStudent.status === "Late" ? "border-amber-400" : "border-emerald-400"
+                      }`}
                     />
                   ) : (
-                    <div className="w-14 h-14 rounded-2xl bg-emerald-900/50 border-2 border-emerald-400/60 flex items-center justify-center font-black text-emerald-300 text-xl shrink-0">
+                    <div
+                      className={`w-14 h-14 rounded-2xl border-2 flex items-center justify-center font-black text-xl shrink-0 ${
+                        lastScannedStudent.status === "Late"
+                          ? "bg-amber-900/50 border-amber-400/60 text-amber-300"
+                          : "bg-emerald-900/50 border-emerald-400/60 text-emerald-300"
+                      }`}
+                    >
                       {lastScannedStudent.name?.charAt(0) || "S"}
                     </div>
                   )}
 
                   <div>
-                    <div className="inline-flex items-center gap-1 text-[10px] font-black uppercase text-emerald-400">
-                      <CheckCircle2 className="w-3 h-3" />
-                      <span>ተገኝቷል (Present)</span>
-                      <span className="text-slate-400 ml-1">· {lastScannedStudent.marked_at}</span>
+                    <div
+                      className={`inline-flex items-center gap-1 text-[10px] font-black uppercase ${
+                        lastScannedStudent.status === "Late" ? "text-amber-400" : "text-emerald-400"
+                      }`}
+                    >
+                      {lastScannedStudent.status === "Late" ? (
+                        <>
+                          <Clock className="w-3 h-3" />
+                          <span>ዘግይቷል (Late{lastScannedStudent.late_minutes ? ` +${lastScannedStudent.late_minutes}m` : ""})</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-3 h-3" />
+                          <span>ተገኝቷል (Present)</span>
+                        </>
+                      )}
+                      <span className="text-slate-400 ml-1">
+                        · {lastScannedStudent.time || lastScannedStudent.marked_at || "አሁን"}
+                      </span>
                     </div>
                     <h3 className="font-black text-base leading-tight mt-0.5 text-white">
                       {lastScannedStudent.name}
                     </h3>
-                    <p className="text-[11px] text-emerald-300 font-bold">
+                    <p
+                      className={`text-[11px] font-bold ${
+                        lastScannedStudent.status === "Late" ? "text-amber-300" : "text-emerald-300"
+                      }`}
+                    >
                       {lastScannedStudent.christian_name || "—"}
                     </p>
                     <p className="text-[10px] text-slate-400 font-mono mt-0.5">
                       ID: {lastScannedStudent.student_id} · {lastScannedStudent.section_name}
+                      {lastScannedStudent.is_night && (
+                        <span className="ml-1 text-amber-400 font-bold">🌙 [ማታ]</span>
+                      )}
                     </p>
                   </div>
                 </div>
 
-                <div className="w-9 h-9 rounded-full bg-emerald-500/20 border border-emerald-400 flex items-center justify-center text-emerald-400 shrink-0">
-                  <CheckCircle2 className="w-5 h-5" />
+                <div
+                  className={`w-9 h-9 rounded-full border flex items-center justify-center shrink-0 ${
+                    lastScannedStudent.status === "Late"
+                      ? "bg-amber-500/20 border-amber-400 text-amber-400"
+                      : "bg-emerald-500/20 border-emerald-400 text-emerald-400"
+                  }`}
+                >
+                  {lastScannedStudent.status === "Late" ? (
+                    <Clock className="w-5 h-5" />
+                  ) : (
+                    <CheckCircle2 className="w-5 h-5" />
+                  )}
                 </div>
               </div>
             )}

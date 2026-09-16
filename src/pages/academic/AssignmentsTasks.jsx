@@ -24,6 +24,8 @@ import {
   ChevronLeft,
   ChevronRight,
   GraduationCap,
+  Moon,
+  Sun,
 } from "lucide-react";
 import { assignmentService } from "../../services/assignmentService";
 import { sectionService } from "../../services/sectionService";
@@ -61,6 +63,7 @@ const CalendarEvent = (props) => {
   const event = props?.event;
   if (!event || !event.title) return null;
   const isCourse = event.type === "Course";
+  const isNight = Boolean(event.raw?.is_night);
   return (
     <div className="flex flex-col h-full justify-between py-1 px-1 text-white">
       <div className="flex items-center gap-1 font-bold text-[11px] leading-tight truncate">
@@ -70,6 +73,11 @@ const CalendarEvent = (props) => {
           <Music className="w-3 h-3 shrink-0" />
         )}
         <span className="truncate">{event.title}</span>
+        {isNight && (
+          <span className="text-[8px] px-1 py-0.2 bg-amber-400 text-slate-950 rounded font-black shrink-0">
+            🌙
+          </span>
+        )}
       </div>
       <div className="flex items-center justify-between text-[9px] opacity-90 font-medium">
         <span className="flex items-center gap-0.5 truncate">
@@ -113,6 +121,7 @@ export default function AssignmentsTasks() {
   const [filterType, setFilterType] = useState("all"); // "all" | "Course" | "MezmurTraining"
   const [filterSection, setFilterSection] = useState("all");
   const [filterDay, setFilterDay] = useState("all");
+  const [filterShift, setFilterShift] = useState("all"); // "all" | "day" | "night"
 
   const [rawSchedule, setRawSchedule] = useState([]);
   const [calendarEvents, setCalendarEvents] = useState([]);
@@ -138,6 +147,7 @@ export default function AssignmentsTasks() {
     scheduled_date: "",
     start_time: "09:00",
     end_time: "10:30",
+    is_night: false,
   });
 
   // ─── Fetch schedule ────────────────────────────────────────────────
@@ -296,6 +306,10 @@ export default function AssignmentsTasks() {
       if (filterDay !== "all" && String(item.day_of_week) !== String(filterDay))
         return false;
 
+      // Filter by Shift (Day vs Night)
+      if (filterShift === "night" && !item.is_night) return false;
+      if (filterShift === "day" && item.is_night) return false;
+
       // Search Query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -330,6 +344,7 @@ export default function AssignmentsTasks() {
     filterType,
     filterSection,
     filterDay,
+    filterShift,
     searchQuery,
   ]);
 
@@ -345,6 +360,10 @@ export default function AssignmentsTasks() {
         String(ev.raw?.section_id) !== String(filterSection)
       )
         return false;
+
+      // Filter by Shift
+      if (filterShift === "night" && !ev.raw?.is_night) return false;
+      if (filterShift === "day" && ev.raw?.is_night) return false;
 
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -364,6 +383,7 @@ export default function AssignmentsTasks() {
     user,
     filterType,
     filterSection,
+    filterShift,
     searchQuery,
   ]);
 
@@ -621,6 +641,17 @@ export default function AssignmentsTasks() {
             <option value="Course">Academic Courses</option>
             <option value="MezmurTraining">Mezmur Training</option>
           </select>
+
+          {/* Shift Filter (Day vs Night) */}
+          <select
+            value={filterShift}
+            onChange={(e) => setFilterShift(e.target.value)}
+            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-brand-600"
+          >
+            <option value="all">All Shifts (ቀን & ማታ)</option>
+            <option value="day">☀️ Day Only (ቀን ብቻ)</option>
+            <option value="night">🌙 Night Shift (ማታ ብቻ)</option>
+          </select>
         </div>
       </div>
 
@@ -691,15 +722,23 @@ export default function AssignmentsTasks() {
                               <div>
                                 {/* Type & Time Banner */}
                                 <div className="flex items-center justify-between gap-1 mb-1.5">
-                                  <span
-                                    className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider ${
-                                      isCourse
-                                        ? "bg-brand-50 text-brand-700 border border-brand-200/50"
-                                        : "bg-amber-50 text-amber-700 border border-amber-200/50"
-                                    }`}
-                                  >
-                                    {isCourse ? "Course" : "Mezmur"}
-                                  </span>
+                                  <div className="flex items-center gap-1 flex-wrap">
+                                    <span
+                                      className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider ${
+                                        isCourse
+                                          ? "bg-brand-50 text-brand-700 border border-brand-200/50"
+                                          : "bg-amber-50 text-amber-700 border border-amber-200/50"
+                                      }`}
+                                    >
+                                      {isCourse ? "Course" : "Mezmur"}
+                                    </span>
+                                    {Boolean(item.is_night) && (
+                                      <span className="px-1.5 py-0.5 rounded-md text-[8.5px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-900 border border-indigo-200 flex items-center gap-0.5">
+                                        <Moon className="w-2.5 h-2.5 fill-indigo-900" />
+                                        ማታ
+                                      </span>
+                                    )}
+                                  </div>
                                   <span className="flex items-center gap-1 text-[10px] font-black text-slate-500">
                                     <Clock className="w-3 h-3 text-slate-400" />
                                     {item.start_time?.slice(0, 5)} -{" "}
@@ -934,6 +973,12 @@ export default function AssignmentsTasks() {
                           ) : (
                             <span className="px-2 py-0.5 rounded-md bg-slate-200/70 text-slate-700 text-[10px] font-black uppercase">
                               Every {dayObj?.label || "Day"}
+                            </span>
+                          )}
+                          {Boolean(item.is_night) && (
+                            <span className="px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-900 border border-indigo-200 text-[10px] font-black uppercase flex items-center gap-1">
+                              <Moon className="w-3 h-3 fill-indigo-900" />
+                              Night Shift (የማታ ፈረቃ)
                             </span>
                           )}
                         </div>
@@ -1327,6 +1372,32 @@ export default function AssignmentsTasks() {
                     onChange={(e) =>
                       setFormData({ ...formData, location: e.target.value })
                     }
+                  />
+                </div>
+
+                {/* Night Schedule Toggle */}
+                <div className="p-3.5 bg-indigo-50/80 border border-indigo-200 rounded-xl flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                      <Moon className="w-4 h-4 fill-white" />
+                    </div>
+                    <div>
+                      <label htmlFor="is_night_schedule" className="text-xs font-bold text-slate-800 cursor-pointer block">
+                        Night Shift Schedule (የማታ ፈረቃ ፕሮግራም)
+                      </label>
+                      <p className="text-[10px] text-slate-500 font-medium">
+                        Marks this timetable specifically for night students & filters night rosters in attendance
+                      </p>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    id="is_night_schedule"
+                    checked={Boolean(formData.is_night)}
+                    onChange={(e) =>
+                      setFormData({ ...formData, is_night: e.target.checked })
+                    }
+                    className="w-5 h-5 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
                   />
                 </div>
               </div>

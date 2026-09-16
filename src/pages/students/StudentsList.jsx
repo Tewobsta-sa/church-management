@@ -19,6 +19,7 @@ import {
   FlagOff,
   AlertTriangle,
   Moon,
+  Sun,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useTranslation } from "react-i18next";
@@ -50,7 +51,8 @@ export default function StudentsList() {
 
   const [activeTab, setActiveTab] = useState("regular"); // prekg | regular | distance
   const [regularSubFilter, setRegularSubFilter] = useState("all"); // all | htsanat | maekelawyan | wetatoch
-  const [statusFilter, setStatusFilter] = useState("all"); // all | new | regular
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [shiftFilter, setShiftFilter] = useState("all"); // all | new | regular
 
   const [currentPage, setCurrentPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -98,6 +100,9 @@ export default function StudentsList() {
       if (statusFilter !== "all") {
         filters.status = statusFilter;
       }
+      if (shiftFilter !== "all") {
+        filters.is_night = shiftFilter === "night";
+      }
 
       let data;
       if (activeTab === "prekg") {
@@ -123,7 +128,7 @@ export default function StudentsList() {
   useEffect(() => {
     fetchStudents();
     setSelectedIds([]);
-  }, [activeTab, regularSubFilter, statusFilter, currentPage, search]);
+  }, [activeTab, regularSubFilter, statusFilter, shiftFilter, currentPage, search]);
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
@@ -354,6 +359,23 @@ export default function StudentsList() {
             <option value="all">All Statuses</option>
             <option value="new">New Students</option>
             <option value="regular">Regular Students</option>
+          </select>
+        </div>
+
+        {/* Shift Filter (Day / Night) */}
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-extrabold uppercase text-slate-400">Shift:</span>
+          <select
+            value={shiftFilter}
+            onChange={(e) => {
+              setShiftFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none cursor-pointer"
+          >
+            <option value="all">All Shifts (ሁሉም ፈረቃ)</option>
+            <option value="day">☀️ ቀን (Day)</option>
+            <option value="night">🌙 ማታ (Night)</option>
           </select>
         </div>
       </div>

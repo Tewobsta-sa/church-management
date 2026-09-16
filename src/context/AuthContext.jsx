@@ -79,11 +79,11 @@ export const AuthProvider = ({ children }) => {
     window.location.href = "/";
   };
 
-  // Inactivity auto-logout: 2 minutes of idle time without user interaction
+  // Inactivity auto-logout: 25 minutes of idle time without user interaction
   useEffect(() => {
     if (!user) return;
 
-    const INACTIVITY_LIMIT_MS = 2 * 60 * 1000; // 2 minutes
+    const INACTIVITY_LIMIT_MS = 25 * 60 * 1000; // 25 minutes
     let lastActive = Date.now();
 
     const updateActivity = () => {
@@ -97,10 +97,10 @@ export const AuthProvider = ({ children }) => {
       if (Date.now() - lastActive >= INACTIVITY_LIMIT_MS) {
         clearInterval(intervalId);
         events.forEach((evt) => window.removeEventListener(evt, updateActivity));
-        alert("የእርስዎ የይለፍ ቃል ክፍለ-ጊዜ በ2 ደቂቃ ባለመንቀሳቀስ ምክንያት ተዘግቷል። እባክዎ እንደገና ይግቡ።\n(Session expired due to 2 minutes of inactivity. Please log in again.)");
+        alert("የእርስዎ ክፍለ-ጊዜ በ25 ደቂቃ እንቅስቃሴ ባለመኖሩ ምክንያት ተዘግቷል። እባክዎ እንደገና ይግቡ።\n(Your session has timed out due to 25 minutes of inactivity. Please sign in again.)");
         logout();
       }
-    }, 10000); // check every 10 seconds
+    }, 15000); // check every 15 seconds
 
     return () => {
       clearInterval(intervalId);

@@ -109,6 +109,11 @@ export async function inlineImagesForCapture(rootEl) {
         }
       } catch (err) {
         console.warn("PDF image inline failed:", src, err);
+        // Fallback: replace with transparent 1x1 data URL so html2canvas never
+        // attempts to load a cross-origin untrusted URL that taints the canvas.
+        img.removeAttribute("crossorigin");
+        img.crossOrigin = null;
+        img.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
       }
     })
   );
@@ -141,6 +146,9 @@ export async function captureElement(el, options = {}) {
     allowTaint: false,
     logging: false,
     backgroundColor: "#ffffff",
+    scrollX: 0,
+    scrollY: 0,
+    windowWidth: el.scrollWidth || el.offsetWidth || 1200,
     imageTimeout: 15000,
     ...options,
   });

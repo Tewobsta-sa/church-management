@@ -1,3 +1,4 @@
+import React, { Suspense, lazy } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -6,28 +7,41 @@ import {
 } from "react-router-dom";
 
 import { AuthProvider, useAuth } from "./context/AuthContext";
-
-import Login from "./pages/auth/login";
-import Setup from "./pages/auth/setup";
-import Dashboard from "./pages/dashboard/Dashboard";
-import StudentsList from "./pages/students/StudentsList";
-import StudentPromotion from "./pages/students/StudentPromotion";
-import UsersManagement from "./pages/superadmin/UsersManagement";
-import CoursesManagement from "./pages/courses/CoursesManagement";
-import AssignmentsTasks from "./pages/academic/AssignmentsTasks";
-import LiveAttendance from "./pages/academic/LiveAttendance";
-import Grades from "./pages/academic/Grades";
-import ResultsDashboard from "./pages/academic/ResultsDashboard";
-import ReportsHub from "./pages/academic/ReportsHub";
-import MezmurMinistry from "./pages/mezmur/MezmurMinistry";
+import ErrorBoundary from "./components/common/ErrorBoundary";
 import AppLayout from "./components/layout/AppLayout";
-import SectionsManagement from "./pages/sections/SectionsManagement";
-import SecuritySettings from "./pages/admin/SecuritySettings";
-import ForgotPassword from "./pages/auth/ForgotPassword";
-import TeachersManagement from "./pages/academic/TeachersManagement";
-import MobileAttendanceScanner from "./pages/academic/MobileAttendanceScanner";
-import MobileAttendanceViewer from "./pages/academic/MobileAttendanceViewer";
 import PwaInstallPrompt from "./components/common/PwaInstallPrompt";
+
+// Lazy-loaded pages for optimal performance and chunk splitting
+const Login = lazy(() => import("./pages/auth/login"));
+const Setup = lazy(() => import("./pages/auth/setup"));
+const ForgotPassword = lazy(() => import("./pages/auth/ForgotPassword"));
+const Dashboard = lazy(() => import("./pages/dashboard/Dashboard"));
+const StudentsList = lazy(() => import("./pages/students/StudentsList"));
+const StudentPromotion = lazy(() => import("./pages/students/StudentPromotion"));
+const UsersManagement = lazy(() => import("./pages/superadmin/UsersManagement"));
+const SystemLogsViewer = lazy(() => import("./pages/superadmin/SystemLogsViewer"));
+const CoursesManagement = lazy(() => import("./pages/courses/CoursesManagement"));
+const AssignmentsTasks = lazy(() => import("./pages/academic/AssignmentsTasks"));
+const LiveAttendance = lazy(() => import("./pages/academic/LiveAttendance"));
+const Grades = lazy(() => import("./pages/academic/Grades"));
+const ResultsDashboard = lazy(() => import("./pages/academic/ResultsDashboard"));
+const ReportsHub = lazy(() => import("./pages/academic/ReportsHub"));
+const MezmurMinistry = lazy(() => import("./pages/mezmur/MezmurMinistry"));
+const SectionsManagement = lazy(() => import("./pages/sections/SectionsManagement"));
+const SecuritySettings = lazy(() => import("./pages/admin/SecuritySettings"));
+const TeachersManagement = lazy(() => import("./pages/academic/TeachersManagement"));
+const MobileAttendanceScanner = lazy(() => import("./pages/academic/MobileAttendanceScanner"));
+const MobileAttendanceViewer = lazy(() => import("./pages/academic/MobileAttendanceViewer"));
+
+// Page Loading Spinner Fallback
+const PageLoader = () => (
+  <div className="min-h-[50vh] flex flex-col items-center justify-center p-8">
+    <div className="w-10 h-10 border-4 border-amber-500/20 border-t-amber-500 rounded-full animate-spin mb-3"></div>
+    <p className="text-sm font-medium text-slate-500 dark:text-slate-400 animate-pulse">
+      እባክዎ ይጠብቁ... (Loading...)
+    </p>
+  </div>
+);
 
 export const getPrimaryRole = (user) => {
   if (user?.roles && Array.isArray(user.roles) && user.roles.length > 0) {
@@ -42,14 +56,9 @@ export const getDefaultRouteForRole = (role) => {
   const roleRedirects = {
     super_admin: "/dashboard",
     yesew_habt: "/students",
-    mereja_kfl: "/dashboard",
-    mezmur_kfl: "/mezmur",
     tmhrt_kfl: "/students",
-    gngnunet_office_admin: "/students",
-    mezmur_office_admin: "/mezmur",
-    tmhrt_office_admin: "/students",
-    distance_admin: "/students",
-    teacher: "/assignments",
+    mezmur_kfl: "/mezmur",
+    mereja_kfl: "/dashboard",
   };
 
   return roleRedirects[role] || "/dashboard";
@@ -60,7 +69,7 @@ const hasAnyAllowedRole = (user, allowedRoles) => {
   const userRoles = [];
   if (user.roles && Array.isArray(user.roles)) {
     user.roles.forEach((r) => {
-      userRoles.push(typeof r === "string" ? r : r.name);
+      userRoles.push(typeof r === "string" ? r : r?.name);
     });
   }
   if (user.role && !userRoles.includes(user.role)) {
@@ -70,11 +79,11 @@ const hasAnyAllowedRole = (user, allowedRoles) => {
   return userRoles.some((r) => allowedRoles.includes(r));
 };
 
-// Public Route (Login)
+// Public Route (Login, Forgot Password)
 function PublicRoute({ children }) {
   const { user, loading, isInitialized } = useAuth();
 
-  if (loading) return <p>Loading...</p>;
+  if (loading) return <PageLoader />;
 
   if (isInitialized === false) {
     return <Navigate to="/setup" replace />;
@@ -93,7 +102,7 @@ function PublicRoute({ children }) {
 function ProtectedRoute({ children }) {
   const { user, loading, isInitialized } = useAuth();
 
-  if (loading) return <p>Loading...</p>;
+  if (loading) return <PageLoader />;
 
   if (isInitialized === false) {
     return <Navigate to="/setup" replace />;
@@ -106,11 +115,11 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
-// Role-Specific Route
+// Role-Specific Route (Strictly enforces canonical 5 roles)
 function RoleRoute({ children, allowedRoles }) {
   const { user, loading, isInitialized } = useAuth();
 
-  if (loading) return <p>Loading...</p>;
+  if (loading) return <PageLoader />;
 
   if (isInitialized === false) {
     return <Navigate to="/setup" replace />;
@@ -133,7 +142,7 @@ function RoleRoute({ children, allowedRoles }) {
 function SetupRoute({ children }) {
   const { isInitialized, loading } = useAuth();
 
-  if (loading) return <p>Loading...</p>;
+  if (loading) return <PageLoader />;
 
   if (isInitialized) {
     return <Navigate to="/" replace />;
@@ -144,319 +153,335 @@ function SetupRoute({ children }) {
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <Routes>
-          {/* Public */}
-          <Route
-            path="/"
-            element={
-              <PublicRoute>
-                <Login />
-              </PublicRoute>
-            }
-          />
-          <Route
-            path="/login"
-            element={
-              <PublicRoute>
-                <Login />
-              </PublicRoute>
-            }
-          />
-          <Route
-            path="/forgot-password"
-            element={
-              <PublicRoute>
-                <ForgotPassword />
-              </PublicRoute>
-            }
-          />
+    <ErrorBoundary>
+      <AuthProvider>
+        <Router>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              {/* Public Routes */}
+              <Route
+                path="/"
+                element={
+                  <PublicRoute>
+                    <Login />
+                  </PublicRoute>
+                }
+              />
+              <Route
+                path="/login"
+                element={
+                  <PublicRoute>
+                    <Login />
+                  </PublicRoute>
+                }
+              />
+              <Route
+                path="/forgot-password"
+                element={
+                  <PublicRoute>
+                    <ForgotPassword />
+                  </PublicRoute>
+                }
+              />
 
-          {/* Setup */}
-          <Route
-            path="/setup"
-            element={
-              <SetupRoute>
-                <Setup />
-              </SetupRoute>
-            }
-          />
+              {/* Initial Setup Route */}
+              <Route
+                path="/setup"
+                element={
+                  <SetupRoute>
+                    <Setup />
+                  </SetupRoute>
+                }
+              />
 
-          {/* Protected Layout */}
-          <Route
-            element={
-              <ProtectedRoute>
-                <AppLayout />
-              </ProtectedRoute>
-            }
-          >
-            {/* All protected pages go here */}
-            <Route
-              path="/users"
-              element={
-                <RoleRoute allowedRoles={["super_admin", "tmhrt_office_admin"]}>
-                  <UsersManagement />
-                </RoleRoute>
-              }
-            />
-            <Route
-              path="/dashboard"
-              element={
-                <RoleRoute
-                  allowedRoles={[
-                    "super_admin",
-                    "yesew_habt",
-                    "mereja_kfl",
-                    "mezmur_kfl",
-                    "tmhrt_kfl",
-                    "gngnunet_office_admin",
-                    "mezmur_office_admin",
-                    "tmhrt_office_admin",
-                    "teacher",
-                  ]}
-                >
-                  <Dashboard />
-                </RoleRoute>
-              }
-            />
-            <Route
-              path="/students"
-              element={
-                <RoleRoute
-                  allowedRoles={[
-                    "super_admin",
-                    "yesew_habt",
-                    "mereja_kfl",
-                    "mezmur_kfl",
-                    "tmhrt_kfl",
-                    "gngnunet_office_admin",
-                    "mezmur_office_admin",
-                    "tmhrt_office_admin",
-                    "distance_admin",
-                  ]}
-                >
-                  <StudentsList />
-                </RoleRoute>
-              }
-            />
-            <Route
-              path="/promotions"
-              element={
-                <RoleRoute
-                  allowedRoles={[
-                    "super_admin",
-                    "yesew_habt",
-                    "tmhrt_kfl",
-                    "mereja_kfl",
-                    "gngnunet_office_admin",
-                    "tmhrt_office_admin",
-                  ]}
-                >
-                  <StudentPromotion />
-                </RoleRoute>
-              }
-            />
-            <Route
-              path="/teachers"
-              element={
-                <RoleRoute
-                  allowedRoles={[
-                    "super_admin",
-                    "yesew_habt",
-                    "tmhrt_kfl",
-                    "mereja_kfl",
-                    "tmhrt_office_admin",
-                  ]}
-                >
-                  <TeachersManagement />
-                </RoleRoute>
-              }
-            />
-            <Route
-              path="/sections"
-              element={
-                <RoleRoute
-                  allowedRoles={[
-                    "super_admin",
-                    "tmhrt_kfl",
-                    "mereja_kfl",
-                    "tmhrt_office_admin",
-                  ]}
-                >
-                  <SectionsManagement />
-                </RoleRoute>
-              }
-            />
-            <Route
-              path="/courses"
-              element={
-                <RoleRoute
-                  allowedRoles={[
-                    "super_admin",
-                    "tmhrt_kfl",
-                    "mereja_kfl",
-                    "tmhrt_office_admin",
-                  ]}
-                >
-                  <CoursesManagement />
-                </RoleRoute>
-              }
-            />
-            <Route
-              path="/assignments"
-              element={
-                <RoleRoute
-                  allowedRoles={[
-                    "super_admin",
-                    "yesew_habt",
-                    "tmhrt_kfl",
-                    "mezmur_kfl",
-                    "mereja_kfl",
-                    "tmhrt_office_admin",
-                    "mezmur_office_admin",
-                    "teacher",
-                  ]}
-                >
-                  <AssignmentsTasks />
-                </RoleRoute>
-              }
-            />
-            <Route
-              path="/attendance"
-              element={
-                <RoleRoute
-                  allowedRoles={[
-                    "super_admin",
-                    "yesew_habt",
-                    "tmhrt_kfl",
-                    "mezmur_kfl",
-                    "mereja_kfl",
-                    "teacher",
-                    "tmhrt_office_admin",
-                    "mezmur_office_admin",
-                    "gngnunet_office_admin",
-                  ]}
-                >
-                  <LiveAttendance />
-                </RoleRoute>
-              }
-            />
-            <Route
-              path="/grades"
-              element={
-                <RoleRoute
-                  allowedRoles={[
-                    "super_admin",
-                    "tmhrt_kfl",
-                    "mereja_kfl",
-                    "teacher",
-                    "tmhrt_office_admin",
-                  ]}
-                >
-                  <Grades />
-                </RoleRoute>
-              }
-            />
-            <Route
-              path="/results"
-              element={
-                <RoleRoute
-                  allowedRoles={[
-                    "super_admin",
-                    "tmhrt_kfl",
-                    "mereja_kfl",
-                    "tmhrt_office_admin",
-                  ]}
-                >
-                  <ResultsDashboard />
-                </RoleRoute>
-              }
-            />
-            <Route
-              path="/mezmur"
-              element={
-                <RoleRoute
-                  allowedRoles={[
-                    "super_admin",
-                    "mezmur_kfl",
-                    "yesew_habt",
-                    "mereja_kfl",
-                    "mezmur_office_admin",
-                    "gngnunet_office_admin",
-                  ]}
-                >
-                  <MezmurMinistry />
-                </RoleRoute>
-              }
-            />
-            <Route
-              path="/security"
-              element={
-                <ProtectedRoute>
-                  <SecuritySettings />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/reports"
-              element={
-                <RoleRoute
-                  allowedRoles={[
-                    "super_admin",
-                    "tmhrt_kfl",
-                    "yesew_habt",
-                    "mereja_kfl",
-                    "tmhrt_office_admin",
-                    "gngnunet_office_admin",
-                  ]}
-                >
-                  <ReportsHub />
-                </RoleRoute>
-              }
-            />
-            <Route
-              path="/attendance/scanner"
-              element={
-                <ProtectedRoute>
-                  <MobileAttendanceScanner />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/attendance/mobile-viewer"
-              element={
-                <ProtectedRoute>
-                  <MobileAttendanceViewer />
-                </ProtectedRoute>
-              }
-            />
-          </Route>
+              {/* Protected App Layout */}
+              <Route
+                element={
+                  <ProtectedRoute>
+                    <AppLayout />
+                  </ProtectedRoute>
+                }
+              >
+                {/* 1. Dashboard (Available to all 5 roles) */}
+                <Route
+                  path="/dashboard"
+                  element={
+                    <RoleRoute
+                      allowedRoles={[
+                        "super_admin",
+                        "yesew_habt",
+                        "tmhrt_kfl",
+                        "mezmur_kfl",
+                        "mereja_kfl",
+                      ]}
+                    >
+                      <Dashboard />
+                    </RoleRoute>
+                  }
+                />
 
-          {/* Standalone Fullscreen Mobile App Routes (Optimized for Phones & PWAs) */}
-          <Route
-            path="/mobile/scanner"
-            element={
-              <ProtectedRoute>
-                <MobileAttendanceScanner />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/mobile/viewer"
-            element={
-              <ProtectedRoute>
-                <MobileAttendanceViewer />
-              </ProtectedRoute>
-            }
-          />
+                {/* 2. User Administration & Audit Logs (Super Admin Only) */}
+                <Route
+                  path="/users"
+                  element={
+                    <RoleRoute allowedRoles={["super_admin"]}>
+                      <UsersManagement />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="/admin/logs"
+                  element={
+                    <RoleRoute allowedRoles={["super_admin"]}>
+                      <SystemLogsViewer />
+                    </RoleRoute>
+                  }
+                />
 
-          {/* Catch-all */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-        <PwaInstallPrompt />
-      </Router>
-    </AuthProvider>
+                {/* 3. Students Management (All 5 roles) */}
+                <Route
+                  path="/students"
+                  element={
+                    <RoleRoute
+                      allowedRoles={[
+                        "super_admin",
+                        "yesew_habt",
+                        "tmhrt_kfl",
+                        "mezmur_kfl",
+                        "mereja_kfl",
+                      ]}
+                    >
+                      <StudentsList />
+                    </RoleRoute>
+                  }
+                />
+
+                {/* 4. Student Promotions Workflow (super_admin, yesew_habt, tmhrt_kfl, mereja_kfl) */}
+                <Route
+                  path="/promotions"
+                  element={
+                    <RoleRoute
+                      allowedRoles={[
+                        "super_admin",
+                        "yesew_habt",
+                        "tmhrt_kfl",
+                        "mereja_kfl",
+                      ]}
+                    >
+                      <StudentPromotion />
+                    </RoleRoute>
+                  }
+                />
+
+                {/* 5. Teachers Management */}
+                <Route
+                  path="/teachers"
+                  element={
+                    <RoleRoute
+                      allowedRoles={[
+                        "super_admin",
+                        "yesew_habt",
+                        "tmhrt_kfl",
+                        "mereja_kfl",
+                      ]}
+                    >
+                      <TeachersManagement />
+                    </RoleRoute>
+                  }
+                />
+
+                {/* 6. Sections Management */}
+                <Route
+                  path="/sections"
+                  element={
+                    <RoleRoute
+                      allowedRoles={["super_admin", "tmhrt_kfl", "mereja_kfl"]}
+                    >
+                      <SectionsManagement />
+                    </RoleRoute>
+                  }
+                />
+
+                {/* 7. Courses Management */}
+                <Route
+                  path="/courses"
+                  element={
+                    <RoleRoute
+                      allowedRoles={["super_admin", "tmhrt_kfl", "mereja_kfl"]}
+                    >
+                      <CoursesManagement />
+                    </RoleRoute>
+                  }
+                />
+
+                {/* 8. Schedules & Tasks */}
+                <Route
+                  path="/assignments"
+                  element={
+                    <RoleRoute
+                      allowedRoles={[
+                        "super_admin",
+                        "yesew_habt",
+                        "tmhrt_kfl",
+                        "mezmur_kfl",
+                        "mereja_kfl",
+                      ]}
+                    >
+                      <AssignmentsTasks />
+                    </RoleRoute>
+                  }
+                />
+
+                {/* 9. Attendance */}
+                <Route
+                  path="/attendance"
+                  element={
+                    <RoleRoute
+                      allowedRoles={[
+                        "super_admin",
+                        "yesew_habt",
+                        "tmhrt_kfl",
+                        "mezmur_kfl",
+                        "mereja_kfl",
+                      ]}
+                    >
+                      <LiveAttendance />
+                    </RoleRoute>
+                  }
+                />
+
+                {/* 10. Grading */}
+                <Route
+                  path="/grades"
+                  element={
+                    <RoleRoute
+                      allowedRoles={["super_admin", "tmhrt_kfl", "mereja_kfl"]}
+                    >
+                      <Grades />
+                    </RoleRoute>
+                  }
+                />
+
+                {/* 11. Academic Results Dashboard */}
+                <Route
+                  path="/results"
+                  element={
+                    <RoleRoute
+                      allowedRoles={["super_admin", "tmhrt_kfl", "mereja_kfl"]}
+                    >
+                      <ResultsDashboard />
+                    </RoleRoute>
+                  }
+                />
+
+                {/* 12. Mezmur Ministry */}
+                <Route
+                  path="/mezmur"
+                  element={
+                    <RoleRoute
+                      allowedRoles={[
+                        "super_admin",
+                        "mezmur_kfl",
+                        "yesew_habt",
+                        "mereja_kfl",
+                      ]}
+                    >
+                      <MezmurMinistry />
+                    </RoleRoute>
+                  }
+                />
+
+                {/* 13. Reports Hub */}
+                <Route
+                  path="/reports"
+                  element={
+                    <RoleRoute
+                      allowedRoles={[
+                        "super_admin",
+                        "tmhrt_kfl",
+                        "yesew_habt",
+                        "mezmur_kfl",
+                        "mereja_kfl",
+                      ]}
+                    >
+                      <ReportsHub />
+                    </RoleRoute>
+                  }
+                />
+
+                {/* 14. Attendance QR Scanner */}
+                <Route
+                  path="/attendance/scanner"
+                  element={
+                    <RoleRoute
+                      allowedRoles={[
+                        "super_admin",
+                        "yesew_habt",
+                        "tmhrt_kfl",
+                        "mezmur_kfl",
+                        "mereja_kfl",
+                      ]}
+                    >
+                      <MobileAttendanceScanner />
+                    </RoleRoute>
+                  }
+                />
+
+                {/* 15. Mobile Attendance Viewer */}
+                <Route
+                  path="/attendance/mobile-viewer"
+                  element={
+                    <RoleRoute
+                      allowedRoles={[
+                        "super_admin",
+                        "yesew_habt",
+                        "tmhrt_kfl",
+                        "mezmur_kfl",
+                        "mereja_kfl",
+                      ]}
+                    >
+                      <MobileAttendanceViewer />
+                    </RoleRoute>
+                  }
+                />
+
+                {/* 16. Security Settings (All Authenticated Users) */}
+                <Route
+                  path="/security"
+                  element={
+                    <ProtectedRoute>
+                      <SecuritySettings />
+                    </ProtectedRoute>
+                  }
+                />
+              </Route>
+
+              {/* Standalone Fullscreen Mobile PWA Routes */}
+              <Route
+                path="/mobile/scanner"
+                element={
+                  <ProtectedRoute>
+                    <MobileAttendanceScanner />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/mobile/viewer"
+                element={
+                  <ProtectedRoute>
+                    <MobileAttendanceViewer />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Fallback */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Suspense>
+          <PwaInstallPrompt />
+        </Router>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

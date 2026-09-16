@@ -91,9 +91,10 @@ export default function MobileAttendanceViewer() {
         });
 
         // Recalculate stats
-        let present = 0, absent = 0, excused = 0;
+        let present = 0, late = 0, absent = 0, excused = 0;
         updatedStudents.forEach((st) => {
           if (st.status === "Present") present++;
+          else if (st.status === "Late") late++;
           else if (st.status === "Absent") absent++;
           else if (st.status === "Excused") excused++;
         });
@@ -103,9 +104,10 @@ export default function MobileAttendanceViewer() {
           stats: {
             total: updatedStudents.length,
             present,
+            late,
             absent,
             excused,
-            unmarked: updatedStudents.length - (present + absent + excused),
+            unmarked: updatedStudents.length - (present + late + absent + excused),
           },
           students: updatedStudents,
         };
@@ -139,7 +141,7 @@ export default function MobileAttendanceViewer() {
     });
   }, [sessionData, searchQuery, statusFilter]);
 
-  const stats = sessionData?.stats || { total: 0, present: 0, absent: 0, excused: 0, unmarked: 0 };
+  const stats = sessionData?.stats || { total: 0, present: 0, late: 0, absent: 0, excused: 0, unmarked: 0 };
 
   return (
     <div className="max-w-md mx-auto min-h-screen bg-slate-950 text-white flex flex-col justify-between pb-8">
@@ -185,9 +187,10 @@ export default function MobileAttendanceViewer() {
                 a.type === "Course"
                   ? `${a.assignment_courses?.[0]?.course?.name || "ኮርስ"} (${a.section?.name || "ክፍል"})`
                   : `${a.mezmurs?.[0]?.title || "የመዝሙር ስልጠና"}`;
+              const nightFlag = a.is_night ? " 🌙 [ማታ]" : "";
               return (
                 <option key={a.id} value={a.id}>
-                  {title}
+                  {title} {nightFlag}
                 </option>
               );
             })}
@@ -195,22 +198,26 @@ export default function MobileAttendanceViewer() {
         </div>
 
         {/* Live Counters */}
-        <div className="grid grid-cols-4 gap-2 pt-1 text-center">
+        <div className="grid grid-cols-5 gap-1.5 pt-1 text-center">
           <div className="p-2 rounded-xl bg-slate-900 border border-white/10">
-            <p className="text-[9px] font-bold text-slate-400 uppercase">ጠቅላላ</p>
-            <p className="text-lg font-black text-white">{stats.total}</p>
+            <p className="text-[8.5px] font-bold text-slate-400 uppercase">ጠቅላላ</p>
+            <p className="text-base font-black text-white">{stats.total}</p>
           </div>
           <div className="p-2 rounded-xl bg-emerald-950/60 border border-emerald-500/40">
-            <p className="text-[9px] font-bold text-emerald-400 uppercase">ተገኝቷል</p>
-            <p className="text-lg font-black text-emerald-400">{stats.present}</p>
-          </div>
-          <div className="p-2 rounded-xl bg-rose-950/60 border border-rose-500/40">
-            <p className="text-[9px] font-bold text-rose-400 uppercase">ቀርቷል</p>
-            <p className="text-lg font-black text-rose-400">{stats.absent}</p>
+            <p className="text-[8.5px] font-bold text-emerald-400 uppercase">ተገኝቷል</p>
+            <p className="text-base font-black text-emerald-400">{stats.present}</p>
           </div>
           <div className="p-2 rounded-xl bg-amber-950/60 border border-amber-500/40">
-            <p className="text-[9px] font-bold text-amber-400 uppercase">በፈቃድ</p>
-            <p className="text-lg font-black text-amber-400">{stats.excused}</p>
+            <p className="text-[8.5px] font-bold text-amber-400 uppercase">ዘግይቷል</p>
+            <p className="text-base font-black text-amber-400">{stats.late || 0}</p>
+          </div>
+          <div className="p-2 rounded-xl bg-rose-950/60 border border-rose-500/40">
+            <p className="text-[8.5px] font-bold text-rose-400 uppercase">ቀርቷል</p>
+            <p className="text-base font-black text-rose-400">{stats.absent}</p>
+          </div>
+          <div className="p-2 rounded-xl bg-blue-950/60 border border-blue-500/40">
+            <p className="text-[8.5px] font-bold text-blue-400 uppercase">ፈቃድ</p>
+            <p className="text-base font-black text-blue-400">{stats.excused}</p>
           </div>
         </div>
 
@@ -235,6 +242,16 @@ export default function MobileAttendanceViewer() {
             የተገኙ ({stats.present})
           </button>
           <button
+            onClick={() => setStatusFilter("Late")}
+            className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition-colors ${
+              statusFilter === "Late"
+                ? "bg-amber-500 text-slate-950 font-black"
+                : "bg-amber-950/40 text-amber-300 hover:bg-amber-900/40"
+            }`}
+          >
+            የዘገዩ ({stats.late || 0})
+          </button>
+          <button
             onClick={() => setStatusFilter("Absent")}
             className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition-colors ${
               statusFilter === "Absent"
@@ -248,8 +265,8 @@ export default function MobileAttendanceViewer() {
             onClick={() => setStatusFilter("Excused")}
             className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition-colors ${
               statusFilter === "Excused"
-                ? "bg-amber-500 text-slate-950 font-black"
-                : "bg-amber-950/40 text-amber-300 hover:bg-amber-900/40"
+                ? "bg-blue-500 text-white font-black"
+                : "bg-blue-950/40 text-blue-300 hover:bg-blue-900/40"
             }`}
           >
             ፈቃድ ({stats.excused})
@@ -318,8 +335,14 @@ export default function MobileAttendanceViewer() {
                     <p className="text-[10px] text-brand-300 font-medium truncate">
                       {st.christian_name || "—"}
                     </p>
-                    <p className="text-[9px] text-slate-500 font-mono">
-                      ID: {st.student_id} {st.marked_at ? `· ${st.marked_at}` : ""}
+                    <p className="text-[9px] text-slate-500 font-mono flex items-center gap-1 flex-wrap">
+                      <span>ID: {st.student_id}</span>
+                      {st.is_night && (
+                        <span className="text-[8.5px] px-1 py-0.2 rounded bg-amber-400 text-slate-950 font-black">
+                          🌙 ማታ
+                        </span>
+                      )}
+                      {st.marked_at && <span>· {st.marked_at}</span>}
                     </p>
                   </div>
                 </div>
@@ -339,6 +362,18 @@ export default function MobileAttendanceViewer() {
                     P
                   </button>
                   <button
+                    onClick={() => handleUpdateStatus(st.id, "Late")}
+                    disabled={isUpdating}
+                    className={`w-8 h-8 rounded-lg font-black text-[11px] flex items-center justify-center transition-all ${
+                      st.status === "Late"
+                        ? "bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20"
+                        : "bg-slate-800 text-slate-400 hover:text-amber-400 hover:bg-amber-950/30"
+                    }`}
+                    title="Mark Late"
+                  >
+                    L
+                  </button>
+                  <button
                     onClick={() => handleUpdateStatus(st.id, "Absent")}
                     disabled={isUpdating}
                     className={`w-8 h-8 rounded-lg font-black text-[11px] flex items-center justify-center transition-all ${
@@ -355,8 +390,8 @@ export default function MobileAttendanceViewer() {
                     disabled={isUpdating}
                     className={`w-8 h-8 rounded-lg font-black text-[11px] flex items-center justify-center transition-all ${
                       st.status === "Excused"
-                        ? "bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20"
-                        : "bg-slate-800 text-slate-400 hover:text-amber-400 hover:bg-amber-950/30"
+                        ? "bg-blue-500 text-white shadow-md shadow-blue-500/20"
+                        : "bg-slate-800 text-slate-400 hover:text-blue-400 hover:bg-blue-950/30"
                     }`}
                     title="Mark Excused"
                   >

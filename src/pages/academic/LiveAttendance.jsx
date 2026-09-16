@@ -10,6 +10,9 @@ import {
   ChevronLeft,
   ClipboardList,
   ChevronRight,
+  Clock,
+  Moon,
+  Sun,
 } from "lucide-react";
 import { Html5QrcodeScanner } from "html5-qrcode";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -79,13 +82,19 @@ export default function LiveAttendance() {
     studentsRef.current = students;
   }, [students]);
 
-  const fetchHistory = async (page = 1) => {
+  const [historyShiftFilter, setHistoryShiftFilter] = useState("all");
+
+  const fetchHistory = async (page = 1, shift = historyShiftFilter) => {
     setHistoryLoading(true);
     try {
-      const res = await attendanceService.getAttendanceRecords({
+      const params = {
         page,
         per_page: 25,
-      });
+      };
+      if (shift && shift !== "all") {
+        params.is_night = shift === "night";
+      }
+      const res = await attendanceService.getAttendanceRecords(params);
       setHistoryData(res.data || []);
       setHistoryLastPage(res.last_page || 1);
       setHistoryPage(res.current_page || page);
@@ -99,9 +108,9 @@ export default function LiveAttendance() {
 
   useEffect(() => {
     if (!assignmentId) {
-      fetchHistory(historyPage);
+      fetchHistory(historyPage, historyShiftFilter);
     }
-  }, [assignmentId, historyPage]);
+  }, [assignmentId, historyPage, historyShiftFilter]);
 
   const fetchSessionData = async () => {
     if (!assignmentId) return;
@@ -136,21 +145,16 @@ export default function LiveAttendance() {
         return;
       }
 
-      if (currentAssign.section_id) {
-        const studentData = await sectionService.getSectionStudents(
-          currentAssign.section_id,
-        );
-        setStudents(studentData || []);
-      } else {
-        setStudents([]);
-      }
+      // Unified session students: handles Course & Mezmur, strictly filtering matching Day/Night shift
+      const sessionData = await attendanceService.getSessionStudents(assignmentId);
+      const studentList = sessionData?.students || [];
+      setStudents(studentList);
 
-      const attendanceData = await attendanceService.getAttendanceRecords({
-        assignment_id: assignmentId,
-      });
       const existing = {};
-      attendanceData.data?.forEach((r) => {
-        existing[r.student_id] = r.status;
+      studentList.forEach((st) => {
+        if (st.status && st.status !== "Unmarked") {
+          existing[st.id] = st.status;
+        }
       });
       setRecords(existing);
     } catch (err) {
@@ -228,7 +232,7 @@ export default function LiveAttendance() {
         if (records[student.id] === "Present") return;
         await handleMark(student.id, "Present");
       } else if (normalized) {
-        setScanMessage(`No student matched code: ${normalized}`);
+        setScanMessage(`ተማሪው በክፍለ-ጊዜው ዝርዝር ውስጥ አልተገኘም (ወይም የፈረቃ ልዩነት አለ): ${normalized}`);
       }
     },
     [records, assignmentId, liveMode],
@@ -282,6 +286,49 @@ export default function LiveAttendance() {
               !isSuperAdmin &&
               "Course attendance you can view."}
           </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-black uppercase text-slate-500">ፈረቃ (Shift):</span>
+            <div className="inline-flex rounded-xl bg-slate-100 p-1">
+              <button
+                type="button"
+                onClick={() => setHistoryShiftFilter("all")}
+                className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
+                  historyShiftFilter === "all"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                ሁሉም (All)
+              </button>
+              <button
+                type="button"
+                onClick={() => setHistoryShiftFilter("day")}
+                className={`flex items-center gap-1 px-3 py-1 text-xs font-bold rounded-lg transition-all ${
+                  historyShiftFilter === "day"
+                    ? "bg-white text-amber-700 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Sun className="w-3.5 h-3.5 text-amber-500" />
+                ቀን (Day)
+              </button>
+              <button
+                type="button"
+                onClick={() => setHistoryShiftFilter("night")}
+                className={`flex items-center gap-1 px-3 py-1 text-xs font-bold rounded-lg transition-all ${
+                  historyShiftFilter === "night"
+                    ? "bg-white text-indigo-700 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Moon className="w-3.5 h-3.5 text-indigo-500" />
+                ማታ (Night)
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="glass-panel overflow-hidden">
@@ -345,19 +392,30 @@ export default function LiveAttendance() {
                           className={`text-xs font-black uppercase px-2 py-1 rounded-lg ${
                             row.status === "Present"
                               ? "bg-green-100 text-green-800"
-                              : row.status === "Absent"
-                                ? "bg-red-100 text-red-800"
-                                : "bg-slate-100 text-slate-700"
+                              : row.status === "Late"
+                                ? "bg-amber-100 text-amber-900 border border-amber-300 font-black"
+                                : row.status === "Absent"
+                                  ? "bg-red-100 text-red-800"
+                                  : "bg-slate-100 text-slate-700"
                           }`}
                         >
                           {row.status}
+                          {row.status === "Late" && row.late_minutes ? ` (${row.late_minutes}m)` : ""}
                         </span>
                       </td>
                       <td
-                        className="px-4 py-3 text-slate-700 max-w-[200px] truncate"
+                        className="px-4 py-3 text-slate-700 max-w-[200px]"
                         title={assignmentLabel(row.assignment)}
                       >
-                        {assignmentLabel(row.assignment)}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="truncate">{assignmentLabel(row.assignment)}</span>
+                          {row.assignment?.is_night && (
+                            <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 shrink-0 flex items-center gap-0.5">
+                              <Moon className="w-2.5 h-2.5" />
+                              ማታ
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-xs font-bold text-slate-500 uppercase">
                         {row.assignment?.type === "MezmurTraining"
@@ -449,6 +507,12 @@ export default function LiveAttendance() {
                   : "Mezmur"}
               </span>
             )}
+            {assignment?.is_night && (
+              <span className="text-sm font-black bg-indigo-100 text-indigo-900 px-3 py-1 rounded-full border border-indigo-200 uppercase flex items-center gap-1.5 shadow-xs">
+                <Moon className="w-3.5 h-3.5 fill-indigo-900" />
+                Night Shift (የማታ ፈረቃ)
+              </span>
+            )}
           </h1>
           <p className="text-slate-500 font-medium mt-1">
             {assignment?.section?.name || assignment?.trainer?.name || "—"}
@@ -487,18 +551,16 @@ export default function LiveAttendance() {
         )}
       </div>
 
-      {liveMode && mode === "qr" ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-          <div className="glass-panel overflow-hidden p-8 border-brand-200 bg-brand-50/10">
+      {mode === "qr" && liveMode ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="glass-panel p-6 flex flex-col items-center justify-center min-h-[500px]">
             <div
               id="qr-reader"
-              className="w-full rounded-3xl overflow-hidden [&>div]:!border-none [&>div]:!shadow-none shadow-2xl"
+              className="w-full max-w-sm rounded-2xl overflow-hidden border-2 border-brand-500 shadow-2xl"
             />
-            <div className="mt-8 flex items-center justify-center gap-4 text-brand-700">
-              <UserCheck className="w-6 h-6 animate-pulse" />
-              <p className="font-black uppercase text-xs tracking-widest">
-                Awaiting scan…
-              </p>
+            <div className="mt-6 flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-400">
+              <span className="w-2 h-2 rounded-full bg-brand-500 animate-ping" />
+              <p>Awaiting scan…</p>
             </div>
             {scanMessage && (
               <p className="mt-4 text-center text-xs font-bold text-slate-600">
@@ -513,41 +575,58 @@ export default function LiveAttendance() {
                 Recent scans
               </h3>
               <span className="text-xs font-black text-brand-600 bg-brand-50 px-3 py-1 rounded-full">
-                {Object.values(records).filter((v) => v === "Present").length}{" "}
-                present
+                {Object.values(records).filter((v) => v === "Present" || v === "Late").length}{" "}
+                marked
               </span>
             </div>
             <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
-              {students.filter((s) => records[s.id] === "Present").length ===
+              {students.filter((s) => records[s.id] === "Present" || records[s.id] === "Late").length ===
               0 ? (
                 <div className="p-20 text-center text-slate-400 font-bold uppercase text-[10px] tracking-[0.2em]">
                   No students scanned yet
                 </div>
               ) : (
                 students
-                  .filter((s) => records[s.id] === "Present")
+                  .filter((s) => records[s.id] === "Present" || records[s.id] === "Late")
                   .reverse()
-                  .map((s) => (
-                    <div
-                      key={s.id}
-                      className="p-6 bg-green-50/30 flex justify-between items-center animate-[slide-in_0.3s_ease-out]"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-green-500 text-white rounded-full flex items-center justify-center font-bold">
-                          {s.name.charAt(0)}
+                  .map((s) => {
+                    const isLate = records[s.id] === "Late";
+                    return (
+                      <div
+                        key={s.id}
+                        className={`p-6 flex justify-between items-center animate-[slide-in_0.3s_ease-out] ${
+                          isLate ? "bg-amber-50/50" : "bg-green-50/30"
+                        }`}
+                      >
+                        <div className="flex items-center gap-4">
+                          <div
+                            className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white ${
+                              isLate ? "bg-amber-500" : "bg-green-500"
+                            }`}
+                          >
+                            {s.name.charAt(0)}
+                          </div>
+                          <div>
+                            <p className="font-extrabold text-slate-800">
+                              {s.name}
+                            </p>
+                            <p
+                              className={`text-[10px] font-bold uppercase ${
+                                isLate ? "text-amber-700" : "text-green-600"
+                              }`}
+                            >
+                              {s.student_id} {isLate ? "· LATE" : ""}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-extrabold text-slate-800">
-                            {s.name}
-                          </p>
-                          <p className="text-[10px] font-bold text-green-600 uppercase">
-                            {s.student_id}
-                          </p>
-                        </div>
+                        {isLate ? (
+                          <Clock className="w-6 h-6 text-amber-500" />
+                        ) : (
+                          <CheckCircle className="w-6 h-6 text-green-500" />
+                        )}
                       </div>
-                      <CheckCircle className="w-6 h-6 text-green-500" />
-                    </div>
-                  ))
+                    );
+                  })
               )}
             </div>
           </div>
@@ -570,6 +649,9 @@ export default function LiveAttendance() {
                 <span className="w-2 h-2 rounded-full bg-green-500" /> Present
               </span>
               <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-amber-500" /> Late (&gt;30m)
+              </span>
+              <span className="flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-red-500" /> Absent
               </span>
               <span className="flex items-center gap-1">
@@ -585,9 +667,11 @@ export default function LiveAttendance() {
                 className={`p-5 rounded-3xl border-2 text-left flex flex-col transition-all duration-300 relative group overflow-hidden ${
                   records[s.id] === "Present"
                     ? "bg-green-50 border-green-200"
-                    : records[s.id] === "Absent"
-                      ? "bg-red-50 border-red-200"
-                      : "bg-white border-slate-100"
+                    : records[s.id] === "Late"
+                      ? "bg-amber-50 border-amber-300 shadow-sm"
+                      : records[s.id] === "Absent"
+                        ? "bg-red-50 border-red-200"
+                        : "bg-white border-slate-100"
                 }`}
               >
                 <div className="flex justify-between items-start w-full mb-4 z-10">
@@ -595,9 +679,11 @@ export default function LiveAttendance() {
                     className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-lg ${
                       records[s.id] === "Present"
                         ? "bg-green-500 text-white"
-                        : records[s.id] === "Absent"
-                          ? "bg-red-500 text-white"
-                          : "bg-slate-100 text-slate-400"
+                        : records[s.id] === "Late"
+                          ? "bg-amber-500 text-white"
+                          : records[s.id] === "Absent"
+                            ? "bg-red-500 text-white"
+                            : "bg-slate-100 text-slate-400"
                     }`}
                   >
                     {s.name.charAt(0)}
@@ -611,6 +697,14 @@ export default function LiveAttendance() {
                         className="p-1.5 bg-green-500 text-white rounded-lg hover:scale-110 mb-1"
                       >
                         <CheckCircle className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleMark(s.id, "Late")}
+                        title="Mark late"
+                        className="p-1.5 bg-amber-500 text-white rounded-lg hover:scale-110 mb-1"
+                      >
+                        <Clock className="w-4 h-4" />
                       </button>
                       <button
                         type="button"
@@ -629,24 +723,35 @@ export default function LiveAttendance() {
                     className={`font-black tracking-tight leading-tight truncate ${
                       records[s.id] === "Present"
                         ? "text-green-900"
-                        : records[s.id] === "Absent"
-                          ? "text-red-900"
-                          : "text-slate-800"
+                        : records[s.id] === "Late"
+                          ? "text-amber-950 font-black"
+                          : records[s.id] === "Absent"
+                            ? "text-red-900"
+                            : "text-slate-800"
                     }`}
                   >
                     {s.name}
                   </h3>
-                  <p
-                    className={`text-[10px] font-bold mt-1 uppercase tracking-widest ${
-                      records[s.id] === "Present"
-                        ? "text-green-600/70"
-                        : records[s.id] === "Absent"
-                          ? "text-red-600/70"
-                          : "text-slate-400"
-                    }`}
-                  >
-                    {s.student_id}
-                  </p>
+                  <div className="flex items-center justify-between mt-1">
+                    <p
+                      className={`text-[10px] font-bold uppercase tracking-widest ${
+                        records[s.id] === "Present"
+                          ? "text-green-600/70"
+                          : records[s.id] === "Late"
+                            ? "text-amber-700 font-black"
+                            : records[s.id] === "Absent"
+                              ? "text-red-600/70"
+                              : "text-slate-400"
+                      }`}
+                    >
+                      {s.student_id}
+                    </p>
+                    {records[s.id] === "Late" && (
+                      <span className="text-[9px] font-black uppercase text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300">
+                        Late
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="absolute top-0 right-0 p-3">

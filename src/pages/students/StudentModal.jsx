@@ -72,6 +72,7 @@ export default function StudentModal({
     classification: "htsanat",
     is_night: false,
     track: "Regular",
+    round: "",
     section_id: "",
     status: "new",
   });
@@ -98,6 +99,14 @@ export default function StudentModal({
         (c) =>
           c.type === "Emergency" || c.relationship === "Emergency Responder",
       );
+
+      let extractedRound = student.round || "";
+      if (!extractedRound && student.student_id && student.student_id.startsWith("DIS/")) {
+        const parts = student.student_id.split("/");
+        if (parts.length >= 3) {
+          extractedRound = parts[1];
+        }
+      }
 
       setFormData({
         name: student.name || "",
@@ -136,6 +145,7 @@ export default function StudentModal({
             : track === "distance"
               ? "Distance"
               : "Regular"),
+        round: extractedRound || "",
         section_id: student.section_id || "",
         status: student.status || "new",
       });
@@ -178,6 +188,7 @@ export default function StudentModal({
               : "htsanat",
         is_night: false,
         track: initialTrack,
+        round: "",
         section_id: "",
         status: "new",
       });
@@ -229,6 +240,10 @@ export default function StudentModal({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (formData.track === "Distance" && !formData.round?.trim()) {
+      alert("የየርቀት ትምህርት ተማሪዎች ዙር (Round) ማስገባት ግዴታ ነው። (Round is mandatory for Distance students).");
+      return;
+    }
     setIsSubmitting(true);
 
     try {
@@ -981,6 +996,25 @@ export default function StudentModal({
                           </span>
                         </span>
                       </label>
+                    </div>
+                  )}
+
+                  {formData.track === "Distance" && (
+                    <div>
+                      <label className="text-xs font-bold text-amber-900 tracking-wide uppercase flex items-center justify-between">
+                        <span>ዙር / Round</span>
+                        <span className="text-red-500 font-black">* ግዴታ</span>
+                      </label>
+                      <input
+                        type="text"
+                        name="round"
+                        value={formData.round || ""}
+                        onChange={handleChange}
+                        placeholder="ለምሳሌ፡ 1፣ 2፣ 2016"
+                        required
+                        className="w-full mt-1.5 px-4 py-2.5 bg-amber-50/80 border border-amber-300 rounded-xl outline-none focus:border-brand-500 focus:bg-white font-bold text-slate-800 shadow-sm"
+                      />
+                      <p className="text-[10px] text-amber-700 mt-1 font-medium">የተማሪ መታወቂያ: DIS/<strong>{formData.round || "ዙር"}</strong>/...</p>
                     </div>
                   )}
 

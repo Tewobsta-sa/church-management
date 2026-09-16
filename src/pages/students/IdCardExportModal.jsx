@@ -8,6 +8,15 @@ export default function IdCardExportModal({ isOpen, onClose, students = [] }) {
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0 });
   const containerRef = useRef(null);
+  const exportPagesRef = useRef(null);
+
+  // Group students in chunks of 9 for exact 9 IDs per A4 page
+  const chunkedPages = students.reduce((acc, st, i) => {
+    const pageIndex = Math.floor(i / 9);
+    if (!acc[pageIndex]) acc[pageIndex] = [];
+    acc[pageIndex].push(st);
+    return acc;
+  }, []);
 
   if (!isOpen || students.length === 0) return null;
 
@@ -90,11 +99,14 @@ export default function IdCardExportModal({ isOpen, onClose, students = [] }) {
   };
 
   const handleDownloadPDF = async () => {
-    if (!containerRef.current) return;
+    if (!exportPagesRef.current || chunkedPages.length === 0) return;
     setDownloading(true);
-    setDownloadProgress({ current: 0, total: students.length });
+    setDownloadProgress({ current: 0, total: chunkedPages.length });
 
     try {
+      await document.fonts?.ready;
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
       // Standard A4 Portrait (210mm x 297mm)
       const pdf = new jsPDF({
         orientation: "portrait",
@@ -103,58 +115,35 @@ export default function IdCardExportModal({ isOpen, onClose, students = [] }) {
         compress: true,
       });
 
-      const cardElements = Array.from(
-        containerRef.current.querySelectorAll(".id-card-item")
+      const pageElements = Array.from(
+        exportPagesRef.current.querySelectorAll(".id-card-a4-sheet")
       );
 
-      if (cardElements.length === 0) {
-        throw new Error("No ID cards found to export");
+      if (pageElements.length === 0) {
+        throw new Error("No ID card pages found to export");
       }
 
-      // EXACTLY 9 CARDS PER PAGE: 3 columns x 3 rows
-      const cardWidth = 62; // mm
-      const cardHeight = 44; // mm
-      const marginX = 6; // mm
-      const marginY = 12; // mm
-      const gapX = 6; // mm
-      const gapY = 10; // mm
+      for (let p = 0; p < pageElements.length; p++) {
+        setDownloadProgress({ current: p + 1, total: pageElements.length });
+        const sheetEl = pageElements[p];
 
-      let renderedCount = 0;
+        const canvas = await captureElement(sheetEl, {
+          scale: 2.5,
+          scrollX: 0,
+          scrollY: 0,
+        });
 
-      for (let i = 0; i < cardElements.length; i++) {
-        setDownloadProgress({ current: i + 1, total: cardElements.length });
-        const el = cardElements[i];
-
-        try {
-          const canvas = await captureElement(el, { scale: 2.5 });
-
-          if (!canvas.width || !canvas.height) {
-            throw new Error("Captured canvas was empty");
-          }
-
-          const imgData = canvas.toDataURL("image/jpeg", 0.95);
-
-          // 9 items per page calculation
-          const pageIndex = renderedCount % 9;
-          const col = pageIndex % 3;
-          const row = Math.floor(pageIndex / 3);
-
-          if (renderedCount > 0 && pageIndex === 0) {
-            pdf.addPage();
-          }
-
-          const x = marginX + col * (cardWidth + gapX);
-          const y = marginY + row * (cardHeight + gapY);
-
-          pdf.addImage(imgData, "JPEG", x, y, cardWidth, cardHeight);
-          renderedCount += 1;
-        } catch (cardErr) {
-          console.warn(`Could not render card index ${i} to canvas`, cardErr);
+        if (!canvas.width || !canvas.height) {
+          throw new Error(`ID card page ${p + 1} captured as empty canvas`);
         }
-      }
 
-      if (renderedCount === 0) {
-        throw new Error("All ID card captures failed");
+        const imgData = canvas.toDataURL("image/jpeg", 0.95);
+
+        if (p > 0) {
+          pdf.addPage();
+        }
+
+        pdf.addImage(imgData, "JPEG", 0, 0, 210, 297);
       }
 
       pdf.save(`Sunday_School_ID_Cards_${new Date().toISOString().slice(0, 10)}.pdf`);
@@ -272,161 +261,67 @@ export default function IdCardExportModal({ isOpen, onClose, students = [] }) {
             ref={containerRef}
             className="id-card-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto"
           >
-            {students.map((st, index) => {
-              const theme = getCardTheme(st);
-              const isNight = Boolean(st.is_night);
+            {students.map((st) => (
+              <IdCardItem
+                key={st.id}
+                st={st}
+                theme={getCardTheme(st)}
+                isExportMode={false}
+              />
+            ))}
+          </div>
+        </div>
 
-              const qrValue = JSON.stringify({
-                id: st.id,
-                sid: st.student_id,
-                name: st.name,
-                class: st.section?.name || st.section_name,
-                night: isNight ? 1 : 0,
-                cat: theme.categoryTitleAm,
-              });
-
-              const isNinthCard = (index + 1) % 9 === 0;
-
-              return (
-                <div
-                  key={st.id}
-                  className={`id-card-item bg-white rounded-2xl shadow-md border-2 ${theme.borderClass} overflow-hidden flex flex-col relative w-full h-[225px] transition-transform select-none ${
-                    isNinthCard ? "page-break-9" : ""
-                  }`}
-                  style={{ width: "340px", height: "220px", margin: "0 auto" }}
-                >
-                  {/* Top Brand Banner with Category Color */}
-                  <div
-                    className={`bg-gradient-to-r ${theme.headerGradient} text-white px-3 py-1.5 flex items-center justify-between border-b border-white/20`}
-                  >
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <div className="w-6 h-6 rounded-lg bg-white p-0.5 flex items-center justify-center shadow-sm shrink-0">
-                        <img
-                          src="/logo.png"
-                          alt="Logo"
-                          className="w-full h-full object-contain"
-                          onError={(e) => {
-                            e.target.style.display = "none";
-                          }}
-                        />
-                      </div>
-                      <div className="min-w-0">
-                        <h4 className="text-[10px] font-black tracking-wide uppercase leading-tight truncate text-white">
-                          ጃቴ ቅ/ኪዳነ ምሕረት ፍ/ሰ/ሰ/ት/ቤት
-                        </h4>
-                        <p className="text-[7px] font-bold text-amber-200 uppercase tracking-wider leading-none truncate">
-                          Jate Kidane Mehret Fnote Semaetat S.S.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1 shrink-0">
-                      {isNight && (
-                        <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 flex items-center gap-0.5 shadow-sm">
-                          <Moon className="w-2.5 h-2.5 fill-slate-950" />
-                          ማታ
-                        </span>
-                      )}
-                      <span
-                        className={`text-[8px] font-extrabold px-1.5 py-0.5 rounded border ${theme.badgeBg}`}
-                      >
-                        {theme.categoryTitleAm}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Card Main Body */}
-                  <div className="flex-1 p-3 flex gap-3 items-center bg-white">
-                    {/* Photo & Student ID */}
-                    <div className="shrink-0 flex flex-col items-center">
-                      {st.picture_url ? (
-                        <img
-                          src={st.picture_url}
-                          alt={st.name}
-                          className="w-18 h-22 object-cover rounded-xl border border-slate-300 shadow-sm"
-                          style={{ width: "70px", height: "86px" }}
-                          referrerPolicy="no-referrer"
-                        />
-                      ) : (
-                        <div
-                          className="rounded-xl bg-slate-100 border border-slate-300 flex flex-col items-center justify-center text-slate-400 font-black text-xl shadow-inner"
-                          style={{ width: "70px", height: "86px" }}
-                        >
-                          {st.name?.charAt(0) || "S"}
-                        </div>
-                      )}
-                      <span className="text-[8.5px] font-black text-slate-900 tracking-wider uppercase mt-1">
-                        {st.student_id}
-                      </span>
-                    </div>
-
-                    {/* Details Column */}
-                    <div className="flex-1 min-w-0 space-y-0.5">
-                      <div>
-                        <h3 className="text-xs font-black text-slate-900 leading-snug truncate">
-                          {st.name}
-                        </h3>
-                        {st.christian_name && (
-                          <p className="text-[9.5px] font-bold text-brand-700 truncate">
-                            {st.christian_name}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="pt-1 border-t border-slate-100 text-[9px] space-y-0.5 text-slate-600">
-                        <p className="truncate">
-                          <span className="font-bold text-slate-400 uppercase text-[7.5px] mr-1">
-                            ክፍል:
-                          </span>
-                          <span className="font-bold text-slate-800">
-                            {st.section?.name || st.section_name || "Unassigned"}
-                          </span>
-                        </p>
-                        <p className="truncate">
-                          <span className="font-bold text-slate-400 uppercase text-[7.5px] mr-1">
-                            አድራሻ:
-                          </span>
-                          <span>
-                            {st.address?.subcity
-                              ? `${st.address.subcity}, W.${st.address.woreda || st.address.district || ""}`
-                              : "Addis Ababa"}
-                          </span>
-                        </p>
-                        <p className="truncate">
-                          <span className="font-bold text-slate-400 uppercase text-[7.5px] mr-1">
-                            ስልክ:
-                          </span>
-                          <span>
-                            {st.family_guardian_phone || st.phone_number || "N/A"}
-                          </span>
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* QR Code */}
-                    <div className="shrink-0 flex flex-col items-center bg-slate-50 p-1 rounded-xl border border-slate-200">
-                      <QRCodeCanvas value={qrValue} size={54} level="M" />
-                      <span className="text-[6.5px] font-black text-slate-400 uppercase mt-0.5 tracking-wider">
-                        SCAN ME
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Card Bottom Strip */}
-                  <div className="bg-slate-50 px-3 py-1 border-t border-slate-100 flex justify-between items-center text-[7.5px] text-slate-400 font-bold uppercase">
-                    <span className="truncate">ፍኖተ ሰማዕታት ሰንበት ት/ቤት</span>
-                    <span className="shrink-0 text-slate-500">2018 E.C.</span>
-                  </div>
-                </div>
-              );
-            })}
+        {/* Off-screen A4 Pages for exact 9-IDs-per-page PDF export (placed at top:0, left:0 behind modal z-50 backdrop) */}
+        <div
+          aria-hidden="true"
+          style={{
+            position: "fixed",
+            left: 0,
+            top: 0,
+            width: "210mm",
+            pointerEvents: "none",
+            zIndex: -20,
+            backgroundColor: "#ffffff",
+          }}
+        >
+          <div ref={exportPagesRef}>
+            {chunkedPages.map((pageStudents, pIdx) => (
+              <div
+                key={pIdx}
+                className="id-card-a4-sheet bg-white"
+                style={{
+                  width: "210mm",
+                  height: "297mm",
+                  boxSizing: "border-box",
+                  padding: "12mm 8mm",
+                  backgroundColor: "#ffffff",
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, 62mm)",
+                  gridTemplateRows: "repeat(3, 86mm)",
+                  columnGap: "4mm",
+                  rowGap: "6mm",
+                  justifyContent: "center",
+                  alignContent: "center",
+                }}
+              >
+                {pageStudents.map((st) => (
+                  <IdCardItem
+                    key={st.id}
+                    st={st}
+                    theme={getCardTheme(st)}
+                    isExportMode={true}
+                  />
+                ))}
+              </div>
+            ))}
           </div>
         </div>
 
         {/* Footer */}
         <div className="px-6 py-3.5 bg-white border-t border-slate-100 flex justify-between items-center text-xs text-slate-500 font-medium">
           <span>
-            Showing <strong className="text-slate-800">{students.length}</strong> selected student ID card(s).
+            Showing <strong className="text-slate-800">{students.length}</strong> selected student ID card(s) across <strong className="text-slate-800">{chunkedPages.length}</strong> page(s) (9 IDs per page).
           </span>
           <button
             onClick={onClose}
@@ -435,6 +330,204 @@ export default function IdCardExportModal({ isOpen, onClose, students = [] }) {
             Close (ዝጋ)
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function IdCardItem({ st, theme, isExportMode = false }) {
+  const isNight = Boolean(st.is_night);
+  const [imgFailed, setImgFailed] = useState(false);
+
+  const qrValue = JSON.stringify({
+    id: st.id,
+    sid: st.student_id,
+    name: st.name,
+    class: st.section?.name || st.section_name,
+    night: isNight ? 1 : 0,
+    cat: theme.categoryTitleAm,
+  });
+
+  return (
+    <div
+      className={`id-card-item bg-white rounded-xl shadow-sm border-2 ${theme.borderClass} overflow-hidden flex flex-col relative select-none`}
+      style={
+        isExportMode
+          ? { width: "62mm", height: "86mm", margin: "0 auto", boxSizing: "border-box" }
+          : { width: "340px", height: "220px", margin: "0 auto" }
+      }
+    >
+      {/* Top Banner */}
+      <div
+        className={`bg-gradient-to-r ${theme.headerGradient} text-white ${
+          isExportMode ? "px-2 py-1" : "px-3 py-1.5"
+        } flex items-center justify-between border-b border-white/20`}
+      >
+        <div className="flex items-center gap-1.5 min-w-0">
+          <div
+            className={`${
+              isExportMode ? "w-5 h-5 rounded" : "w-6 h-6 rounded-lg"
+            } bg-white p-0.5 flex items-center justify-center shadow-sm shrink-0`}
+          >
+            <img
+              src="/logo.png"
+              alt="Logo"
+              className="w-full h-full object-contain"
+              onError={(e) => {
+                e.target.style.display = "none";
+              }}
+            />
+          </div>
+          <div className="min-w-0">
+            <h4
+              className={`${
+                isExportMode ? "text-[8px]" : "text-[10px]"
+              } font-black tracking-wide uppercase leading-tight truncate text-white`}
+            >
+              ጃቴ ቅ/ኪዳነ ምሕረት ፍ/ሰ/ሰ/ት/ቤት
+            </h4>
+            <p
+              className={`${
+                isExportMode ? "text-[6px]" : "text-[7px]"
+              } font-bold text-amber-200 uppercase tracking-wider leading-none truncate`}
+            >
+              Jate Kidane Mehret Fnote Semaetat S.S.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1 shrink-0">
+          {isNight && (
+            <span
+              className={`${
+                isExportMode ? "text-[6.5px] px-1" : "text-[8px] px-1.5"
+              } py-0.5 rounded bg-amber-400 text-slate-950 font-black flex items-center gap-0.5 shadow-sm`}
+            >
+              <Moon className={isExportMode ? "w-2 h-2 fill-slate-950" : "w-2.5 h-2.5 fill-slate-950"} />
+              ማታ
+            </span>
+          )}
+          <span
+            className={`${
+              isExportMode ? "text-[6.5px] px-1" : "text-[8px] px-1.5"
+            } font-extrabold py-0.5 rounded border ${theme.badgeBg}`}
+          >
+            {theme.categoryTitleAm}
+          </span>
+        </div>
+      </div>
+
+      {/* Card Main Body */}
+      <div className={`flex-1 ${isExportMode ? "p-2 gap-2" : "p-3 gap-3"} flex items-center bg-white`}>
+        {/* Photo & Student ID */}
+        <div className="shrink-0 flex flex-col items-center">
+          {st.picture_url && !imgFailed ? (
+            <img
+              src={st.picture_url}
+              alt={st.name}
+              className={`${
+                isExportMode ? "rounded-lg" : "rounded-xl"
+              } object-cover border border-slate-300 shadow-sm`}
+              style={
+                isExportMode
+                  ? { width: "18mm", height: "23mm" }
+                  : { width: "70px", height: "86px" }
+              }
+              crossOrigin="anonymous"
+              referrerPolicy="no-referrer"
+              onError={() => setImgFailed(true)}
+            />
+          ) : (
+            <div
+              className={`${
+                isExportMode ? "rounded-lg text-sm" : "rounded-xl text-xl"
+              } bg-slate-100 border border-slate-300 flex flex-col items-center justify-center text-slate-400 font-black shadow-inner`}
+              style={
+                isExportMode
+                  ? { width: "18mm", height: "23mm" }
+                  : { width: "70px", height: "86px" }
+              }
+            >
+              {st.name?.charAt(0) || "S"}
+            </div>
+          )}
+          <span
+            className={`${
+              isExportMode ? "text-[7px]" : "text-[8.5px]"
+            } font-black text-slate-900 tracking-wider uppercase mt-1 truncate max-w-[18mm]`}
+          >
+            {st.student_id}
+          </span>
+        </div>
+
+        {/* Details Column */}
+        <div className="flex-1 min-w-0 space-y-0.5">
+          <div>
+            <h3
+              className={`${
+                isExportMode ? "text-[8.5px]" : "text-xs"
+              } font-black text-slate-900 leading-snug truncate`}
+            >
+              {st.name}
+            </h3>
+            {st.christian_name && (
+              <p
+                className={`${
+                  isExportMode ? "text-[7px]" : "text-[9.5px]"
+                } font-bold text-brand-700 truncate`}
+              >
+                {st.christian_name}
+              </p>
+            )}
+          </div>
+
+          <div
+            className={`pt-1 border-t border-slate-100 ${
+              isExportMode ? "text-[6.5px]" : "text-[9px]"
+            } space-y-0.5 text-slate-600`}
+          >
+            <p className="truncate">
+              <span className="font-bold text-slate-400 uppercase text-[6px] mr-1">ክፍል:</span>
+              <span className="font-bold text-slate-800">
+                {st.section?.name || st.section_name || "Unassigned"}
+              </span>
+            </p>
+            <p className="truncate">
+              <span className="font-bold text-slate-400 uppercase text-[6px] mr-1">አድራሻ:</span>
+              <span>
+                {st.address?.subcity
+                  ? `${st.address.subcity}, W.${st.address.woreda || ""}`
+                  : "Addis Ababa"}
+              </span>
+            </p>
+            <p className="truncate">
+              <span className="font-bold text-slate-400 uppercase text-[6px] mr-1">ስልክ:</span>
+              <span>{st.family_guardian_phone || st.phone_number || "N/A"}</span>
+            </p>
+          </div>
+        </div>
+
+        {/* QR Code */}
+        <div className="shrink-0 flex flex-col items-center bg-slate-50 p-1 rounded-xl border border-slate-200">
+          <QRCodeCanvas value={qrValue} size={isExportMode ? 42 : 54} level="M" />
+          <span
+            className={`${
+              isExportMode ? "text-[5.5px]" : "text-[6.5px]"
+            } font-black text-slate-400 uppercase mt-0.5 tracking-wider`}
+          >
+            SCAN ME
+          </span>
+        </div>
+      </div>
+
+      {/* Card Bottom Strip */}
+      <div
+        className={`bg-slate-50 ${
+          isExportMode ? "px-2 py-0.5 text-[6px]" : "px-3 py-1 text-[7.5px]"
+        } border-t border-slate-100 flex justify-between items-center text-slate-400 font-bold uppercase`}
+      >
+        <span className="truncate">ፍኖተ ሰማዕታት ሰንበት ት/ቤት</span>
+        <span className="shrink-0 text-slate-500">2018 E.C.</span>
       </div>
     </div>
   );

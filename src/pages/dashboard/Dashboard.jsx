@@ -188,31 +188,64 @@ export default function Dashboard() {
 
       {/* Bottom Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-         {/* Activities */}
+         {/* Activities (System Audit Trail) */}
          <div className="glass-panel overflow-hidden">
             <div className="px-8 py-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
                <h3 className="font-black text-slate-800 uppercase tracking-widest text-xs flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-brand-600" /> System Audit Trail
+                  <Activity className="w-4 h-4 text-brand-600" /> System Audit Trail (የስርዓት ክንውኖች ማስታወሻ)
                </h3>
-               <button onClick={() => navigate('/admin/logs')} className="text-[10px] font-black text-brand-600 uppercase hover:underline">Full Log</button>
+               {stats?.recent_logs && (
+                  <button onClick={() => navigate('/admin/logs')} className="text-[11px] font-black text-brand-600 uppercase hover:underline">
+                     ሙሉ ዝርዝር (Full Log)
+                  </button>
+               )}
             </div>
             <div className="divide-y divide-slate-100">
-               {stats?.recent_logs?.map(log => (
-                 <div key={log.id} className="px-8 py-4 flex justify-between items-center group hover:bg-slate-50 transition-colors">
-                    <div className="flex items-center gap-4">
-                       <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-400 text-[10px]">
-                          {log.user.charAt(0)}
-                       </div>
-                       <div>
-                          <p className="text-sm font-bold text-slate-800 leading-tight mb-0.5">{log.action}</p>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase">{log.user}</p>
-                       </div>
-                    </div>
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter shrink-0">{log.time}</span>
-                 </div>
-               ))}
+               {stats?.recent_logs?.map(log => {
+                 const badgeType = log.badge_type || 'info';
+                 const badgeStyle = {
+                   create: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                   update: 'bg-amber-50 text-amber-700 border-amber-200',
+                   delete: 'bg-rose-50 text-rose-700 border-rose-200',
+                   attendance: 'bg-blue-50 text-blue-700 border-blue-200',
+                   promotion: 'bg-purple-50 text-purple-700 border-purple-200',
+                   grade: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+                   schedule: 'bg-cyan-50 text-cyan-700 border-cyan-200',
+                   mezmur: 'bg-violet-50 text-violet-700 border-violet-200',
+                   user: 'bg-slate-100 text-slate-700 border-slate-200',
+                   info: 'bg-slate-50 text-slate-600 border-slate-200',
+                 }[badgeType] || 'bg-slate-50 text-slate-600 border-slate-200';
+
+                 return (
+                   <div key={log.id} className="px-6 sm:px-8 py-4 flex justify-between items-center group hover:bg-slate-50 transition-colors">
+                      <div className="flex items-center gap-3.5 min-w-0">
+                         <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-black text-slate-600 text-xs shrink-0">
+                            {log.user?.charAt(0)?.toUpperCase() || "U"}
+                         </div>
+                         <div className="min-w-0">
+                            <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                               <span className={`inline-flex px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider border shrink-0 ${badgeStyle}`}>
+                                  {log.category || 'ክንውን (Action)'}
+                               </span>
+                               <p className="text-xs sm:text-sm font-bold text-slate-800 truncate">
+                                  {log.action}
+                               </p>
+                            </div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase truncate">
+                               {log.user}
+                            </p>
+                         </div>
+                      </div>
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter shrink-0 pl-3">
+                         {log.time}
+                      </span>
+                   </div>
+                 );
+               })}
                {(!stats?.recent_logs || stats.recent_logs.length === 0) && (
-                 <div className="p-10 text-center text-slate-400 text-sm font-bold opacity-30 uppercase tracking-[0.2em]">No recent activity</div>
+                 <div className="p-10 text-center text-slate-400 text-xs font-bold uppercase tracking-widest">
+                    ምንም የቅርብ ጊዜ የስርዓት ክንውን የለም (No recent activity)
+                 </div>
                )}
             </div>
          </div>
