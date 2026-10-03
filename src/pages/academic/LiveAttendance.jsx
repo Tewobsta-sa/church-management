@@ -13,14 +13,22 @@ import {
   Clock,
   Moon,
   Sun,
+  CheckCheck,
+  CheckSquare,
+  Square,
+  Shield,
+  Download,
 } from "lucide-react";
 import { Html5QrcodeScanner } from "html5-qrcode";
 import { useLocation, useNavigate } from "react-router-dom";
 import { attendanceService } from "../../services/attendanceService";
 import { assignmentService } from "../../services/assignmentService";
 import { sectionService } from "../../services/sectionService";
+import { reportingService } from "../../services/reportingService";
 import { useAuth } from "../../context/AuthContext";
+import { useFeedback } from "../../context/FeedbackContext";
 import { formatEthiopianDateTime } from "../../utils/ethiopianDate";
+import { formatApiError } from "../../services/api";
 
 function assignmentLabel(a) {
   if (!a) return "—";
@@ -35,6 +43,7 @@ function assignmentLabel(a) {
 
 export default function LiveAttendance() {
   const { hasRole } = useAuth();
+  const { notify } = useFeedback();
   const location = useLocation();
   const navigate = useNavigate();
   const queryParams = new URLSearchParams(location.search);
@@ -69,6 +78,8 @@ export default function LiveAttendance() {
   const [loading, setLoading] = useState(() => Boolean(assignmentId));
   const [search, setSearch] = useState("");
   const [scanMessage, setScanMessage] = useState("");
+  const [selectedStudentIds, setSelectedStudentIds] = useState([]);
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   const [historyPage, setHistoryPage] = useState(1);
   const [historyData, setHistoryData] = useState([]);
@@ -83,8 +94,39 @@ export default function LiveAttendance() {
   }, [students]);
 
   const [historyShiftFilter, setHistoryShiftFilter] = useState("all");
+  const [historySectionFilter, setHistorySectionFilter] = useState("all");
+  const [historySections, setHistorySections] = useState([]);
+  const [exportingCsv, setExportingCsv] = useState(false);
+  const [availableAssignments, setAvailableAssignments] = useState([]);
+  const [selectedLiveId, setSelectedLiveId] = useState("");
 
-  const fetchHistory = async (page = 1, shift = historyShiftFilter) => {
+  // Load available schedules for live attendance on the web + sections for filtering
+  useEffect(() => {
+    const loadAssignments = async () => {
+      try {
+        const res = await assignmentService.getAssignments({ per_page: 100 });
+        const list = Array.isArray(res) ? res : res?.data || [];
+        setAvailableAssignments(list);
+        if (list.length > 0) {
+          setSelectedLiveId(String(list[0].id));
+        }
+      } catch (err) {
+        console.error("Failed loading assignments for live attendance", err);
+      }
+    };
+    const loadSections = async () => {
+      try {
+        const res = await sectionService.getSections(1, "", "");
+        setHistorySections(res?.data || res || []);
+      } catch (err) {
+        console.error("Failed loading sections for attendance filter", err);
+      }
+    };
+    loadAssignments();
+    loadSections();
+  }, []);
+
+  const fetchHistory = async (page = 1, shift = historyShiftFilter, section = historySectionFilter) => {
     setHistoryLoading(true);
     try {
       const params = {
@@ -93,6 +135,9 @@ export default function LiveAttendance() {
       };
       if (shift && shift !== "all") {
         params.is_night = shift === "night";
+      }
+      if (section && section !== "all") {
+        params.section_id = section;
       }
       const res = await attendanceService.getAttendanceRecords(params);
       setHistoryData(res.data || []);
@@ -108,9 +153,27 @@ export default function LiveAttendance() {
 
   useEffect(() => {
     if (!assignmentId) {
-      fetchHistory(historyPage, historyShiftFilter);
+      fetchHistory(historyPage, historyShiftFilter, historySectionFilter);
     }
-  }, [assignmentId, historyPage, historyShiftFilter]);
+  }, [assignmentId, historyPage, historyShiftFilter, historySectionFilter]);
+
+  const handleExportCsv = async () => {
+    setExportingCsv(true);
+    try {
+      await reportingService.exportCSV("attendance", {
+        section_id: historySectionFilter !== "all" ? historySectionFilter : undefined,
+        is_night:
+          historyShiftFilter !== "all"
+            ? historyShiftFilter === "night"
+            : undefined,
+      });
+      notify("Attendance CSV downloaded.", "success");
+    } catch (err) {
+      notify(formatApiError(err, "Failed to export attendance CSV."), "error");
+    } finally {
+      setExportingCsv(false);
+    }
+  };
 
   const fetchSessionData = async () => {
     if (!assignmentId) return;
@@ -160,7 +223,7 @@ export default function LiveAttendance() {
     } catch (err) {
       console.error("Failed to fetch attendance data", err);
       setScanMessage(
-        err.response?.data?.message || "Failed to load attendance session.",
+        formatApiError(err, "Failed to load attendance session."),
       );
     } finally {
       setLoading(false);
@@ -192,15 +255,64 @@ export default function LiveAttendance() {
       setRecords((prev) => ({ ...prev, [studentId]: status }));
       setScanMessage(`Marked ${status}.`);
     } catch (err) {
-      const backendMessage =
-        err.response?.data?.message ||
-        Object.values(err.response?.data?.errors || {})
-          .flat()
-          .join(", ") ||
-        "Failed to mark attendance";
-      alert(backendMessage);
+      const backendMessage = formatApiError(err, "Failed to mark attendance");
+      notify(backendMessage, "error");
       setScanMessage(backendMessage);
     }
+  };
+
+  const toggleSelectStudent = (id) => {
+    setSelectedStudentIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAll = (filtered) => {
+    if (selectedStudentIds.length === filtered.length && filtered.length > 0) {
+      setSelectedStudentIds([]);
+    } else {
+      setSelectedStudentIds(filtered.map((s) => s.id));
+    }
+  };
+
+  const handleBulkMark = async (status, targetIds = null) => {
+    if (!liveMode) return;
+    const ids = targetIds || selectedStudentIds;
+    if (!ids || ids.length === 0) return;
+
+    try {
+      setBulkLoading(true);
+      const res = await attendanceService.bulkMarkAttendance({
+        assignment_id: Number(assignmentId),
+        student_ids: ids,
+        status,
+      });
+
+      const updated = {};
+      ids.forEach((sid) => {
+        updated[sid] = status;
+      });
+      setRecords((prev) => ({ ...prev, ...updated }));
+      setSelectedStudentIds([]);
+      setScanMessage(res.message || `Marked ${ids.length} students as ${status}.`);
+    } catch (err) {
+      const backendMessage = formatApiError(err, "Failed to bulk mark attendance");
+      notify(backendMessage, "error");
+      setScanMessage(backendMessage);
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const handleMarkAllUnmarkedPresent = () => {
+    const unmarked = students.filter(
+      (s) => !records[s.id] || records[s.id] === "Unmarked"
+    );
+    if (unmarked.length === 0) {
+      notify("All students are already marked for this session.", "info");
+      return;
+    }
+    handleBulkMark("Present", unmarked.map((s) => s.id));
   };
 
   const onScanSuccess = useCallback(
@@ -288,7 +400,60 @@ export default function LiveAttendance() {
           </p>
         </div>
 
+        {canTakeLive && availableAssignments.length > 0 && (
+          <div className="bg-brand-50 border border-brand-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4 shadow-sm">
+            <div className="flex-1 w-full sm:w-auto">
+              <label className="block text-[10px] font-black uppercase text-brand-700 mb-1">
+                Take live attendance (የቀጥታ መገኘት ይመዝግቡ)
+              </label>
+              <select
+                value={selectedLiveId}
+                onChange={(e) => setSelectedLiveId(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-white border border-brand-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500 hover:border-brand-400 transition-all shadow-xs"
+              >
+                {availableAssignments.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {assignmentLabel(a)}
+                    {a.is_night ? " · ማታ (Night)" : ""}
+                    {a.start_time ? ` · ${a.start_time.slice(0, 5)}` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="button"
+              disabled={!selectedLiveId}
+              onClick={() =>
+                navigate(`/attendance?assignment_id=${selectedLiveId}`)
+              }
+              className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm shadow-md disabled:opacity-50 disabled:hover:bg-brand-600"
+            >
+              Start live attendance
+            </button>
+          </div>
+        )}
+
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm">
+          <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-black uppercase text-slate-500">ክፍል (Section):</span>
+            <select
+              value={historySectionFilter}
+              onChange={(e) => {
+                setHistorySectionFilter(e.target.value);
+                setHistoryPage(1);
+              }}
+              className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none hover:border-brand-400 focus:ring-2 focus:ring-brand-500/15 focus:border-brand-500 transition-all shadow-xs cursor-pointer"
+            >
+              <option value="all">ሁሉም ክፍሎች (All Sections)</option>
+              {historySections.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                  {s.program_type?.name ? ` (${s.program_type.name})` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
           <div className="flex items-center gap-2">
             <span className="text-xs font-black uppercase text-slate-500">ፈረቃ (Shift):</span>
             <div className="inline-flex rounded-xl bg-slate-100 p-1">
@@ -329,6 +494,22 @@ export default function LiveAttendance() {
               </button>
             </div>
           </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            disabled={exportingCsv}
+            className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-brand-700 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-sm transition-all disabled:opacity-50 shrink-0"
+            title="Download attendance records as CSV (honors section & shift filters)"
+          >
+            {exportingCsv ? (
+              <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Download className="w-3.5 h-3.5" />
+            )}
+            {exportingCsv ? "Exporting..." : "Export CSV"}
+          </button>
         </div>
 
         <div className="glass-panel overflow-hidden">
@@ -646,47 +827,145 @@ export default function LiveAttendance() {
             </div>
             <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-400">
               <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-green-500" /> Present
+                <span className="w-2 h-2 rounded-full bg-green-500" /> Present (ተገኝቷል)
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-amber-500" /> Late (&gt;30m)
+                <span className="w-2 h-2 rounded-full bg-blue-500" /> Excused (ፈቃድ)
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-red-500" /> Absent
+                <span className="w-2 h-2 rounded-full bg-red-500" /> Absent (ቀርቷል)
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-slate-200" /> Pending
+                <span className="w-2 h-2 rounded-full bg-slate-200" /> Pending (ያልተመዘገበ)
               </span>
             </div>
           </div>
+
+          {liveMode && (
+            <div className="px-6 py-3 bg-slate-50 border-b border-slate-200/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => handleSelectAll(filteredStudents)}
+                  className="inline-flex items-center gap-2 font-bold text-slate-700 hover:text-brand-600 transition-colors"
+                >
+                  {selectedStudentIds.length === filteredStudents.length && filteredStudents.length > 0 ? (
+                    <CheckSquare className="w-4 h-4 text-brand-600" />
+                  ) : (
+                    <Square className="w-4 h-4 text-slate-400" />
+                  )}
+                  <span>
+                    {selectedStudentIds.length > 0
+                      ? `${selectedStudentIds.length} Selected (የተመረጡ)`
+                      : "Select All (ሁሉንም ምረጥ)"}
+                  </span>
+                </button>
+                {selectedStudentIds.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedStudentIds([])}
+                    className="text-[11px] text-slate-400 underline hover:text-slate-600"
+                  >
+                    Clear selection
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                {selectedStudentIds.length > 0 ? (
+                  <>
+                    <span className="text-[11px] font-black uppercase text-slate-400 mr-1">
+                      Mark Selected:
+                    </span>
+                    <button
+                      type="button"
+                      disabled={bulkLoading}
+                      onClick={() => handleBulkMark("Present")}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm transition-all disabled:opacity-50"
+                    >
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      Present (ተገኝቷል)
+                    </button>
+                    <button
+                      type="button"
+                      disabled={bulkLoading}
+                      onClick={() => handleBulkMark("Excused")}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm transition-all disabled:opacity-50"
+                    >
+                      <Shield className="w-3.5 h-3.5" />
+                      Excused (ፈቃድ)
+                    </button>
+                    <button
+                      type="button"
+                      disabled={bulkLoading}
+                      onClick={() => handleBulkMark("Absent")}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold shadow-sm transition-all disabled:opacity-50"
+                    >
+                      <XCircle className="w-3.5 h-3.5" />
+                      Absent (ቀርቷል)
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={bulkLoading}
+                    onClick={handleMarkAllUnmarkedPresent}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-brand-50 border border-brand-200 text-brand-700 hover:bg-brand-100 font-bold shadow-sm transition-all"
+                  >
+                    <CheckCheck className="w-4 h-4 text-brand-600" />
+                    Mark All Unmarked as Present (ቀሪዎችን በሙሉ ተገኝተዋል በል)
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 p-8 gap-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
             {filteredStudents.map((s) => (
               <div
                 key={s.id}
                 className={`p-5 rounded-3xl border-2 text-left flex flex-col transition-all duration-300 relative group overflow-hidden ${
+                  selectedStudentIds.includes(s.id)
+                    ? "ring-2 ring-brand-500 border-brand-400"
+                    : ""
+                } ${
                   records[s.id] === "Present"
                     ? "bg-green-50 border-green-200"
-                    : records[s.id] === "Late"
-                      ? "bg-amber-50 border-amber-300 shadow-sm"
+                    : records[s.id] === "Excused"
+                      ? "bg-blue-50 border-blue-200"
                       : records[s.id] === "Absent"
                         ? "bg-red-50 border-red-200"
                         : "bg-white border-slate-100"
                 }`}
               >
                 <div className="flex justify-between items-start w-full mb-4 z-10">
-                  <div
-                    className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-lg ${
-                      records[s.id] === "Present"
-                        ? "bg-green-500 text-white"
-                        : records[s.id] === "Late"
-                          ? "bg-amber-500 text-white"
-                          : records[s.id] === "Absent"
-                            ? "bg-red-500 text-white"
-                            : "bg-slate-100 text-slate-400"
-                    }`}
-                  >
-                    {s.name.charAt(0)}
+                  <div className="flex items-center gap-2.5">
+                    {liveMode && (
+                      <button
+                        type="button"
+                        onClick={() => toggleSelectStudent(s.id)}
+                        className="p-1 rounded-lg hover:bg-slate-200/60 transition-colors"
+                      >
+                        {selectedStudentIds.includes(s.id) ? (
+                          <CheckSquare className="w-5 h-5 text-brand-600" />
+                        ) : (
+                          <Square className="w-5 h-5 text-slate-300" />
+                        )}
+                      </button>
+                    )}
+                    <div
+                      className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-lg ${
+                        records[s.id] === "Present"
+                          ? "bg-green-500 text-white"
+                          : records[s.id] === "Excused"
+                            ? "bg-blue-500 text-white"
+                            : records[s.id] === "Absent"
+                              ? "bg-red-500 text-white"
+                              : "bg-slate-100 text-slate-400"
+                      }`}
+                    >
+                      {s.name.charAt(0)}
+                    </div>
                   </div>
                   {liveMode && (
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -700,11 +979,11 @@ export default function LiveAttendance() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleMark(s.id, "Late")}
-                        title="Mark late"
-                        className="p-1.5 bg-amber-500 text-white rounded-lg hover:scale-110 mb-1"
+                        onClick={() => handleMark(s.id, "Excused")}
+                        title="Mark excused"
+                        className="p-1.5 bg-blue-500 text-white rounded-lg hover:scale-110 mb-1"
                       >
-                        <Clock className="w-4 h-4" />
+                        <Shield className="w-4 h-4" />
                       </button>
                       <button
                         type="button"
@@ -723,8 +1002,8 @@ export default function LiveAttendance() {
                     className={`font-black tracking-tight leading-tight truncate ${
                       records[s.id] === "Present"
                         ? "text-green-900"
-                        : records[s.id] === "Late"
-                          ? "text-amber-950 font-black"
+                        : records[s.id] === "Excused"
+                          ? "text-blue-900"
                           : records[s.id] === "Absent"
                             ? "text-red-900"
                             : "text-slate-800"
@@ -737,8 +1016,8 @@ export default function LiveAttendance() {
                       className={`text-[10px] font-bold uppercase tracking-widest ${
                         records[s.id] === "Present"
                           ? "text-green-600/70"
-                          : records[s.id] === "Late"
-                            ? "text-amber-700 font-black"
+                          : records[s.id] === "Excused"
+                            ? "text-blue-600/70"
                             : records[s.id] === "Absent"
                               ? "text-red-600/70"
                               : "text-slate-400"
@@ -746,20 +1025,31 @@ export default function LiveAttendance() {
                     >
                       {s.student_id}
                     </p>
-                    {records[s.id] === "Late" && (
-                      <span className="text-[9px] font-black uppercase text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300">
-                        Late
+                    {records[s.id] && records[s.id] !== "Unmarked" && (
+                      <span
+                        className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
+                          records[s.id] === "Present"
+                            ? "bg-green-100 text-green-800 border border-green-200"
+                            : records[s.id] === "Excused"
+                              ? "bg-blue-100 text-blue-800 border border-blue-200"
+                              : "bg-red-100 text-red-800 border border-red-200"
+                        }`}
+                      >
+                        {records[s.id]}
                       </span>
                     )}
                   </div>
                 </div>
 
-                <div className="absolute top-0 right-0 p-3">
+                <div className="absolute top-0 right-0 p-3 pointer-events-none">
                   {records[s.id] === "Present" && (
-                    <CheckCircle className="w-6 h-6 text-green-500/30" />
+                    <CheckCircle className="w-6 h-6 text-green-500/20" />
+                  )}
+                  {records[s.id] === "Excused" && (
+                    <Shield className="w-6 h-6 text-blue-500/20" />
                   )}
                   {records[s.id] === "Absent" && (
-                    <XCircle className="w-6 h-6 text-red-500/30" />
+                    <XCircle className="w-6 h-6 text-red-500/20" />
                   )}
                 </div>
               </div>

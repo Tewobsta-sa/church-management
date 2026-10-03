@@ -155,6 +155,10 @@
     "bulkStatusUpdate": "Promote to Regular Status",
     "bulkStatusSuccess": "Successfully updated status to Regular for {{count}} student(s).",
     "printIdCards": "Print ID Cards",
+    "trackPreKG": "Pre-KG Program",
+    "trackRegular": "Regular Program",
+    "trackDistance": "Distance Learning",
+    "trackYoung": "Young Program",
     "classifications": {
       "all": "All Classifications",
       "prekg": "PreKG",
@@ -226,6 +230,7 @@
     "editCourse": "Edit Course",
     "deleteCourse": "Delete Course",
     "noCourses": "No courses configured",
+    "confirmDelete": "Are you sure you want to delete this course?",
     "fields": {
       "name": "Course Name",
       "creditHour": "Credit Hours",
@@ -240,6 +245,8 @@
       "titleField": "Title",
       "maxScore": "Max Score",
       "weight": "Weight (%)",
+      "typeField": "Type",
+      "empty": "No assessments added yet",
       "totalWeight": "Total Weight",
       "weightsMustSum": "Assessment weights must sum to exactly 100%. Current: {{sum}}%"
     }
@@ -251,7 +258,17 @@
     "selectCourse": "Select Course",
     "noCourseSelected": "Please select a course to record marks.",
     "saveGrades": "Save Marks",
-    "saved": "Grades saved successfully"
+    "saved": "Grades saved successfully",
+    "student": "Student",
+    "total": "Total",
+    "letter": "Grade",
+    "noStudents": "No students enrolled in this course",
+    "noCourses": "No courses available",
+    "searchStudent": "Search student…",
+    "noChanges": "No grade changes to save",
+    "savedCount": "{{count}} grade records saved",
+    "weightWarning": "Assessment weights must sum to 100%. Current total: {{sum}}%",
+    "maxShort": "Max"
   },
   "schedule": {
     "title": "Schedule & Timetable",

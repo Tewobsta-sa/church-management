@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { courseService } from "../../services/courseService";
 import { sectionService } from "../../services/sectionService";
 import { translateTrack } from "../../i18n/tracks";
+import { formatApiError } from "../../services/api";
 
 export default function CourseModal({ isOpen, onClose, course = null, onSuccess }) {
   const { t } = useTranslation();
@@ -118,12 +119,7 @@ export default function CourseModal({ isOpen, onClose, course = null, onSuccess 
       onSuccess?.();
       onClose();
     } catch (err) {
-      const errs = err.response?.data?.errors;
-      setErrorMsg(
-        errs
-          ? Object.values(errs).flat().join("\n")
-          : err.response?.data?.message || t("common.serverError")
-      );
+      setErrorMsg(formatApiError(err));
     } finally {
       setSubmitting(false);
     }
@@ -195,7 +191,7 @@ export default function CourseModal({ isOpen, onClose, course = null, onSuccess 
                 value={programTypeName}
                 onChange={(e) => setProgramTypeName(e.target.value)}
                 required
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 bg-white"
+                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl outline-none hover:border-brand-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 transition-all bg-white font-medium text-slate-800 shadow-xs"
               >
                 <option value="">{t("common.select")}…</option>
                 {programTypes.map((pt) => (

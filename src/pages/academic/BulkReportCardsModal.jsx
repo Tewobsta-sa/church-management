@@ -18,6 +18,7 @@ import jsPDF from "jspdf";
 import { captureElement } from "../../utils/pdfCapture";
 import { resultsService } from "../../services/resultsService";
 import { sectionService } from "../../services/sectionService";
+import { useFeedback } from "../../context/FeedbackContext";
 
 const COLOR_PRESETS = [
   { name: "Royal Navy", primary: "#1e3a8a", secondary: "#3b82f6", light: "#eff6ff", border: "#bfdbfe" },
@@ -29,6 +30,7 @@ const COLOR_PRESETS = [
 ];
 
 export default function BulkReportCardsModal({ isOpen, onClose, initialSectionId = null }) {
+  const { notify } = useFeedback();
   const [sections, setSections] = useState([]);
   const [selectedSectionId, setSelectedSectionId] = useState(initialSectionId || "");
   const [selectedTheme, setSelectedTheme] = useState(COLOR_PRESETS[0]);
@@ -39,7 +41,11 @@ export default function BulkReportCardsModal({ isOpen, onClose, initialSectionId
   const [reportCards, setReportCards] = useState([]);
   const [activePreviewIndex, setActivePreviewIndex] = useState(0);
   const [downloading, setDownloading] = useState(false);
+  const [printing, setPrinting] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0 });
+  // Hidden print pages mount lazily (on export/print) so opening the modal for a
+  // large section doesn't render a full report card per student up front.
+  const [sheetsMounted, setSheetsMounted] = useState(false);
 
   const printContainerRef = useRef(null);
   const currentYear = new Date().getFullYear();
@@ -83,6 +89,11 @@ export default function BulkReportCardsModal({ isOpen, onClose, initialSectionId
     fetchReportCards();
   }, [isOpen, selectedSectionId]);
 
+  // Reset lazy-mounted print pages each time the modal reopens
+  useEffect(() => {
+    if (isOpen) setSheetsMounted(false);
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const currentTheme = isCustomColor
@@ -97,24 +108,41 @@ export default function BulkReportCardsModal({ isOpen, onClose, initialSectionId
 
   const selectedSection = sections.find((s) => String(s.id) === String(selectedSectionId));
 
+  // Mount the hidden print pages (if not yet) and wait for React to commit them.
+  const ensureSheetsMounted = async () => {
+    setSheetsMounted(true);
+    for (
+      let i = 0;
+      i < 120 && !printContainerRef.current?.querySelector(".report-card-page");
+      i++
+    ) {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    }
+    await document.fonts?.ready;
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  };
+
   const handleDownloadPDF = async () => {
-    if (!printContainerRef.current || reportCards.length === 0) return;
+    if (downloading || reportCards.length === 0) return;
     setDownloading(true);
-    setDownloadProgress({ current: 0, total: reportCards.length });
 
     try {
-      // Give the off-screen print layout time to settle and fonts to load
-      await document.fonts?.ready;
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      await ensureSheetsMounted();
 
-      const pdf = new jsPDF("p", "mm", "a4");
       const cardElements = Array.from(
-        printContainerRef.current.querySelectorAll(".report-card-page")
+        printContainerRef.current?.querySelectorAll(".report-card-page") || []
       );
 
       if (cardElements.length === 0) {
         throw new Error("No report cards found to export");
       }
+
+      setDownloadProgress({ current: 0, total: cardElements.length });
+
+      const pdf = new jsPDF("p", "mm", "a4");
+      // Large exports: slightly lower JPEG quality keeps hundreds of pages
+      // fast and the PDF at a reasonable size.
+      const jpegQuality = cardElements.length > 40 ? 0.9 : 0.95;
 
       let renderedCount = 0;
 
@@ -122,13 +150,21 @@ export default function BulkReportCardsModal({ isOpen, onClose, initialSectionId
         setDownloadProgress({ current: i + 1, total: cardElements.length });
         const el = cardElements[i];
 
-        const canvas = await captureElement(el, { scale: 2 });
+        const canvas = await captureElement(el, {
+          scale: 2,
+          // Skip sibling report-card pages so each capture clones only the
+          // current page instead of the whole stack (critical for 100+ cards).
+          ignoreElements: (node) =>
+            node.nodeType === 1 &&
+            node.classList?.contains("report-card-page") &&
+            node !== el,
+        });
 
         if (!canvas.width || !canvas.height) {
           throw new Error(`Report card ${i + 1} captured as empty canvas`);
         }
 
-        const imgData = canvas.toDataURL("image/jpeg", 0.95);
+        const imgData = canvas.toDataURL("image/jpeg", jpegQuality);
         const pdfWidth = 210; // A4 width in mm
         const pdfHeight = Math.min(297, (canvas.height * pdfWidth) / canvas.width);
 
@@ -144,15 +180,21 @@ export default function BulkReportCardsModal({ isOpen, onClose, initialSectionId
       pdf.save(`${sectionNameClean}_Report_Cards_${currentYear}.pdf`);
     } catch (err) {
       console.error("Failed to generate PDF", err);
-      alert("An error occurred while generating the PDF. Try printing directly.");
+      notify("An error occurred while generating the PDF. Try printing directly.", "error");
     } finally {
       setDownloading(false);
       setDownloadProgress({ current: 0, total: 0 });
     }
   };
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    setPrinting(true);
+    try {
+      await ensureSheetsMounted();
+      window.print();
+    } finally {
+      setPrinting(false);
+    }
   };
 
   const currentStudent = reportCards[activePreviewIndex] || null;
@@ -194,17 +236,19 @@ export default function BulkReportCardsModal({ isOpen, onClose, initialSectionId
                 <Download className="w-4 h-4" />
               )}
               {downloading
-                ? `Exporting ${downloadProgress.current}/${downloadProgress.total}...`
+                ? downloadProgress.total === 0
+                  ? "Preparing pages..."
+                  : `Exporting ${downloadProgress.current}/${downloadProgress.total}...`
                 : `Download All PDFs (${reportCards.length})`}
             </button>
 
             <button
               onClick={handlePrint}
-              disabled={reportCards.length === 0}
+              disabled={reportCards.length === 0 || printing}
               className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50"
             >
               <Printer className="w-4 h-4" />
-              Print
+              {printing ? "Preparing..." : "Print"}
             </button>
 
             <button
@@ -226,7 +270,7 @@ export default function BulkReportCardsModal({ isOpen, onClose, initialSectionId
             <select
               value={selectedSectionId}
               onChange={(e) => setSelectedSectionId(e.target.value)}
-              className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+              className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none hover:border-brand-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 transition-all shadow-xs"
             >
               <option value="">-- Choose Section --</option>
               {sections.map((sec) => (
@@ -348,21 +392,23 @@ export default function BulkReportCardsModal({ isOpen, onClose, initialSectionId
           )}
         </div>
 
-        {/* Off-screen print layout (placed at top:0, left:0 behind modal backdrop z-50 so html2canvas computes true positive coordinates) */}
+        {/* Off-screen print layout parked at left:-10000px so it never paints
+            over the translucent modal backdrop (negative z-index would still
+            show through it). html2canvas renders the element's own bounds, so
+            the off-screen position does not affect capture. */}
         <div
           aria-hidden="true"
           style={{
             position: "fixed",
-            left: 0,
+            left: "-10000px",
             top: 0,
             width: "210mm",
             pointerEvents: "none",
-            zIndex: -20,
             backgroundColor: "#ffffff",
           }}
         >
           <div ref={printContainerRef}>
-            {reportCards.map((student) => (
+            {sheetsMounted && reportCards.map((student) => (
               <div
                 key={student.id}
                 className="report-card-page bg-white"

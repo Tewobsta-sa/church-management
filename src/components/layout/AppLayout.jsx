@@ -1,4 +1,5 @@
-import { Outlet, Navigate } from "react-router-dom";
+import { Outlet, Navigate, useLocation } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
@@ -6,6 +7,12 @@ import Topbar from "./Topbar";
 export default function AppLayout() {
   const { user, loading, isInitialized } = useAuth();
   const token = localStorage.getItem("token");
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const location = useLocation();
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
 
   if (loading) {
     return (
@@ -36,9 +43,25 @@ export default function AppLayout() {
           <Sidebar />
         </div>
 
+        {/* Mobile Sidebar Drawer */}
+        {mobileOpen && (
+          <div
+            className="fixed inset-0 z-50 lg:hidden"
+            onClick={() => setMobileOpen(false)}
+          >
+            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"></div>
+            <div
+              className="absolute inset-y-0 left-0 w-80"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Sidebar onNavClick={() => setMobileOpen(false)} />
+            </div>
+          </div>
+        )}
+
         {/* Main Workspace */}
         <div className="flex-1 flex flex-col min-h-screen relative overflow-hidden">
-          <Topbar />
+          <Topbar onMenuClick={() => setMobileOpen(true)} />
           <main className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 pb-12 custom-scrollbar">
             <div className="mx-auto max-w-7xl animate-[fade-in_0.4s_ease-out]">
               <Outlet />

@@ -1,28 +1,14 @@
 import { useState, useEffect } from "react";
 import { X, Save, UserPlus } from "lucide-react";
-import { useAuth } from "../../context/AuthContext";
+import { useFeedback } from "../../context/FeedbackContext";
 
+// Canonical 5 system roles only
 const availableRoles = [
   { value: "super_admin", label: "Super Admin" },
   { value: "yesew_habt", label: "Yesew Habt" },
   { value: "mereja_kfl", label: "Mereja Kfl" },
   { value: "mezmur_kfl", label: "Mezmur Kfl" },
   { value: "tmhrt_kfl", label: "Tmhrt Kfl" },
-  { value: "gngnunet_office_admin", label: "Gngnunet Office Admin" },
-  { value: "mezmur_office_admin", label: "Mezmur Office Admin" },
-  { value: "tmhrt_office_admin", label: "Tmhrt Office Admin" },
-  { value: "distance_admin", label: "Distance Admin" },
-  { value: "teacher", label: "Teacher" },
-  { value: "student", label: "Student" },
-  { value: "mezmur_office_coordinator", label: "Mezmur Office Coordinator" },
-  { value: "tmhrt_office_coordinator", label: "Tmhrt Office Coordinator" },
-  { value: "distance_coordinator", label: "Distance Coordinator" },
-  {
-    value: "gngnunet_office_coordinator",
-    label: "Gngnunet Office Coordinator",
-  },
-  { value: "young_tmhrt_admin", label: "Young Tmhrt Admin" },
-  { value: "young_gngnunet_admin", label: "Young Gngnunet Admin" },
 ];
 
 export default function UserModal({
@@ -32,7 +18,7 @@ export default function UserModal({
   onSave,
   mode = "create",
 }) {
-  const { hasRole } = useAuth();
+  const { notify } = useFeedback();
   const [formData, setFormData] = useState({
     name: "",
     username: "",
@@ -45,11 +31,8 @@ export default function UserModal({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isEdit = mode === "edit";
-  const isTmhrtOfficeAdmin = hasRole("tmhrt_office_admin");
-  const defaultRole = isTmhrtOfficeAdmin ? "teacher" : "super_admin";
-  const selectableRoles = availableRoles.filter(
-    (role) => !isTmhrtOfficeAdmin || role.value === "teacher",
-  );
+  const defaultRole = "super_admin";
+  const selectableRoles = availableRoles;
 
   useEffect(() => {
     if (user && isEdit) {
@@ -84,7 +67,7 @@ export default function UserModal({
     e.preventDefault();
 
     if (!isEdit && formData.password !== formData.password_confirmation) {
-      alert("Passwords do not match");
+      notify("Passwords do not match", "error");
       return;
     }
 
@@ -94,7 +77,7 @@ export default function UserModal({
       onClose();
     } catch (err) {
       console.log(err.response);
-      alert(err.response?.data?.error || "Failed to save user");
+      notify(err.response?.data?.error || "Failed to save user", "error");
     } finally {
       setIsSubmitting(false);
     }

@@ -4,9 +4,11 @@ import { Plus, Trash2, Users, Search, Shield, Settings, Activity } from "lucide-
 import UserModal from "./UserModal";
 import SystemLogsViewer from "./SystemLogsViewer";
 import { useAuth } from "../../context/AuthContext";
+import { useFeedback } from "../../context/FeedbackContext";
 
 export default function UsersManagement() {
   const { hasRole } = useAuth();
+  const { notify, confirmAction } = useFeedback();
   const [users, setUsers] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -64,18 +66,24 @@ export default function UsersManagement() {
       setModalOpen(false);
     } catch (err) {
       const msgs = err.response?.data?.errors ? Object.values(err.response.data.errors).flat().join("\n") : err.response?.data?.error || "Operation failed";
-      alert(msgs);
+      notify(msgs, "error");
     }
   };
 
   const handleDelete = async (id) => {
-    if (!confirm("Are you sure you want to delete this user?")) return;
+    const confirmed = await confirmAction({
+      title: "Delete User",
+      message: "Are you sure you want to delete this user?",
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!confirmed) return;
     try {
       await adminService.deleteUser(id);
       fetchUsers();
       if(isSuperAdmin) fetchStats();
     } catch (err) {
-      alert(err.response?.data?.error || err.response?.data?.message || "Delete failed");
+      notify(err.response?.data?.error || err.response?.data?.message || "Delete failed", "error");
     }
   };
 

@@ -30,12 +30,13 @@ import {
 import { assignmentService } from "../../services/assignmentService";
 import { sectionService } from "../../services/sectionService";
 import { courseService } from "../../services/courseService";
-import { trainerService } from "../../services/trainerService";
 import { teacherService } from "../../services/teacherService";
 import { useAuth } from "../../context/AuthContext";
+import { useFeedback } from "../../context/FeedbackContext";
 import { useNavigate } from "react-router-dom";
 import EthiopianDateInput from "../../components/common/EthiopianDateInput";
 import { formatEthiopianDate } from "../../utils/ethiopianDate";
+import { formatApiError } from "../../services/api";
 
 const locales = { "en-US": enUS };
 
@@ -92,6 +93,7 @@ const CalendarEvent = (props) => {
 
 export default function AssignmentsTasks() {
   const { hasRole, user } = useAuth();
+  const { notify, confirmAction } = useFeedback();
   const navigate = useNavigate();
 
   const isSuperAdmin = hasRole("super_admin");
@@ -100,9 +102,16 @@ export default function AssignmentsTasks() {
   const isTeacher = hasRole("teacher");
   const isMereja = hasRole("mereja_kfl");
 
-  const attendanceActionLabel = isSuperAdmin
-    ? "View attendance"
-    : "Mark attendance";
+  const isAssignedToTeacher = (item) => {
+    if (!user?.id || !item) return false;
+    if (item.user_id === user.id) return true;
+    return (item.assignment_courses || []).some(
+      (ac) => ac.teacher_id === user.id,
+    );
+  };
+
+  const attendanceActionLabel =
+    isSuperAdmin || isTeacher || isMereja ? "View attendance" : "Mark attendance";
 
   // Role locked assignment type
   const lockedType = isSuperAdmin
@@ -128,11 +137,13 @@ export default function AssignmentsTasks() {
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+  const [endSemesterModalOpen, setEndSemesterModalOpen] = useState(false);
+  const [endSemesterLoading, setEndSemesterLoading] = useState(false);
+  const [endSemesterNotice, setEndSemesterNotice] = useState(null);
 
   // Dropdown options
   const [sections, setSections] = useState([]);
   const [courses, setCourses] = useState([]);
-  const [trainers, setTrainers] = useState([]);
   const [teachers, setTeachers] = useState([]);
 
   const [formData, setFormData] = useState({
@@ -140,7 +151,7 @@ export default function AssignmentsTasks() {
     recurrence_type: "periodic",
     section_id: "",
     user_id: "",
-    trainer_id: "",
+    trainer_name: "",
     course_id: "",
     location: "",
     day_of_week: "1",
@@ -187,7 +198,7 @@ export default function AssignmentsTasks() {
                 end,
                 type: ev.type || "Course",
                 location: ev.location || "Main Sanctuary",
-                teacher: ev.teacher?.name || ev.trainer?.name || "Unassigned",
+                teacher: ev.teacher?.name || ev.trainer_name || ev.trainer?.name || "Unassigned",
                 raw: ev,
               },
             ];
@@ -216,7 +227,7 @@ export default function AssignmentsTasks() {
                 end,
                 type: ev.type || "Course",
                 location: ev.location || "Main Sanctuary",
-                teacher: ev.teacher?.name || ev.trainer?.name || "Unassigned",
+                teacher: ev.teacher?.name || ev.trainer_name || ev.trainer?.name || "Unassigned",
                 raw: ev,
               });
             }
@@ -234,9 +245,24 @@ export default function AssignmentsTasks() {
     }
   };
 
+  const handleConfirmEndSemester = async () => {
+    try {
+      setEndSemesterLoading(true);
+      const res = await assignmentService.endSemester(
+        isAcademicAdmin && !isSuperAdmin ? "Course" : null
+      );
+      setEndSemesterNotice(res.message || "Semester successfully archived.");
+      setEndSemesterModalOpen(false);
+      await fetchSchedule();
+    } catch (err) {
+      notify(formatApiError(err, "Failed to end semester."), "error");
+    } finally {
+      setEndSemesterLoading(false);
+    }
+  };
+
   // ─── Fetch dropdown resources ──────────────────────────────────────
   const fetchResources = async () => {
-    const canAccessTrainers = isSuperAdmin || isMezmurAdmin;
     const canAccessTeachers = isSuperAdmin || isAcademicAdmin;
 
     const requests = [
@@ -245,7 +271,6 @@ export default function AssignmentsTasks() {
       canAccessTeachers
         ? teacherService.getTeachers("", 1)
         : Promise.resolve({ data: [] }),
-      canAccessTrainers ? trainerService.getTrainers() : Promise.resolve([]),
     ];
 
     const results = await Promise.allSettled(requests);
@@ -255,7 +280,6 @@ export default function AssignmentsTasks() {
     const secData = getValue(0, { data: [] });
     const courseData = getValue(1, []);
     const teacherData = getValue(2, { data: [] });
-    const trainerData = getValue(3, []);
 
     // All sections across PreKG, Regular (Htsanat, Maekelawyan, Wetatoch), Distance
     const secList = Array.isArray(secData) ? secData : (secData?.data ?? []);
@@ -271,12 +295,6 @@ export default function AssignmentsTasks() {
     const teacherList =
       teacherData?.data ?? (Array.isArray(teacherData) ? teacherData : []);
     setTeachers(teacherList);
-
-    // Trainers
-    const trainerList = Array.isArray(trainerData)
-      ? trainerData
-      : (trainerData?.data ?? []);
-    setTrainers(trainerList);
   };
 
   useEffect(() => {
@@ -290,7 +308,7 @@ export default function AssignmentsTasks() {
       // Role-based visibility
       if (isAcademicAdmin && item.type !== "Course") return false;
       if (isMezmurAdmin && item.type !== "MezmurTraining") return false;
-      if (isTeacher && item.user_id !== user?.id) return false;
+      if (isTeacher && !isAssignedToTeacher(item)) return false;
 
       // Filter by Type
       if (filterType !== "all" && item.type !== filterType) return false;
@@ -319,6 +337,7 @@ export default function AssignmentsTasks() {
         const sectionName = item.section?.name?.toLowerCase() || "";
         const instructor = (
           item.teacher?.name ||
+          item.trainer_name ||
           item.trainer?.name ||
           ""
         ).toLowerCase();
@@ -352,7 +371,7 @@ export default function AssignmentsTasks() {
     return calendarEvents.filter((ev) => {
       if (isAcademicAdmin && ev.type !== "Course") return false;
       if (isMezmurAdmin && ev.type !== "MezmurTraining") return false;
-      if (isTeacher && ev.raw?.user_id !== user?.id) return false;
+      if (isTeacher && !isAssignedToTeacher(ev.raw)) return false;
 
       if (filterType !== "all" && ev.type !== filterType) return false;
       if (
@@ -418,16 +437,19 @@ export default function AssignmentsTasks() {
       fetchSchedule();
       fetchResources();
     } catch (err) {
-      alert(err.response?.data?.message || "Creation failed");
+      notify(formatApiError(err, "Creation failed"), "error");
     }
   };
 
   // Handle Delete Schedule
   const handleDeleteSchedule = async (assignmentId) => {
     if (!assignmentId || deletingId) return;
-    const confirmed = window.confirm(
-      "Delete this schedule entry? This action cannot be undone.",
-    );
+    const confirmed = await confirmAction({
+      title: "Delete Schedule",
+      message: "Delete this schedule entry? This action cannot be undone.",
+      confirmLabel: "Delete",
+      danger: true,
+    });
     if (!confirmed) return;
 
     setDeletingId(assignmentId);
@@ -435,7 +457,7 @@ export default function AssignmentsTasks() {
       await assignmentService.deleteAssignment(assignmentId);
       await fetchSchedule();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to delete schedule");
+      notify(formatApiError(err, "Failed to delete schedule"), "error");
     } finally {
       setDeletingId(null);
     }
@@ -493,17 +515,42 @@ export default function AssignmentsTasks() {
           </div>
         </div>
 
-        {/* Action Button */}
+        {/* Action Buttons */}
         {(isSuperAdmin || isAcademicAdmin || isMezmurAdmin) && !isMereja && (
-          <button
-            onClick={() => setModalOpen(true)}
-            className="flex items-center justify-center gap-2 bg-gradient-to-r from-brand-700 via-brand-800 to-brand-900 hover:from-brand-600 hover:to-brand-800 text-white px-5 py-3 rounded-2xl font-bold shadow-lg shadow-brand-900/20 hover:-translate-y-0.5 transition-all text-xs uppercase tracking-wider shrink-0 active:scale-[0.98]"
-          >
-            <Plus className="w-4 h-4 text-amber-400" />
-            New Schedule Entry
-          </button>
+          <div className="flex items-center gap-2.5">
+            {(isSuperAdmin || isAcademicAdmin) && (
+              <button
+                type="button"
+                onClick={() => setEndSemesterModalOpen(true)}
+                className="flex items-center justify-center gap-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-4 py-3 rounded-2xl font-bold shadow-xs hover:-translate-y-0.5 transition-all text-xs uppercase tracking-wider shrink-0 active:scale-[0.98]"
+                title="Archive current semester classes to start fresh"
+              >
+                <RefreshCcw className="w-4 h-4 text-amber-600" />
+                End Semester (ሴሚስተር አጠናቅቅ)
+              </button>
+            )}
+            <button
+              onClick={() => setModalOpen(true)}
+              className="flex items-center justify-center gap-2 bg-gradient-to-r from-brand-700 via-brand-800 to-brand-900 hover:from-brand-600 hover:to-brand-800 text-white px-5 py-3 rounded-2xl font-bold shadow-lg shadow-brand-900/20 hover:-translate-y-0.5 transition-all text-xs uppercase tracking-wider shrink-0 active:scale-[0.98]"
+            >
+              <Plus className="w-4 h-4 text-amber-400" />
+              New Schedule Entry
+            </button>
+          </div>
         )}
       </div>
+
+      {endSemesterNotice && (
+        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold rounded-2xl flex items-center justify-between">
+          <span>{endSemesterNotice}</span>
+          <button
+            onClick={() => setEndSemesterNotice(null)}
+            className="text-emerald-600 hover:text-emerald-900 text-xs underline"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* ── Stats Summary Badges ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -621,7 +668,7 @@ export default function AssignmentsTasks() {
           <select
             value={filterSection}
             onChange={(e) => setFilterSection(e.target.value)}
-            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-brand-600"
+            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none hover:border-brand-300 focus:ring-2 focus:ring-brand-500/15 focus:border-brand-500 transition-all shadow-xs"
           >
             <option value="all">All Sections</option>
             {sections.map((sec) => (
@@ -635,7 +682,7 @@ export default function AssignmentsTasks() {
           <select
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
-            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-brand-600"
+            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none hover:border-brand-300 focus:ring-2 focus:ring-brand-500/15 focus:border-brand-500 transition-all shadow-xs"
           >
             <option value="all">All Types</option>
             <option value="Course">Academic Courses</option>
@@ -646,7 +693,7 @@ export default function AssignmentsTasks() {
           <select
             value={filterShift}
             onChange={(e) => setFilterShift(e.target.value)}
-            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-brand-600"
+            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none hover:border-brand-300 focus:ring-2 focus:ring-brand-500/15 focus:border-brand-500 transition-all shadow-xs"
           >
             <option value="all">All Shifts (ቀን & ማታ)</option>
             <option value="day">☀️ Day Only (ቀን ብቻ)</option>
@@ -711,6 +758,7 @@ export default function AssignmentsTasks() {
                             : item.mezmurs?.[0]?.title || "Mezmur Training";
                           const instructor =
                             item.teacher?.name ||
+                            item.trainer_name ||
                             item.trainer?.name ||
                             "Unassigned";
 
@@ -924,7 +972,7 @@ export default function AssignmentsTasks() {
                     "Academic Block"
                   : item.mezmurs?.[0]?.title || "Mezmur Training Session";
                 const instructor =
-                  item.teacher?.name || item.trainer?.name || "Unassigned";
+                  item.teacher?.name || item.trainer_name || item.trainer?.name || "Unassigned";
                 const dayObj = DAYS_OF_WEEK.find(
                   (d) => String(d.id) === String(item.day_of_week),
                 );
@@ -1242,26 +1290,20 @@ export default function AssignmentsTasks() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-slate-700">
-                        Lead Trainer *
+                        Lead Trainer
                       </label>
-                      <select
-                        required
+                      <input
+                        type="text"
                         className={inputCls}
-                        value={formData.trainer_id}
+                        placeholder="e.g. Deacon Yohannes"
+                        value={formData.trainer_name}
                         onChange={(e) =>
                           setFormData({
                             ...formData,
-                            trainer_id: e.target.value,
+                            trainer_name: e.target.value,
                           })
                         }
-                      >
-                        <option value="">Select Trainer</option>
-                        {trainers.map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.name}
-                          </option>
-                        ))}
-                      </select>
+                      />
                     </div>
 
                     <div className="space-y-1.5">
@@ -1411,6 +1453,47 @@ export default function AssignmentsTasks() {
                 Publish Schedule Entry
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── End Semester Confirmation Modal ── */}
+      {endSemesterModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+              <RefreshCcw className="w-6 h-6" />
+            </div>
+            <div className="text-center">
+              <h3 className="text-lg font-black text-slate-800">
+                End Current Semester? (ሴሚስተር ማጠናቀቂያ)
+              </h3>
+              <p className="text-xs text-slate-500 font-medium mt-2 leading-relaxed">
+                This action will archive active timetable schedules for this term so you can configure schedules for the upcoming semester.
+              </p>
+              <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 text-[11px] text-slate-600 font-semibold mt-3 text-left space-y-1">
+                <p>✓ All previous student grades and attendance history will remain safe and intact.</p>
+                <p>✓ Only active recurring class schedules will be deactivated.</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setEndSemesterModalOpen(false)}
+                disabled={endSemesterLoading}
+                className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors"
+              >
+                Cancel (ተመለስ)
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmEndSemester}
+                disabled={endSemesterLoading}
+                className="flex-1 py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs transition-colors shadow-md shadow-amber-600/20 disabled:opacity-50"
+              >
+                {endSemesterLoading ? "Archiving…" : "Confirm & Archive"}
+              </button>
+            </div>
           </div>
         </div>
       )}

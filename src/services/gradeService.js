@@ -15,4 +15,21 @@ export const gradeService = {
     const response = await api.get("/teacher/my-courses");
     return response.data;
   },
+
+  downloadTemplate: async (courseId, sectionId = null) => {
+    const response = await api.get(`/courses/${courseId}/grades/template`, {
+      params: sectionId ? { section_id: sectionId } : {},
+      responseType: "blob",
+    });
+    return response.data;
+  },
+
+  importGrades: async (courseId, file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await api.post(`/courses/${courseId}/grades/import`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  },
 };

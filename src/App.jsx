@@ -1,15 +1,19 @@
-import React, { Suspense, lazy } from "react";
+import React, { Suspense, lazy, useEffect } from "react";
 import {
   BrowserRouter as Router,
   Routes,
   Route,
   Navigate,
+  useLocation,
+  useNavigate,
 } from "react-router-dom";
 
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { FeedbackProvider } from "./context/FeedbackContext";
 import ErrorBoundary from "./components/common/ErrorBoundary";
 import AppLayout from "./components/layout/AppLayout";
 import PwaInstallPrompt from "./components/common/PwaInstallPrompt";
+import { isStandalone, isMobileDevice } from "./utils/device";
 
 // Lazy-loaded pages for optimal performance and chunk splitting
 const Login = lazy(() => import("./pages/auth/login"));
@@ -53,15 +57,29 @@ export const getPrimaryRole = (user) => {
 };
 
 export const getDefaultRouteForRole = (role) => {
+  // When running as an installed PWA, the app is attendance-only.
+  if (isStandalone()) {
+    const pwaRedirects = {
+      super_admin: "/attendance/scanner",
+      yesew_habt: "/attendance/scanner",
+      tmhrt_kfl: "/attendance",
+      mezmur_kfl: "/attendance",
+      mereja_kfl: "/attendance",
+      teacher: "/attendance",
+    };
+    return pwaRedirects[role] || "/attendance";
+  }
+
   const roleRedirects = {
     super_admin: "/dashboard",
     yesew_habt: "/students",
     tmhrt_kfl: "/students",
     mezmur_kfl: "/mezmur",
-    mereja_kfl: "/dashboard",
+    mereja_kfl: "/students",
+    teacher: "/grades",
   };
 
-  return roleRedirects[role] || "/dashboard";
+  return roleRedirects[role] || "/students";
 };
 
 const hasAnyAllowedRole = (user, allowedRoles) => {
@@ -151,11 +169,46 @@ function SetupRoute({ children }) {
   return children;
 }
 
+// Redirect desktop browsers away from the mobile QR scanner route
+function MobileAttendanceRoute({ children }) {
+  if (!isMobileDevice() && !isStandalone()) {
+    return <Navigate to="/attendance" replace />;
+  }
+  return children;
+}
+
+// Enforce that the installed PWA can only navigate inside attendance pages
+function PwaScopeGuard() {
+  const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!isStandalone()) return;
+
+    const pathname = location.pathname;
+    const publicPaths = ["/", "/login", "/forgot-password", "/setup"];
+    const isAttendancePath = pathname === "/attendance" || pathname.startsWith("/attendance/");
+    const isPublic = publicPaths.includes(pathname);
+
+    if (isPublic || isAttendancePath) return;
+
+    if (user) {
+      navigate(getDefaultRouteForRole(getPrimaryRole(user)), { replace: true });
+    } else {
+      navigate("/login", { replace: true });
+    }
+  }, [location.pathname, user, navigate]);
+
+  return null;
+}
+
 function App() {
   return (
     <ErrorBoundary>
-      <AuthProvider>
-        <Router>
+      <FeedbackProvider>
+        <AuthProvider>
+          <Router>
           <Suspense fallback={<PageLoader />}>
             <Routes>
               {/* Public Routes */}
@@ -202,19 +255,11 @@ function App() {
                   </ProtectedRoute>
                 }
               >
-                {/* 1. Dashboard (Available to all 5 roles) */}
+                {/* 1. Dashboard (Super Admin Only) */}
                 <Route
                   path="/dashboard"
                   element={
-                    <RoleRoute
-                      allowedRoles={[
-                        "super_admin",
-                        "yesew_habt",
-                        "tmhrt_kfl",
-                        "mezmur_kfl",
-                        "mereja_kfl",
-                      ]}
-                    >
+                    <RoleRoute allowedRoles={["super_admin"]}>
                       <Dashboard />
                     </RoleRoute>
                   }
@@ -280,7 +325,6 @@ function App() {
                     <RoleRoute
                       allowedRoles={[
                         "super_admin",
-                        "yesew_habt",
                         "tmhrt_kfl",
                         "mereja_kfl",
                       ]}
@@ -325,6 +369,7 @@ function App() {
                         "tmhrt_kfl",
                         "mezmur_kfl",
                         "mereja_kfl",
+                        "teacher",
                       ]}
                     >
                       <AssignmentsTasks />
@@ -343,6 +388,7 @@ function App() {
                         "tmhrt_kfl",
                         "mezmur_kfl",
                         "mereja_kfl",
+                        "teacher",
                       ]}
                     >
                       <LiveAttendance />
@@ -355,7 +401,12 @@ function App() {
                   path="/grades"
                   element={
                     <RoleRoute
-                      allowedRoles={["super_admin", "tmhrt_kfl", "mereja_kfl"]}
+                      allowedRoles={[
+                        "super_admin",
+                        "tmhrt_kfl",
+                        "mereja_kfl",
+                        "teacher",
+                      ]}
                     >
                       <Grades />
                     </RoleRoute>
@@ -409,21 +460,23 @@ function App() {
                   }
                 />
 
-                {/* 14. Attendance QR Scanner */}
+                {/* 14. Attendance QR Scanner (mobile / installed PWA only) */}
                 <Route
                   path="/attendance/scanner"
                   element={
-                    <RoleRoute
-                      allowedRoles={[
-                        "super_admin",
-                        "yesew_habt",
-                        "tmhrt_kfl",
-                        "mezmur_kfl",
-                        "mereja_kfl",
-                      ]}
-                    >
-                      <MobileAttendanceScanner />
-                    </RoleRoute>
+                    <MobileAttendanceRoute>
+                      <RoleRoute
+                        allowedRoles={[
+                          "super_admin",
+                          "yesew_habt",
+                          "tmhrt_kfl",
+                          "mezmur_kfl",
+                          "mereja_kfl",
+                        ]}
+                      >
+                        <MobileAttendanceScanner />
+                      </RoleRoute>
+                    </MobileAttendanceRoute>
                   }
                 />
 
@@ -478,9 +531,11 @@ function App() {
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Suspense>
-          <PwaInstallPrompt />
-        </Router>
-      </AuthProvider>
+            <PwaScopeGuard />
+            <PwaInstallPrompt />
+          </Router>
+        </AuthProvider>
+      </FeedbackProvider>
     </ErrorBoundary>
   );
 }

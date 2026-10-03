@@ -66,10 +66,74 @@
   to { transform: scale(1); opacity: 1; }
 }
 
+@keyframes toast-in {
+  from { transform: translateX(16px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
 /* Base structural overrides */
 @layer base {
   body {
     @apply bg-surface-50 text-slate-900 antialiased font-sans;
+  }
+
+  /* Consistent, theme-aligned dropdowns across the app */
+  select {
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23be123c' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 0.95rem;
+    padding-right: 2.35rem !important;
+    font-size: 0.875rem;
+    font-weight: 600;
+    border-radius: 0.75rem;
+    transition: border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.15s ease;
+  }
+
+  /* Gentle brand hover on bordered selects */
+  select:hover:not(:disabled) {
+    border-color: var(--color-brand-400);
+  }
+
+  /* Polished focus ring with brand accent */
+  select:focus,
+  select:focus-visible {
+    outline: none !important;
+    border-color: var(--color-brand-600) !important;
+    box-shadow: 0 0 0 3px rgba(190, 18, 60, 0.12) !important;
+  }
+
+  select:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+    background-color: var(--color-surface-100);
+  }
+
+  select option {
+    color: var(--color-surface-900);
+    background-color: #ffffff;
+    font-weight: 500;
+    padding: 6px 10px;
+  }
+
+  /* When a custom chevron icon is rendered by a component */
+  select.bg-none {
+    background-image: none !important;
+  }
+
+  /* Light chevron for dropdowns rendered on dark surfaces */
+  select.select-on-dark {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23f1f5f9' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-color: #0f172a;
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+  select.select-on-dark option {
+    background-color: #1e293b;
+    color: #ffffff;
   }
 
   /* Sleek Modern Global Scrollbars */

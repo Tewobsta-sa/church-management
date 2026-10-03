@@ -25,9 +25,11 @@ import { Link, useNavigate } from "react-router-dom";
 import { attendanceService } from "../../services/attendanceService";
 import { assignmentService } from "../../services/assignmentService";
 import { useAuth } from "../../context/AuthContext";
+import { useFeedback } from "../../context/FeedbackContext";
 
 export default function MobileAttendanceScanner() {
   const { user, hasRole } = useAuth();
+  const { notify } = useFeedback();
   const navigate = useNavigate();
 
   const isSuperAdmin = hasRole("super_admin");
@@ -170,7 +172,7 @@ export default function MobileAttendanceScanner() {
         });
         setTorchEnabled(nextTorch);
       } else {
-        alert("የስልክዎ ካሜራ ፍላሽ በብራውዘር በኩል አይደገፍም።");
+        notify("የስልክዎ ካሜራ ፍላሽ በብራውዘር በኩል አይደገፍም።", "warning");
       }
     } catch (e) {
       console.error("Torch error", e);
@@ -204,7 +206,7 @@ export default function MobileAttendanceScanner() {
     }
 
     if (!selectedAssignmentId) {
-      alert("እባክዎ መጀመሪያ ክፍለ-ጊዜ (Assignment/Session) ይምረጡ።");
+      notify("እባክዎ መጀመሪያ ክፍለ-ጊዜ (Assignment/Session) ይምረጡ።", "warning");
       return;
     }
 
@@ -258,7 +260,7 @@ export default function MobileAttendanceScanner() {
       playBeep();
       triggerHaptic();
     } catch (err) {
-      alert(err.response?.data?.message || "ተማሪው አልተገኘም ወይም መመዝገብ አልተቻለም።");
+      notify(err.response?.data?.message || "ተማሪው አልተገኘም ወይም መመዝገብ አልተቻለም።", "error");
     } finally {
       setManualSearching(false);
     }
@@ -326,7 +328,7 @@ export default function MobileAttendanceScanner() {
             <select
               value={selectedAssignmentId}
               onChange={(e) => setSelectedAssignmentId(e.target.value)}
-              className="w-full bg-slate-900 border border-white/15 rounded-xl px-3 py-2.5 text-xs font-black text-white appearance-none pr-8 focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className="w-full bg-slate-900 border border-white/15 rounded-xl px-3 py-2.5 text-xs font-black text-white appearance-none bg-none pr-8 focus:outline-none focus:ring-2 focus:ring-brand-500"
             >
               {assignments.map((a) => {
                 const title =

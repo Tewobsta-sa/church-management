@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Download, X, Smartphone, Share, PlusSquare, Check } from "lucide-react";
+import { X, Smartphone, Share, PlusSquare } from "lucide-react";
+import { isMobileDevice, isStandalone } from "../../utils/device";
 
 export default function PwaInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -8,13 +9,11 @@ export default function PwaInstallPrompt() {
   const [showIosInstructions, setShowIosInstructions] = useState(false);
 
   useEffect(() => {
-    // Check if already in standalone mode (already installed)
-    const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone;
-    if (isStandalone) {
+    // PWA install is only offered on mobile devices.
+    if (isStandalone() || !isMobileDevice()) {
       return;
     }
 
-    // Check if device is iOS (Safari)
     const userAgent = window.navigator.userAgent.toLowerCase();
     const isIosDevice = /iphone|ipad|ipod/.test(userAgent);
     setIsIos(isIosDevice);
@@ -22,8 +21,9 @@ export default function PwaInstallPrompt() {
     // Listen for beforeinstallprompt (Android / Chrome)
     const handleBeforeInstall = (e) => {
       e.preventDefault();
+      if (!isMobileDevice()) return;
+
       setDeferredPrompt(e);
-      // Check if user dismissed recently
       const dismissedUntil = localStorage.getItem("jkm_pwa_dismissed");
       if (!dismissedUntil || Date.now() > parseInt(dismissedUntil)) {
         setShowPrompt(true);
@@ -64,14 +64,17 @@ export default function PwaInstallPrompt() {
   const handleDismiss = () => {
     setShowPrompt(false);
     // Remember dismissal for 2 days
-    localStorage.setItem("jkm_pwa_dismissed", (Date.now() + 2 * 24 * 60 * 60 * 1000).toString());
+    localStorage.setItem(
+      "jkm_pwa_dismissed",
+      (Date.now() + 2 * 24 * 60 * 60 * 1000).toString(),
+    );
   };
 
   if (!showPrompt) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-6 md:max-w-md z-50 animate-[slide-up_0.3s_ease-out]">
-      <div className="bg-gradient-to-r from-brand-950 via-slate-900 to-brand-900 text-white rounded-3xl p-4 shadow-2xl border border-gold-500/30 backdrop-blur-xl flex flex-col gap-3">
+    <div className="fixed bottom-4 left-4 right-4 z-50 animate-[slide-up_0.3s_ease-out]">
+      <div className="bg-gradient-to-r from-brand-950 via-slate-900 to-brand-900 text-white rounded-3xl p-4 shadow-2xl border border-gold-500/30 backdrop-blur-xl flex flex-col gap-3 max-w-md mx-auto">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-white/10 border border-gold-400/40 p-1 flex items-center justify-center shrink-0 shadow-md">

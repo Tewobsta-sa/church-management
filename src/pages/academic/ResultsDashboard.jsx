@@ -14,8 +14,10 @@ import {
 import { resultsService } from "../../services/resultsService";
 import { sectionService } from "../../services/sectionService";
 import BulkReportCardsModal from "./BulkReportCardsModal";
+import { useFeedback } from "../../context/FeedbackContext";
 
 export default function ResultsDashboard() {
+  const { notify } = useFeedback();
   const [sections, setSections] = useState([]);
   const [selectedSection, setSelectedSection] = useState("");
   const [rankings, setRankings] = useState([]);
@@ -94,7 +96,7 @@ export default function ResultsDashboard() {
       });
     } catch (err) {
       console.error(err);
-      alert("Failed to load report");
+      notify("Failed to load report", "error");
     } finally {
       setReportLoading(false);
     }

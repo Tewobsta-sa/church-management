@@ -18,7 +18,9 @@ import { QRCodeSVG } from "qrcode.react";
 import { studentService } from "../../services/studentService";
 import { sectionService } from "../../services/sectionService";
 import { useAuth } from "../../context/AuthContext";
+import { useFeedback } from "../../context/FeedbackContext";
 import EthiopianDateInput from "../../components/common/EthiopianDateInput";
+import { formatApiError } from "../../services/api";
 
 const EDUCATION_LEVELS = [
   { value: "elementary", label: "Elementary School (1-8)" },
@@ -46,6 +48,7 @@ export default function StudentModal({
   canDelete = false,
 }) {
   const { hasRole } = useAuth();
+  const { notify, confirmAction } = useFeedback();
 
   const [formData, setFormData] = useState({
     name: "",
@@ -238,61 +241,93 @@ export default function StudentModal({
     }
   };
 
-  const handleSubmit = async (e) => {
+  const buildFormData = (extra = {}) => {
+    const data = new FormData();
+    Object.entries(formData).forEach(([key, val]) => {
+      if (val !== null && val !== undefined) {
+        data.append(key, typeof val === "boolean" ? (val ? 1 : 0) : val);
+      }
+    });
+    Object.entries(extra).forEach(([key, val]) => data.append(key, val));
+
+    if (pictureFile) {
+      data.append("picture", pictureFile);
+    }
+    birthCertFiles.forEach((file) => {
+      data.append("birth_certificates[]", file);
+    });
+    eduCertFiles.forEach((file) => {
+      data.append("educational_certificates[]", file);
+    });
+    return data;
+  };
+
+  const submitStudent = async (data) => {
+    if (isCreate) {
+      await studentService.createStudent(data, formData.track);
+    } else {
+      await studentService.updateStudent(student.id, data, formData.track);
+    }
+  };
+
+  const handleSubmit = async (e, allowDuplicate = false) => {
     e.preventDefault();
     if (formData.track === "Distance" && !formData.round?.trim()) {
-      alert("የየርቀት ትምህርት ተማሪዎች ዙር (Round) ማስገባት ግዴታ ነው። (Round is mandatory for Distance students).");
+      notify("የየርቀት ትምህርት ተማሪዎች ዙር (Round) ማስገባት ግዴታ ነው። (Round is mandatory for Distance students).", "warning");
       return;
     }
     setIsSubmitting(true);
 
     try {
-      const data = new FormData();
-      Object.entries(formData).forEach(([key, val]) => {
-        if (val !== null && val !== undefined) {
-          data.append(key, typeof val === "boolean" ? (val ? 1 : 0) : val);
-        }
-      });
-
-      if (pictureFile) {
-        data.append("picture", pictureFile);
-      }
-
-      birthCertFiles.forEach((file) => {
-        data.append("birth_certificates[]", file);
-      });
-
-      eduCertFiles.forEach((file) => {
-        data.append("educational_certificates[]", file);
-      });
-
-      if (isCreate) {
-        await studentService.createStudent(data, formData.track);
-      } else {
-        await studentService.updateStudent(student.id, data, formData.track);
-      }
+      await submitStudent(
+        buildFormData(allowDuplicate ? { allow_duplicate: 1 } : {}),
+      );
 
       onSuccess?.();
       onClose();
     } catch (err) {
-      const msgs = err.response?.data?.errors
-        ? Object.values(err.response.data.errors).flat().join("\n")
-        : err.response?.data?.message || "Server error";
-      alert(msgs);
+      // 409 = possible duplicate student — offer an explicit override
+      if (err.response?.status === 409 && err.response?.data?.duplicate) {
+        const matches = (err.response.data.duplicates || [])
+          .map(
+            (d) =>
+              `• ${d.name} (${d.student_id}) — ${d.section || "Unassigned"}${d.birth_date ? `, born ${d.birth_date}` : ""}`,
+          )
+          .join("\n");
+        const confirmed = await confirmAction({
+          title: "ተመሳሳይ ተማሪ ተገኝቷል (Possible Duplicate)",
+          message: `${err.response.data.message}\n\nSimilar existing record(s):\n${matches}\n\nRegister anyway?`,
+          confirmLabel: "Register Anyway",
+          cancelLabel: "Cancel",
+          danger: true,
+        });
+        if (confirmed) {
+          setIsSubmitting(false);
+          return handleSubmit(e, true);
+        }
+      } else {
+        notify(formatApiError(err, "Server error"), "error");
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleDelete = async () => {
-    if (!confirm("Are you sure you want to permanently remove this student?"))
-      return;
+    const confirmed = await confirmAction({
+      title: "Delete Student",
+      message: "Are you sure you want to permanently remove this student? This action cannot be undone.",
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!confirmed) return;
     try {
       await studentService.deleteStudent(student.id);
+      notify("Student deleted.", "success");
       onSuccess?.();
       onClose();
     } catch (err) {
-      alert("Failed to delete student");
+      notify(formatApiError(err, "Failed to delete student"), "error");
     }
   };
 

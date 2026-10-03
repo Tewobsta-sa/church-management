@@ -59,6 +59,7 @@ api.interceptors.response.use(
         localStorage.removeItem("token");
         localStorage.removeItem("refresh_token");
         localStorage.removeItem("user");
+        localStorage.removeItem("last_activity_at");
         if (window.location.pathname !== "/" && window.location.pathname !== "/login") {
           window.location.href = "/";
         }
@@ -102,6 +103,7 @@ api.interceptors.response.use(
         localStorage.removeItem("token");
         localStorage.removeItem("refresh_token");
         localStorage.removeItem("user");
+        localStorage.removeItem("last_activity_at");
         if (window.location.pathname !== "/" && window.location.pathname !== "/login") {
           window.location.href = "/";
         }
@@ -116,9 +118,80 @@ api.interceptors.response.use(
 );
 
 /**
+ * Converts raw backend field keys embedded inside error messages
+ * (e.g. "grades.0.score", "student_ids.2", "student.course", "family_guardian_phone")
+ * into user-friendly labels so users never see technical keys.
+ */
+export const humanizeFieldKeys = (message) => {
+  if (typeof message !== "string") return message;
+
+  const dictionary = {
+    "grades.assessment_id": "assessment",
+    "grades.student_id": "student",
+    "grades.score": "score",
+    "student.course": "course",
+    "student.section": "section",
+    "student_ids": "students",
+    "student_id": "student",
+    "course_id": "course",
+    "section_id": "section",
+    "assessment_id": "assessment",
+    "user_id": "assigned teacher",
+    "trainer_id": "assigned trainer",
+    "program_type_id": "program track",
+    "target_section_id": "target section",
+    "scheduled_date": "scheduled date",
+    "day_of_week": "day of the week",
+    "start_time": "start time",
+    "end_time": "end time",
+    "family_guardian_name": "guardian name",
+    "family_guardian_phone": "guardian phone",
+    "emergency_contact_name": "emergency contact name",
+    "emergency_contact_phone": "emergency contact phone",
+    "educational_level": "educational level",
+    "grade_level": "grade level",
+    "occupation_type": "occupation",
+    "current_school": "current school",
+    "current_office": "current office",
+  };
+
+  let humanized = message;
+
+  // Replace dotted tokens like "grades.0.score", "student.course", "student_ids.0"
+  humanized = humanized.replace(
+    /\b[a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z0-9_]+)+\b/g,
+    (token) => {
+      // Remove numeric array indices: "grades.0.score" -> "grades.score"
+      const cleaned = token
+        .split(".")
+        .filter((p) => !/^\d+$/.test(p))
+        .join(".");
+      if (dictionary[cleaned]) return dictionary[cleaned];
+      if (dictionary[token]) return dictionary[token];
+      const parts = cleaned.split(".");
+      const last = parts[parts.length - 1] || token;
+      return dictionary[last] || last.replace(/_/g, " ");
+    },
+  );
+
+  // Replace standalone snake_case technical keys
+  for (const [techKey, friendly] of Object.entries(dictionary)) {
+    if (!techKey.includes(".")) {
+      const regex = new RegExp(`\\b${techKey}\\b`, "g");
+      humanized = humanized.replace(regex, friendly);
+    }
+  }
+
+  return humanized;
+};
+
+/**
  * Resolves API and network errors into human-friendly, bilingual messages.
  */
-export const formatApiError = (error, fallback = "ያልተጠበቀ ስህተት አጋጥሟል (An unexpected error occurred)") => {
+export const formatApiError = (
+  error,
+  fallback = "ያልተጠበቀ ስህተት አጋጥሟል (An unexpected error occurred)",
+) => {
   if (!error) return fallback;
 
   if (error.code === "ERR_NETWORK" || !error.response) {
@@ -133,7 +206,9 @@ export const formatApiError = (error, fallback = "ያልተጠበቀ ስህተ�
   }
 
   if (status === 403) {
-    return "ይህን ተግባር ለማከናወን የሚያስችል ፈቃድ የለዎትም (Access denied. You do not have permission for this action.)";
+    return data?.message
+      ? humanizeFieldKeys(data.message)
+      : "ይህን ተግባር ለማከናወን የሚያስችል ፈቃድ የለዎትም (Access denied. You do not have permission for this action.)";
   }
 
   if (status === 404) {
@@ -144,16 +219,20 @@ export const formatApiError = (error, fallback = "ያልተጠበቀ ስህተ�
     return "ጥያቄዎች በዝተዋል፤ እባክዎ ጥቂት ቆይተው እንደገና ይሞክሩ (Too many requests. Please wait a moment and try again.)";
   }
 
-  if (status === 422 && data?.errors) {
-    const firstKey = Object.keys(data.errors)[0];
-    const messages = data.errors[firstKey];
-    if (Array.isArray(messages) && messages.length > 0) {
-      return messages[0];
+  if (status === 422) {
+    if (data?.errors) {
+      const allMsgs = Object.values(data.errors).flat();
+      if (allMsgs.length > 0) {
+        return allMsgs.map((m) => humanizeFieldKeys(m)).join("; ");
+      }
+    }
+    if (data?.message) {
+      return humanizeFieldKeys(data.message);
     }
   }
 
   if (data?.message) {
-    return data.message;
+    return humanizeFieldKeys(data.message);
   }
 
   if (status >= 500) {

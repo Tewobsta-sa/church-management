@@ -18,9 +18,11 @@ import {
 import { teacherService } from "../../services/teacherService";
 import { sectionService } from "../../services/sectionService";
 import { useAuth } from "../../context/AuthContext";
+import { useFeedback } from "../../context/FeedbackContext";
 
 export default function TeachersManagement() {
   const { hasRole } = useAuth();
+  const { notify, confirmAction } = useFeedback();
   const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -109,26 +111,29 @@ export default function TeachersManagement() {
       setModalOpen(false);
       fetchTeachers();
     } catch (err) {
-      alert(
+      notify(
         err.response?.data?.message ||
           err.response?.data?.error ||
           "Operation failed",
+        "error",
       );
     }
   };
 
   const handleDelete = async (id) => {
-    if (
-      !confirm(
+    const confirmed = await confirmAction({
+      title: "Delete Teacher",
+      message:
         "Are you sure you want to delete this teacher? This will also remove them from all their assigned schedules.",
-      )
-    )
-      return;
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!confirmed) return;
     try {
       await teacherService.deleteTeacher(id);
       fetchTeachers();
     } catch (err) {
-      alert("Error deleting teacher");
+      notify(err.response?.data?.message || "Error deleting teacher", "error");
     }
   };
 

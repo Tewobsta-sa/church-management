@@ -7,6 +7,16 @@ export const attendanceService = {
     return response.data;
   },
 
+  bulkMarkAttendance: async ({ assignment_id, student_ids, status, session_date }) => {
+    const response = await api.post("/attendance/bulk", {
+      assignment_id,
+      student_ids,
+      status,
+      session_date,
+    });
+    return response.data;
+  },
+
   getAttendanceRecords: async (params = {}) => {
     const response = await api.get("/attendance", { params });
     return response.data;

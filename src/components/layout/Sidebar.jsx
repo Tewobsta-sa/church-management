@@ -14,7 +14,6 @@ import {
   ShieldCheck,
   Layers,
   UserCheck,
-  QrCode,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import clsx from "clsx";
@@ -24,7 +23,7 @@ const navItems = [
     path: "/dashboard",
     labelKey: "nav.Dashboard",
     icon: LayoutDashboard,
-    roles: ["*"],
+    roles: ["super_admin"],
   },
   {
     path: "/users",
@@ -42,7 +41,7 @@ const navItems = [
     path: "/teachers",
     labelKey: "nav.Teachers",
     icon: UserCheck,
-    roles: ["super_admin", "yesew_habt", "tmhrt_kfl", "mereja_kfl"],
+    roles: ["super_admin", "tmhrt_kfl", "mereja_kfl"],
   },
   {
     path: "/promotions",
@@ -66,25 +65,20 @@ const navItems = [
     path: "/assignments",
     labelKey: "nav.Schedules",
     icon: Calendar,
-    roles: ["super_admin", "yesew_habt", "tmhrt_kfl", "mezmur_kfl", "mereja_kfl"],
+    roles: ["super_admin", "yesew_habt", "tmhrt_kfl", "mezmur_kfl", "mereja_kfl", "teacher"],
   },
   {
     path: "/attendance",
     labelKey: "nav.Attendance",
     icon: CheckSquare,
-    roles: ["super_admin", "yesew_habt", "tmhrt_kfl", "mezmur_kfl", "mereja_kfl"],
+    roles: ["super_admin", "yesew_habt", "tmhrt_kfl", "mezmur_kfl", "mereja_kfl", "teacher"],
   },
-  {
-    path: "/attendance/scanner",
-    labelKey: "nav.MobileScanner",
-    icon: QrCode,
-    roles: ["super_admin", "yesew_habt", "tmhrt_kfl", "mezmur_kfl", "mereja_kfl"],
-  },
+
   {
     path: "/grades",
     labelKey: "nav.Grading",
     icon: CheckSquare,
-    roles: ["super_admin", "tmhrt_kfl", "mereja_kfl"],
+    roles: ["super_admin", "tmhrt_kfl", "mereja_kfl", "teacher"],
   },
   {
     path: "/results",
@@ -112,7 +106,7 @@ const navItems = [
   },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ onNavClick }) {
   const { user, logout, hasRole } = useAuth();
   const { t } = useTranslation();
 
@@ -128,7 +122,8 @@ export default function Sidebar() {
     yesew_habt: "/students",
     tmhrt_kfl: "/students",
     mezmur_kfl: "/mezmur",
-    mereja_kfl: "/dashboard",
+    mereja_kfl: "/students",
+    teacher: "/grades",
   };
 
   const getDefaultRoute = () => {
@@ -177,6 +172,7 @@ export default function Sidebar() {
             <NavLink
               key={item.path}
               to={item.path}
+              onClick={onNavClick}
               className={({ isActive }) =>
                 clsx(
                   "flex items-center px-4 py-3 rounded-2xl transition-all duration-300 group relative font-semibold text-sm",

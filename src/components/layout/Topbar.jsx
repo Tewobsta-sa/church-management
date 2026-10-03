@@ -5,7 +5,7 @@ import { useState } from "react";
 import ProfileModal from "./ProfileModal";
 import { formatEthiopianDate } from "../../utils/ethiopianDate";
 
-export default function Topbar() {
+export default function Topbar({ onMenuClick }) {
   const { user } = useAuth();
   const { t, i18n } = useTranslation();
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -31,7 +31,11 @@ export default function Topbar() {
         {/* Left side: Mobile menu & Context Title */}
         <div className="flex items-center gap-4">
           <div className="lg:hidden">
-            <button className="p-2.5 rounded-xl text-slate-500 hover:text-brand-600 hover:bg-brand-50 transition-colors">
+            <button
+              onClick={onMenuClick}
+              className="p-2.5 rounded-xl text-slate-500 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+              aria-label="Open navigation"
+            >
               <Menu className="h-6 w-6" />
             </button>
           </div>

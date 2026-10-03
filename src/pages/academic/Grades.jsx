@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
-import { Search, Save, BookOpen } from "lucide-react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { Search, Save, BookOpen, Download, Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../../context/AuthContext";
 import { courseService } from "../../services/courseService";
 import { gradeService } from "../../services/gradeService";
 import { translateTrack } from "../../i18n/tracks";
+import { formatApiError, humanizeFieldKeys } from "../../services/api";
 
 /**
  * Letter grade based on percentage (0-100).
@@ -49,9 +50,12 @@ export default function Grades() {
   const [grades, setGrades] = useState({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importErrors, setImportErrors] = useState([]);
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
   const [search, setSearch] = useState("");
+  const fileInputRef = useRef(null);
 
   // Load the teacher's courses (or admin view: all courses with assessments)
   useEffect(() => {
@@ -76,7 +80,7 @@ export default function Grades() {
           setMyCourses(list);
         }
       } catch (err) {
-        setError(err.response?.data?.message || t("common.serverError"));
+        setError(formatApiError(err));
       } finally {
         setLoading(false);
       }
@@ -92,42 +96,99 @@ export default function Grades() {
     }
   }, [myCourses, selected]);
 
-  // When selected changes, load assessments + students
-  useEffect(() => {
-    if (!selected) return;
-    const load = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        setSuccessMsg(null);
-        const [assessRes, studentsRes] = await Promise.all([
-          courseService.assessments(selected.course_id),
-          courseService.courseStudents(selected.course_id, selected.section_id),
-        ]);
-        const assessList = Array.isArray(assessRes)
-          ? assessRes
-          : assessRes?.data || [];
-        const studentList = studentsRes?.students || [];
-        setAssessments(assessList);
-        setStudents(studentList);
+  // Load assessments + students for currently selected course
+  const loadCourseData = useCallback(async () => {
+    if (!selected?.course_id) return;
+    try {
+      setLoading(true);
+      setError(null);
+      const [assessRes, studentsRes] = await Promise.all([
+        courseService.assessments(selected.course_id),
+        courseService.courseStudents(selected.course_id, selected.section_id),
+      ]);
+      const assessList = Array.isArray(assessRes)
+        ? assessRes
+        : assessRes?.data || [];
+      const studentList = studentsRes?.students || [];
+      setAssessments(assessList);
+      setStudents(studentList);
 
-        // Build initial grades map from students[].grades[]
-        const initial = {};
-        studentList.forEach((s) => {
-          initial[s.id] = {};
-          (s.grades || []).forEach((g) => {
-            initial[s.id][g.assessment_id] = g.score;
-          });
+      // Build initial grades map from students[].grades[]
+      const initial = {};
+      studentList.forEach((s) => {
+        initial[s.id] = {};
+        (s.grades || []).forEach((g) => {
+          initial[s.id][g.assessment_id] = g.score;
         });
-        setGrades(initial);
-      } catch (err) {
-        setError(err.response?.data?.message || t("common.serverError"));
-      } finally {
-        setLoading(false);
+      });
+      setGrades(initial);
+    } catch (err) {
+      setError(formatApiError(err));
+    } finally {
+      setLoading(false);
+    }
+  }, [selected, t]);
+
+  useEffect(() => {
+    loadCourseData();
+  }, [loadCourseData]);
+
+  const handleDownloadTemplate = async () => {
+    if (!selected?.course_id) return;
+    try {
+      setLoading(true);
+      const blob = await gradeService.downloadTemplate(
+        selected.course_id,
+        selected.section_id,
+      );
+      const url = window.URL.createObjectURL(new Blob([blob]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute(
+        "download",
+        `grades_template_course_${selected.course_id}.csv`,
+      );
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to download template");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !selected?.course_id) return;
+
+    // Reset so same file can be selected again
+    e.target.value = "";
+
+    try {
+      setImporting(true);
+      setError(null);
+      setSuccessMsg(null);
+      setImportErrors([]);
+
+      const res = await gradeService.importGrades(selected.course_id, file);
+      setSuccessMsg(res.message || "Grades imported successfully!");
+      if (res.errors && res.errors.length > 0) {
+        setImportErrors(res.errors);
       }
-    };
-    load();
-  }, [selected]);
+      await loadCourseData();
+    } catch (err) {
+      setError(
+        formatApiError(
+          err,
+          "Failed to import grades. Please check your CSV format.",
+        ),
+      );
+    } finally {
+      setImporting(false);
+    }
+  };
 
   const totalWeight = useMemo(
     () => assessments.reduce((acc, a) => acc + (Number(a.weight) || 0), 0),
@@ -184,7 +245,7 @@ export default function Grades() {
           errs
             .map(
               (e) =>
-                `Row ${(e.index ?? 0) + 1}: ${e.message || "Validation failed"}`,
+                `Row ${(e.index ?? 0) + 1}: ${humanizeFieldKeys(e.message) || "Validation failed"}`,
             )
             .join("\n"),
         );
@@ -192,7 +253,7 @@ export default function Grades() {
         setSuccessMsg(t("grades.savedCount", { count: okCount }));
       }
     } catch (err) {
-      setError(err.response?.data?.message || t("common.serverError"));
+      setError(formatApiError(err));
     } finally {
       setSaving(false);
     }
@@ -225,14 +286,43 @@ export default function Grades() {
             {t("grades.subtitle")}
           </p>
         </div>
-        <button
-          onClick={handleSave}
-          disabled={saving || !selected || students.length === 0}
-          className="flex items-center gap-2 bg-linear-to-r from-brand-600 to-brand-500 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-brand-500/30 hover:-translate-y-0.5 transition-all disabled:opacity-50"
-        >
-          <Save className="w-5 h-5" />
-          {saving ? t("common.saving") : t("grades.saveGrades")}
-        </button>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept=".csv,text/csv"
+            className="hidden"
+          />
+          <button
+            type="button"
+            onClick={handleDownloadTemplate}
+            disabled={loading || !selected?.course_id}
+            title="Download CSV template prefilled with enrolled students and assessment columns"
+            className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-4 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all disabled:opacity-50"
+          >
+            <Download className="w-4 h-4 text-brand-600" />
+            <span>Download CSV Template</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importing || loading || !selected?.course_id}
+            title="Upload CSV to bulk import grades for this course"
+            className="flex items-center gap-2 bg-white border border-brand-200 text-brand-700 hover:bg-brand-50 px-4 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all disabled:opacity-50"
+          >
+            <Upload className="w-4 h-4 text-brand-600" />
+            <span>{importing ? "Importing…" : "Import Grades (CSV)"}</span>
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving || !selected || students.length === 0}
+            className="flex items-center gap-2 bg-linear-to-r from-brand-600 to-brand-500 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-brand-500/30 hover:-translate-y-0.5 transition-all disabled:opacity-50"
+          >
+            <Save className="w-5 h-5" />
+            {saving ? t("common.saving") : t("grades.saveGrades")}
+          </button>
+        </div>
       </div>
 
       <div className="glass-panel p-4 flex flex-col lg:flex-row gap-4 items-stretch lg:items-center border-b-[3px] border-b-brand-500">
@@ -245,7 +335,7 @@ export default function Grades() {
               {t("grades.activeCourse")}
             </label>
             <select
-              className="w-full max-w-full bg-white border border-slate-200 rounded-lg outline-none font-bold text-base text-slate-800 px-3 py-2 cursor-pointer hover:border-brand-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 transition-colors"
+              className="w-full max-w-full bg-white border border-slate-200 rounded-xl outline-none font-bold text-sm text-slate-800 px-3.5 py-2.5 cursor-pointer hover:border-brand-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 transition-all shadow-xs"
               value={
                 selected
                   ? `${selected.course_id}:${selected.section_id ?? ""}`
@@ -305,6 +395,16 @@ export default function Grades() {
       {successMsg && (
         <div className="bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg px-4 py-3">
           {successMsg}
+        </div>
+      )}
+      {importErrors.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 text-xs rounded-xl p-4 space-y-1">
+          <p className="font-bold">Some rows had issues during CSV import:</p>
+          <ul className="list-disc list-inside space-y-0.5 text-slate-700">
+            {importErrors.map((err, i) => (
+              <li key={i}>{err}</li>
+            ))}
+          </ul>
         </div>
       )}
 

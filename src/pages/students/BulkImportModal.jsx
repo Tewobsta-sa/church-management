@@ -2,6 +2,7 @@ import { useState } from "react";
 import { X, Upload, Download, FileSpreadsheet, CheckCircle2, AlertCircle, Info } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { studentService } from "../../services/studentService";
+import { formatApiError, humanizeFieldKeys } from "../../services/api";
 
 export default function BulkImportModal({ isOpen, onClose, track = "Regular", onSuccess }) {
   const { t } = useTranslation();
@@ -24,7 +25,7 @@ export default function BulkImportModal({ isOpen, onClose, track = "Regular", on
       a.remove();
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      setErrorMsg(err.response?.data?.message || err.message || "Template download failed");
+      setErrorMsg(formatApiError(err, "Template download failed"));
     }
   };
 
@@ -44,7 +45,7 @@ export default function BulkImportModal({ isOpen, onClose, track = "Regular", on
         onSuccess?.();
       }
     } catch (err) {
-      setErrorMsg(err.response?.data?.message || "Failed to import file.");
+      setErrorMsg(formatApiError(err, "Failed to import file."));
       if (err.response?.data?.errors) {
         setResult({ created_count: 0, errors: err.response.data.errors });
       }
@@ -118,7 +119,7 @@ export default function BulkImportModal({ isOpen, onClose, track = "Regular", on
               <li><strong>name*</strong>, <strong>sex*</strong> (Male/Female), <strong>education_level*</strong></li>
               <li><strong>family_guardian_name*</strong> & <strong>family_guardian_phone*</strong></li>
               <li><strong>subcity*</strong>, <strong>woreda*</strong>, and <strong>section_name*</strong></li>
-              <li>Optional: birth_date, grade_level, school/office, kebele, house_no, status</li>
+              <li>Optional: birth_date, grade_level, school/office, kebele, house_no, status, shift (day/night)</li>
             </ul>
           </div>
 
@@ -170,7 +171,7 @@ export default function BulkImportModal({ isOpen, onClose, track = "Regular", on
                   <ul className="list-disc list-inside space-y-1 text-red-600 text-[11px]">
                     {result.errors.slice(0, 30).map((err, i) => (
                       <li key={i}>
-                        Row {err.row}: {Array.isArray(err.errors) ? err.errors.join("; ") : err.message}
+                        Row {err.row}: {Array.isArray(err.errors) ? err.errors.map(humanizeFieldKeys).join("; ") : humanizeFieldKeys(err.message)}
                       </li>
                     ))}
                   </ul>

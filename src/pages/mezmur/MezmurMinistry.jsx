@@ -27,11 +27,14 @@ import {
 import jsPDF from "jspdf";
 import { mezmurService } from "../../services/mezmurService";
 import { useAuth } from "../../context/AuthContext";
+import { useFeedback } from "../../context/FeedbackContext";
 import EthiopianDateInput from "../../components/common/EthiopianDateInput";
 import { formatEthiopianDate } from "../../utils/ethiopianDate";
+import { captureElement } from "../../utils/pdfCapture";
 
 export default function MezmurMinistry() {
   const { hasRole } = useAuth();
+  const { notify, confirmAction } = useFeedback();
 
   const isSuperAdmin = hasRole("super_admin");
   const isMezmurAdmin = hasRole("mezmur_kfl") || hasRole("mezmur_office_admin");
@@ -89,182 +92,159 @@ export default function MezmurMinistry() {
   const [creatingMinistry, setCreatingMinistry] = useState(false);
   const [exportingPdfId, setExportingPdfId] = useState(null);
 
+  // Render the ministry roster as Amharic HTML pages, capture each to canvas,
+  // and assemble a portrait A4 PDF. html2canvas paints real Ethiopic glyphs via
+  // system fonts — jsPDF's built-in fonts cannot render Amharic text.
   const handleExportMinistryPDF = async (ministry) => {
+    let container = null;
     try {
       setExportingPdfId(ministry.id);
       const res = await mezmurService.getMinistryMembers(ministry.id);
       const members = res.members || [];
 
-      const doc = new jsPDF("p", "mm", "a4");
-      const pageWidth = doc.internal.pageSize.getWidth();
+      const escapeHtml = (value) =>
+        String(value ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
 
-      // Top Header Church Branding
-      doc.setFillColor(69, 26, 3);
-      doc.rect(0, 0, pageWidth, 28, "F");
+      const fontStack =
+        '"Noto Sans Ethiopic","Nyala","Ebrima","Abyssinica SIL",sans-serif';
+      const PAGE_W = 794; // 210mm at 96dpi
+      const PAGE_H = 1123; // 297mm at 96dpi
+      const ROWS_FIRST = 24;
+      const ROWS_NEXT = 31;
 
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(14);
-      doc.setFont("helvetica", "bold");
-      doc.text(
-        "JATE KIDANE MEHRET FNOTE SEMAETAT SUNDAY SCHOOL",
-        pageWidth / 2,
-        11,
-        { align: "center" },
-      );
-
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "normal");
-      doc.text(
-        "MINISTRY OF SERVICE & CHOIR DEPARTMENT • OFFICIAL ROSTER",
-        pageWidth / 2,
-        18,
-        { align: "center" },
-      );
-      doc.text(
-        "Date Generated: " + formatEthiopianDate(new Date()),
-        pageWidth / 2,
-        23,
-        { align: "center" },
-      );
-
-      // Ministry Information Box
-      doc.setFillColor(248, 250, 252);
-      doc.setDrawColor(226, 232, 240);
-      doc.roundedRect(14, 34, pageWidth - 28, 26, 3, 3, "FD");
-
-      doc.setTextColor(30, 41, 59);
-      doc.setFontSize(12);
-      doc.setFont("helvetica", "bold");
-      doc.text("Ministry: " + (ministry.name || "N/A"), 18, 42);
-
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(100, 116, 139);
-      doc.text(
-        "Ministry Date: " +
-          (ministry.ministry_date
-            ? formatEthiopianDate(`${ministry.ministry_date}T00:00:00`)
-            : "Continuous Active"),
-        18,
-        49,
-      );
-      doc.text(
-        "Location: " + (ministry.location || "Addis Ababa, Jate"),
-        18,
-        55,
-      );
-
-      doc.text("Total Assigned Members: " + members.length, pageWidth - 70, 49);
-      doc.text(
-        "Notes: " + (ministry.notes ? ministry.notes.slice(0, 30) : "None"),
-        pageWidth - 70,
-        55,
-      );
-
-      // Members Table Header
-      let y = 68;
-      doc.setFillColor(241, 245, 249);
-      doc.setDrawColor(203, 213, 225);
-      doc.rect(14, y, pageWidth - 28, 8, "FD");
-
-      doc.setTextColor(15, 23, 42);
-      doc.setFontSize(8.5);
-      doc.setFont("helvetica", "bold");
-      doc.text("#", 17, y + 5.5);
-      doc.text("STUDENT NAME", 26, y + 5.5);
-      doc.text("STUDENT ID", 86, y + 5.5);
-      doc.text("SECTION / CLASS", 120, y + 5.5);
-      doc.text("PHONE / CONTACT", 160, y + 5.5);
-
-      y += 8;
-
+      const chunks = [];
       if (members.length === 0) {
-        doc.setFont("helvetica", "italic");
-        doc.setTextColor(148, 163, 184);
-        doc.text(
-          "No members assigned to this ministry yet.",
-          pageWidth / 2,
-          y + 10,
-          { align: "center" },
-        );
-        y += 20;
+        chunks.push([]);
       } else {
-        doc.setFont("helvetica", "normal");
-        members.forEach((m, idx) => {
-          if (y > 265) {
-            doc.addPage();
-            y = 20;
-            // Repeat table header on new page
-            doc.setFillColor(241, 245, 249);
-            doc.rect(14, y, pageWidth - 28, 8, "FD");
-            doc.setFont("helvetica", "bold");
-            doc.setTextColor(15, 23, 42);
-            doc.text("#", 17, y + 5.5);
-            doc.text("STUDENT NAME", 26, y + 5.5);
-            doc.text("STUDENT ID", 86, y + 5.5);
-            doc.text("SECTION / CLASS", 120, y + 5.5);
-            doc.text("PHONE / CONTACT", 160, y + 5.5);
-            doc.setFont("helvetica", "normal");
-            y += 8;
-          }
-
-          if (idx % 2 === 1) {
-            doc.setFillColor(248, 250, 252);
-            doc.rect(14, y, pageWidth - 28, 7.5, "F");
-          }
-
-          doc.setDrawColor(241, 245, 249);
-          doc.line(14, y + 7.5, pageWidth - 14, y + 7.5);
-
-          doc.setTextColor(51, 65, 85);
-          doc.text(String(idx + 1), 17, y + 5);
-          doc.text(
-            String(m.name || m.first_name || "").slice(0, 32),
-            26,
-            y + 5,
-          );
-          doc.text(String(m.student_id || "N/A"), 86, y + 5);
-          doc.text(
-            String(m.section?.name || m.section_name || "-").slice(0, 20),
-            120,
-            y + 5,
-          );
-          doc.text(
-            String(m.phone_number || m.family_guardian_phone || "-"),
-            160,
-            y + 5,
-          );
-
-          y += 7.5;
-        });
+        chunks.push(members.slice(0, ROWS_FIRST));
+        for (let i = ROWS_FIRST; i < members.length; i += ROWS_NEXT) {
+          chunks.push(members.slice(i, i + ROWS_NEXT));
+        }
       }
 
-      // Verification / Signature blocks at bottom
-      y = Math.max(y + 12, 255);
-      if (y > 270) {
-        doc.addPage();
-        y = 30;
+      const generatedOn = formatEthiopianDate(new Date());
+      const ministryDate = ministry.ministry_date
+        ? formatEthiopianDate(`${ministry.ministry_date}T00:00:00`)
+        : "ቀጣይ አገልግሎት";
+
+      const headerHtml = `
+        <div style="background:#451a03;color:#fff;text-align:center;padding:22px 24px 18px;">
+          <div style="font-size:21px;font-weight:800;line-height:1.35;">ጃቴ ኪዳነ ምሕረት ፍኖተ ሰማዕታት ሰንበት ትምህርት ቤት</div>
+          <div style="font-size:12.5px;opacity:.9;margin-top:4px;">የአገልግሎትና የመዝሙር ክፍል • የአባላት ይፋዊ ዝርዝር</div>
+          <div style="font-size:11px;opacity:.75;margin-top:2px;">የታተመበት ቀን፦ ${escapeHtml(generatedOn)}</div>
+        </div>`;
+
+      const slimHeaderHtml = `
+        <div style="background:#451a03;color:#fff;text-align:center;padding:12px 24px;">
+          <div style="font-size:14px;font-weight:800;">${escapeHtml(ministry.name || "አገልግሎት")} — ቀጣይ</div>
+        </div>`;
+
+      const infoBoxHtml = `
+        <div style="margin:16px 20px 0;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 16px;display:flex;justify-content:space-between;gap:16px;">
+          <div>
+            <div style="font-size:15px;font-weight:800;color:#1e293b;">አገልግሎት፦ ${escapeHtml(ministry.name || "—")}</div>
+            <div style="font-size:11.5px;color:#64748b;margin-top:6px;">የአገልግሎት ቀን፦ ${escapeHtml(ministryDate)}</div>
+            <div style="font-size:11.5px;color:#64748b;margin-top:3px;">ቦታ፦ ${escapeHtml(ministry.location || "ጃቴ፣ አዲስ አበባ")}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:11.5px;color:#64748b;">ጠቅላላ አባላት፦ <b style="color:#1e293b;">${members.length}</b></div>
+            <div style="font-size:11.5px;color:#64748b;margin-top:6px;">ማስታወሻ፦ ${escapeHtml(ministry.notes ? ministry.notes.slice(0, 40) : "—")}</div>
+          </div>
+        </div>`;
+
+      const tableHeaderHtml = `
+        <tr>
+          <th style="width:36px;text-align:left;padding:8px 10px;">#</th>
+          <th style="text-align:left;padding:8px 10px;">የተማሪ ስም</th>
+          <th style="width:110px;text-align:left;padding:8px 10px;">የተማሪ መለያ</th>
+          <th style="width:130px;text-align:left;padding:8px 10px;">ክፍል</th>
+          <th style="width:130px;text-align:left;padding:8px 10px;">ስልክ ቁጥር</th>
+        </tr>`;
+
+      const signatureHtml = `
+        <div style="margin:auto 20px 28px;padding-top:26px;display:flex;justify-content:space-between;">
+          <div style="width:220px;text-align:center;">
+            <div style="border-top:1px solid #cbd5e1;padding-top:6px;font-size:11px;color:#64748b;font-weight:700;">የመዝሙር ክፍል ኃላፊ</div>
+          </div>
+          <div style="width:220px;text-align:center;">
+            <div style="border-top:1px solid #cbd5e1;padding-top:6px;font-size:11px;color:#64748b;font-weight:700;">የሰው ሀብት ክፍል ኃላፊ</div>
+          </div>
+        </div>`;
+
+      container = document.createElement("div");
+      container.style.cssText = `position:fixed;left:-10000px;top:0;width:${PAGE_W}px;z-index:-1;`;
+      document.body.appendChild(container);
+
+      const pageEls = [];
+      let rowOffset = 0;
+      chunks.forEach((chunk, pageIdx) => {
+        const isFirst = pageIdx === 0;
+        const isLast = pageIdx === chunks.length - 1;
+
+        const rowsHtml =
+          members.length === 0
+            ? `<tr><td colspan="5" style="text-align:center;padding:30px;color:#94a3b8;font-style:italic;">እስካሁን በዚህ አገልግሎት ምንም አባል አልተመደበም።</td></tr>`
+            : chunk
+                .map((m, i) => {
+                  const idx = rowOffset + i;
+                  const name = m.name || m.first_name || "";
+                  const sid = m.student_id || "—";
+                  const section = m.section?.name || m.section_name || "—";
+                  const phone = m.phone_number || m.family_guardian_phone || "—";
+                  const bg = idx % 2 === 1 ? "background:#f8fafc;" : "";
+                  return `<tr style="${bg}">
+                    <td style="padding:7px 10px;border-bottom:1px solid #f1f5f9;color:#475569;">${idx + 1}</td>
+                    <td style="padding:7px 10px;border-bottom:1px solid #f1f5f9;color:#334155;font-weight:600;">${escapeHtml(name)}</td>
+                    <td style="padding:7px 10px;border-bottom:1px solid #f1f5f9;color:#475569;">${escapeHtml(sid)}</td>
+                    <td style="padding:7px 10px;border-bottom:1px solid #f1f5f9;color:#475569;">${escapeHtml(section)}</td>
+                    <td style="padding:7px 10px;border-bottom:1px solid #f1f5f9;color:#475569;">${escapeHtml(phone)}</td>
+                  </tr>`;
+                })
+                .join("");
+        rowOffset += chunk.length;
+
+        const pageEl = document.createElement("div");
+        pageEl.style.cssText = `width:${PAGE_W}px;min-height:${PAGE_H}px;background:#fff;display:flex;flex-direction:column;font-family:${fontStack};box-sizing:border-box;`;
+        pageEl.innerHTML = `
+          ${isFirst ? headerHtml : slimHeaderHtml}
+          ${isFirst ? infoBoxHtml : ""}
+          <div style="margin:16px 20px 0;">
+            <table style="width:100%;border-collapse:collapse;font-size:12px;">
+              <thead style="background:#f1f5f9;border:1px solid #cbd5e1;color:#0f172a;font-size:11px;text-transform:uppercase;">
+                ${tableHeaderHtml}
+              </thead>
+              <tbody>${rowsHtml}</tbody>
+            </table>
+          </div>
+          ${isLast ? signatureHtml : ""}`;
+        container.appendChild(pageEl);
+        pageEls.push(pageEl);
+      });
+
+      const doc = new jsPDF("p", "mm", "a4");
+      for (let i = 0; i < pageEls.length; i++) {
+        const canvas = await captureElement(pageEls[i]);
+        const imgData = canvas.toDataURL("image/jpeg", 0.95);
+        const imgHeight = Math.min(297, (canvas.height * 210) / canvas.width);
+        if (i > 0) doc.addPage();
+        doc.addImage(imgData, "JPEG", 0, 0, 210, imgHeight);
       }
-
-      doc.setDrawColor(203, 213, 225);
-      doc.line(18, y, 75, y);
-      doc.line(pageWidth - 75, y, pageWidth - 18, y);
-
-      doc.setFontSize(8);
-      doc.setTextColor(100, 116, 139);
-      doc.setFont("helvetica", "bold");
-      doc.text("Mezmur Department Head", 18, y + 5);
-      doc.text("Ye Sew Habt Department", pageWidth - 75, y + 5);
 
       doc.save(
         `Ministry_Roster_${(ministry.name || "export").replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`,
       );
     } catch (err) {
       console.error("PDF generation failed", err);
-      alert(
+      notify(
         "Failed to export ministry PDF: " + (err.message || "Server error"),
+        "error",
       );
     } finally {
+      if (container) container.remove();
       setExportingPdfId(null);
     }
   };
@@ -371,7 +351,7 @@ export default function MezmurMinistry() {
         location: ministryLocation || null,
         notes: ministryNotes || null,
       });
-      alert("Ministry created successfully!");
+      notify("Ministry created successfully!", "success");
       setCreateMinistryModal(false);
       setMinistryName("");
       setMinistryLocation("");
@@ -384,7 +364,10 @@ export default function MezmurMinistry() {
         setQueueTargetMinistryId(res.data.id);
       }
     } catch (err) {
-      alert("Failed to create ministry");
+      notify(
+        err.response?.data?.message || "Failed to create ministry",
+        "error",
+      );
     } finally {
       setCreatingMinistry(false);
     }
@@ -407,7 +390,7 @@ export default function MezmurMinistry() {
       fetchData();
       loadExamDetails(res);
     } catch (err) {
-      alert("Failed to create exam");
+      notify(err.response?.data?.message || "Failed to create exam", "error");
     }
   };
 
@@ -440,11 +423,14 @@ export default function MezmurMinistry() {
         mezmur_exam_id: selectedExam.id,
         results: payloadResults,
       });
-      alert("Exam results saved successfully!");
+      notify("Exam results saved successfully!", "success");
       loadExamDetails(selectedExam);
       fetchData();
     } catch (err) {
-      alert("Failed to save exam results");
+      notify(
+        err.response?.data?.message || "Failed to save exam results",
+        "error",
+      );
     } finally {
       setSavingResults(false);
     }
@@ -459,17 +445,16 @@ export default function MezmurMinistry() {
       .map(([sid]) => Number(sid));
 
     if (passedStudentIds.length === 0) {
-      alert("No students marked as 'Passed' to send.");
+      notify("No students marked as 'Passed' to send.", "warning");
       return;
     }
 
-    if (
-      !confirm(
-        `Send ${passedStudentIds.length} passed student(s) to Yesew Habt for ministry assignment?`,
-      )
-    ) {
-      return;
-    }
+    const confirmed = await confirmAction({
+      title: "Send to Yesew Habt",
+      message: `Send ${passedStudentIds.length} passed student(s) to Yesew Habt for ministry assignment?`,
+      confirmLabel: "Send",
+    });
+    if (!confirmed) return;
 
     setSendingPassed(true);
     try {
@@ -477,8 +462,9 @@ export default function MezmurMinistry() {
         mezmur_exam_id: selectedExam.id,
         student_ids: passedStudentIds,
       });
-      alert(
+      notify(
         res.message || "Passed students successfully forwarded to Yesew Habt!",
+        "success",
       );
       loadExamDetails(selectedExam);
       fetchData();
@@ -486,7 +472,10 @@ export default function MezmurMinistry() {
         fetchPassedQueue();
       }
     } catch (err) {
-      alert("Failed to forward passed students.");
+      notify(
+        err.response?.data?.message || "Failed to forward passed students.",
+        "error",
+      );
     } finally {
       setSendingPassed(false);
     }
@@ -494,7 +483,10 @@ export default function MezmurMinistry() {
 
   const handleBulkAssignFromExam = async () => {
     if (selectedExamStudents.length === 0) {
-      alert("Please select at least one student to assign to a ministry.");
+      notify(
+        "Please select at least one student to assign to a ministry.",
+        "warning",
+      );
       return;
     }
 
@@ -503,8 +495,9 @@ export default function MezmurMinistry() {
       selectedExam?.ministry_id ||
       (ministries.length > 0 ? ministries[0].id : null);
     if (!targetId) {
-      alert(
+      notify(
         "No ministry selected or available. Please create a ministry first.",
+        "warning",
       );
       return;
     }
@@ -514,13 +507,12 @@ export default function MezmurMinistry() {
     );
     const mName = ministryObj?.name || "the selected ministry";
 
-    if (
-      !confirm(
-        `Assign ${selectedExamStudents.length} student(s) directly to ministry '${mName}'?`,
-      )
-    ) {
-      return;
-    }
+    const confirmed = await confirmAction({
+      title: "Assign Students",
+      message: `Assign ${selectedExamStudents.length} student(s) directly to ministry '${mName}'?`,
+      confirmLabel: "Assign",
+    });
+    if (!confirmed) return;
 
     setBulkAssigningExam(true);
     try {
@@ -529,7 +521,10 @@ export default function MezmurMinistry() {
         student_ids: selectedExamStudents,
         mezmur_exam_id: selectedExam?.id,
       });
-      alert(res.message || "Students successfully assigned to ministry!");
+      notify(
+        res.message || "Students successfully assigned to ministry!",
+        "success",
+      );
       setSelectedExamStudents([]);
       loadExamDetails(selectedExam);
       fetchData();
@@ -537,8 +532,9 @@ export default function MezmurMinistry() {
         fetchPassedQueue();
       }
     } catch (err) {
-      alert(
+      notify(
         err.response?.data?.message || "Failed to assign students to ministry.",
+        "error",
       );
     } finally {
       setBulkAssigningExam(false);
@@ -547,7 +543,7 @@ export default function MezmurMinistry() {
 
   const handleBulkAssignFromQueue = async () => {
     if (selectedQueueIds.length === 0) {
-      alert("Please select at least one candidate from the queue.");
+      notify("Please select at least one candidate from the queue.", "warning");
       return;
     }
 
@@ -555,7 +551,7 @@ export default function MezmurMinistry() {
       queueTargetMinistryId ||
       (ministries.length > 0 ? ministries[0].id : null);
     if (!targetId) {
-      alert("Please choose or create a target ministry.");
+      notify("Please choose or create a target ministry.", "warning");
       return;
     }
 
@@ -564,11 +560,12 @@ export default function MezmurMinistry() {
     );
     const mName = ministryObj?.name || "the chosen ministry";
 
-    if (
-      !confirm(`Assign ${selectedQueueIds.length} candidate(s) to '${mName}'?`)
-    ) {
-      return;
-    }
+    const confirmedQueue = await confirmAction({
+      title: "Assign Candidates",
+      message: `Assign ${selectedQueueIds.length} candidate(s) to '${mName}'?`,
+      confirmLabel: "Assign",
+    });
+    if (!confirmedQueue) return;
 
     setBulkAssigningQueue(true);
     try {
@@ -576,12 +573,18 @@ export default function MezmurMinistry() {
         ministry_id: Number(targetId),
         student_ids: selectedQueueIds,
       });
-      alert(res.message || "Candidates successfully assigned to ministry!");
+      notify(
+        res.message || "Candidates successfully assigned to ministry!",
+        "success",
+      );
       setSelectedQueueIds([]);
       fetchPassedQueue();
       fetchData();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to assign candidates.");
+      notify(
+        err.response?.data?.message || "Failed to assign candidates.",
+        "error",
+      );
     } finally {
       setBulkAssigningQueue(false);
     }
@@ -609,6 +612,29 @@ export default function MezmurMinistry() {
     } else {
       setSelectedExamStudents(passedStudentCandidates.map((st) => st.id));
     }
+  };
+
+  // Select/deselect every visible candidate (used for bulk pass/fail marking)
+  const toggleSelectAllCandidates = () => {
+    const ids = filteredCandidates.map((st) => st.id);
+    const allSelected =
+      ids.length > 0 && ids.every((id) => selectedExamStudents.includes(id));
+    setSelectedExamStudents(allSelected ? [] : ids);
+  };
+
+  // Bulk mark selected candidates as passed / failed / pending
+  const handleBulkMarkStatus = (status) => {
+    if (selectedExamStudents.length === 0) return;
+    setExamResults((prev) => {
+      const next = { ...prev };
+      selectedExamStudents.forEach((sid) => {
+        next[sid] = {
+          ...(next[sid] || { score: "", notes: "" }),
+          status,
+        };
+      });
+      return next;
+    });
   };
 
   const toggleSelectAllQueue = () => {
@@ -1013,6 +1039,41 @@ export default function MezmurMinistry() {
                   </div>
                 </div>
 
+                {/* Bulk Pass/Fail Marking Bar */}
+                {canManageMezmur && selectedExamStudents.length > 0 && (
+                  <div className="px-6 py-3 bg-brand-50/70 border-b border-brand-100 flex flex-wrap items-center justify-between gap-3">
+                    <span className="text-xs font-bold text-brand-800">
+                      {selectedExamStudents.length} candidate(s) selected for
+                      evaluation
+                    </span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        onClick={() => handleBulkMarkStatus("passed")}
+                        className="flex items-center gap-1.5 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-sm transition-all cursor-pointer"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        Mark Passed
+                      </button>
+                      <button
+                        onClick={() => handleBulkMarkStatus("failed")}
+                        className="flex items-center gap-1.5 px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-sm transition-all cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        Mark Failed
+                      </button>
+                      <button
+                        onClick={() => handleBulkMarkStatus("pending")}
+                        className="px-4 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer"
+                      >
+                        Reset Pending
+                      </button>
+                      <span className="text-[10px] font-bold text-slate-400">
+                        then press "Save Scores"
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Bulk Assignment Bar */}
                 {isSuperAdmin && (
                   <div className="px-6 py-3.5 bg-linear-to-r from-emerald-50 via-teal-50 to-slate-50 border-b border-emerald-100 flex flex-wrap items-center justify-between gap-4">
@@ -1094,18 +1155,19 @@ export default function MezmurMinistry() {
                   <table className="w-full text-left">
                     <thead>
                       <tr className="bg-white text-[10px] uppercase font-bold text-slate-400 tracking-wider sticky top-0 z-10 border-b border-slate-200">
-                        {isSuperAdmin && (
+                        {(canManageMezmur || isSuperAdmin) && (
                           <th className="px-4 py-3.5 w-10 text-center">
                             <input
                               type="checkbox"
                               checked={
-                                passedStudentCandidates.length > 0 &&
-                                selectedExamStudents.length ===
-                                  passedStudentCandidates.length
+                                filteredCandidates.length > 0 &&
+                                filteredCandidates.every((st) =>
+                                  selectedExamStudents.includes(st.id),
+                                )
                               }
-                              onChange={toggleSelectAllPassed}
+                              onChange={toggleSelectAllCandidates}
                               className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                              title="Select/Deselect All Passed"
+                              title="Select/Deselect All Candidates"
                             />
                           </th>
                         )}
@@ -1152,7 +1214,7 @@ export default function MezmurMinistry() {
                               key={st.id}
                               className="hover:bg-slate-50/60 transition-colors"
                             >
-                              {isSuperAdmin && (
+                              {(canManageMezmur || isSuperAdmin) && (
                                 <td className="px-4 py-4 text-center">
                                   <input
                                     type="checkbox"
@@ -1493,8 +1555,9 @@ export default function MezmurMinistry() {
                                   ? ministries[0].id
                                   : null);
                               if (!targetId) {
-                                alert(
+                                notify(
                                   "Please select or create a ministry first.",
+                                  "warning",
                                 );
                                 return;
                               }
@@ -1507,14 +1570,19 @@ export default function MezmurMinistry() {
                                     ministry_id: Number(targetId),
                                     student_ids: [sid],
                                   });
-                                alert(
+                                notify(
                                   res.message ||
                                     "Student assigned successfully!",
+                                  "success",
                                 );
                                 fetchPassedQueue();
                                 fetchData();
                               } catch (err) {
-                                alert("Failed to assign student to ministry.");
+                                notify(
+                                  err.response?.data?.message ||
+                                    "Failed to assign student to ministry.",
+                                  "error",
+                                );
                               }
                             }}
                             className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold uppercase tracking-wider text-[10px] shadow cursor-pointer"

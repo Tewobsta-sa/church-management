@@ -17,8 +17,10 @@ import {
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { attendanceService } from "../../services/attendanceService";
 import { assignmentService } from "../../services/assignmentService";
+import { useFeedback } from "../../context/FeedbackContext";
 
 export default function MobileAttendanceViewer() {
+  const { notify } = useFeedback();
   const location = useLocation();
   const navigate = useNavigate();
   const queryParams = new URLSearchParams(location.search);
@@ -113,7 +115,7 @@ export default function MobileAttendanceViewer() {
         };
       });
     } catch (err) {
-      alert("መገኘት ማዘመን አልተሳካም።");
+      notify("መገኘት ማዘመን አልተሳካም።", "error");
     } finally {
       setUpdatingId(null);
     }
@@ -180,7 +182,7 @@ export default function MobileAttendanceViewer() {
           <select
             value={selectedAssignmentId}
             onChange={(e) => setSelectedAssignmentId(e.target.value)}
-            className="w-full bg-slate-900 border border-white/15 rounded-xl px-3 py-2.5 text-xs font-black text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+            className="w-full bg-slate-900 border border-white/15 rounded-xl px-3 py-2.5 text-xs font-black text-white select-on-dark focus:outline-none focus:ring-2 focus:ring-brand-500"
           >
             {assignments.map((a) => {
               const title =

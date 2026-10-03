@@ -26,14 +26,17 @@ import {
   Percent,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { useFeedback } from "../../context/FeedbackContext";
 import { academicService } from "../../services/academicService";
 import {
   formatEthiopianDate,
   formatEthiopianDateTime,
 } from "../../utils/ethiopianDate";
+import { formatApiError } from "../../services/api";
 
 export default function StudentPromotion() {
   const { user, hasRole } = useAuth();
+  const { notify, confirmAction } = useFeedback();
 
   // Permissions
   const isSuperAdmin = hasRole("super_admin");
@@ -59,6 +62,7 @@ export default function StudentPromotion() {
     endorsed_count: 0,
     promoted_count: 0,
   });
+  const [thresholds, setThresholds] = useState({ min_grade: 50, min_attendance: 60 });
   const [sections, setSections] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
 
@@ -67,10 +71,12 @@ export default function StudentPromotion() {
   const [selectedSection, setSelectedSection] = useState("all");
   const [minGradeFilter, setMinGradeFilter] = useState("all"); // 'all', '75', '50', 'below50'
   const [minAttendanceFilter, setMinAttendanceFilter] = useState("all"); // 'all', '80', '70', 'below70'
+  const [eligibilityFilter, setEligibilityFilter] = useState("all"); // 'all' | 'eligible' | 'ineligible'
 
   // Modals
   const [activeGradeStudent, setActiveGradeStudent] = useState(null);
   const [activeAttendanceStudent, setActiveAttendanceStudent] = useState(null);
+  const [activeNotesStudent, setActiveNotesStudent] = useState(null);
   const [isNominateModalOpen, setIsNominateModalOpen] = useState(false);
   const [isEndorseModalOpen, setIsEndorseModalOpen] = useState(false);
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
@@ -80,11 +86,9 @@ export default function StudentPromotion() {
   const [nominationNotes, setNominationNotes] = useState("");
   const [endorsementNotes, setEndorsementNotes] = useState("");
   const [rejectReason, setRejectReason] = useState("");
-  const [toastMessage, setToastMessage] = useState(null);
 
   const showToast = (msg, type = "success") => {
-    setToastMessage({ text: msg, type });
-    setTimeout(() => setToastMessage(null), 4500);
+    notify(msg, type === "error" ? "error" : "success");
   };
 
   // Fetch candidates from backend
@@ -100,17 +104,21 @@ export default function StudentPromotion() {
 
       const res = await academicService.getPromotionCandidates({
         promotion_status: statusParam,
+        // Level 1 shows both eligible and non-eligible students so admins
+        // can see who falls short and why.
+        include_ineligible: activeTab === "level1" ? 1 : undefined,
         section_id: selectedSection !== "all" ? selectedSection : undefined,
         search: searchQuery || undefined,
       });
 
       setCandidates(res.candidates || []);
       if (res.stats) setStats(res.stats);
+      if (res.thresholds) setThresholds(res.thresholds);
       if (res.sections) setSections(res.sections);
     } catch (err) {
       console.error("Failed fetching promotion candidates", err);
       showToast(
-        err.response?.data?.message || "Failed to load candidates",
+        formatApiError(err, "Failed to load candidates"),
         "error",
       );
     } finally {
@@ -135,6 +143,10 @@ export default function StudentPromotion() {
         if (!matchesName && !matchesId && !matchesChristian) return false;
       }
 
+      // Eligibility filter (Level-1 tab can show both groups)
+      if (eligibilityFilter === "eligible" && !c.is_eligible) return false;
+      if (eligibilityFilter === "ineligible" && c.is_eligible) return false;
+
       // Grade Threshold filter
       if (minGradeFilter !== "all") {
         if (c.overall_grade_avg === null) return false;
@@ -157,7 +169,12 @@ export default function StudentPromotion() {
 
       return true;
     });
-  }, [candidates, searchQuery, minGradeFilter, minAttendanceFilter]);
+  }, [candidates, searchQuery, minGradeFilter, minAttendanceFilter, eligibilityFilter]);
+
+  // Students who can be actioned in the current tab (ineligible students can't be nominated)
+  const selectableCandidates = activeTab === "level1"
+    ? filteredCandidates.filter((c) => c.is_eligible)
+    : filteredCandidates;
 
   // Selection handlers
   const handleToggleSelect = (id) => {
@@ -167,19 +184,19 @@ export default function StudentPromotion() {
   };
 
   const handleSelectAll = () => {
-    if (selectedIds.length === filteredCandidates.length) {
+    if (selectedIds.length === selectableCandidates.length) {
       setSelectedIds([]);
     } else {
-      setSelectedIds(filteredCandidates.map((c) => c.id));
+      setSelectedIds(selectableCandidates.map((c) => c.id));
     }
   };
 
-  // Quick select students meeting standard passing threshold (>= 50% Grade and >= 60% Attendance)
+  // Quick select students meeting the configured promotion thresholds
   const handleSelectQualified = () => {
     const qualified = filteredCandidates.filter((c) => c.is_eligible);
     setSelectedIds(qualified.map((c) => c.id));
     showToast(
-      `Selected ${qualified.length} qualified candidates (Grade ≥50% & Attendance ≥60%)`,
+      `Selected ${qualified.length} qualified candidates (Grade ≥${thresholds.min_grade}% & Attendance ≥${thresholds.min_attendance}%)`,
     );
   };
 
@@ -200,7 +217,7 @@ export default function StudentPromotion() {
       setNominationTargetSection("");
       fetchPromotionData();
     } catch (err) {
-      showToast(err.response?.data?.message || "Nomination failed", "error");
+      showToast(formatApiError(err, "Nomination failed"), "error");
     } finally {
       setActionLoading(false);
     }
@@ -231,7 +248,7 @@ export default function StudentPromotion() {
       setIsEndorseModalOpen(false);
       fetchPromotionData();
     } catch (err) {
-      showToast(err.response?.data?.message || "Endorsement failed", "error");
+      showToast(formatApiError(err, "Endorsement failed"), "error");
     } finally {
       setActionLoading(false);
     }
@@ -247,13 +264,12 @@ export default function StudentPromotion() {
       return;
     }
 
-    if (
-      !confirm(
-        `Are you sure you want to officially approve and promote ${selectedIds.length} student(s) to their next grade level?`,
-      )
-    ) {
-      return;
-    }
+    const confirmed = await confirmAction({
+      title: "ይፋዊ ማጽደቂያ (Final Approval)",
+      message: `Are you sure you want to officially approve and promote ${selectedIds.length} student(s) to their next grade level?`,
+      confirmLabel: "Approve & Promote",
+    });
+    if (!confirmed) return;
 
     try {
       setActionLoading(true);
@@ -269,7 +285,7 @@ export default function StudentPromotion() {
       fetchPromotionData();
     } catch (err) {
       showToast(
-        err.response?.data?.message || "Final approval failed",
+        formatApiError(err, "Final approval failed"),
         "error",
       );
     } finally {
@@ -297,7 +313,7 @@ export default function StudentPromotion() {
       setRejectReason("");
       fetchPromotionData();
     } catch (err) {
-      showToast(err.response?.data?.message || "Action failed", "error");
+      showToast(formatApiError(err, "Action failed"), "error");
     } finally {
       setActionLoading(false);
     }
@@ -305,24 +321,6 @@ export default function StudentPromotion() {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div
-          className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl text-sm font-bold border transition-all animate-slide-up ${
-            toastMessage.type === "error"
-              ? "bg-rose-900/90 text-rose-100 border-rose-700/60 shadow-rose-950/40"
-              : "bg-slate-900/95 text-emerald-300 border-emerald-500/40 shadow-slate-950/50"
-          }`}
-        >
-          {toastMessage.type === "error" ? (
-            <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
-          ) : (
-            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-          )}
-          <span>{toastMessage.text}</span>
-        </div>
-      )}
-
       {/* Header Banner */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-brand-950 via-brand-900 to-slate-950 p-8 text-white shadow-sacred border border-brand-800/40">
         <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
@@ -338,7 +336,7 @@ export default function StudentPromotion() {
               </span>
             </h1>
             <p className="text-sm text-brand-100/80 max-w-3xl font-medium leading-relaxed">
-              ደረጃ 1፡ ትምህርት ክፍል (መገኘት ≥ 70%) ➔ ደረጃ 2፡ የሰው ሀብት ክፍል ግምገማ ➔ ደረጃ 3፡
+              ደረጃ 1፡ ትምህርት ክፍል (ውጤት ≥ {thresholds.min_grade}% እና መገኘት ≥ {thresholds.min_attendance}%) ➔ ደረጃ 2፡ የሰው ሀብት ክፍል ግምገማ ➔ ደረጃ 3፡
               የበላይ አስተዳዳሪ ይፋዊ ማጽደቂያ።
             </p>
           </div>
@@ -431,7 +429,7 @@ export default function StudentPromotion() {
               {stats.eligible_count}
             </p>
             <p className="text-[10px] text-brand-600/80">
-              Tmhrt Eligible (≥70%)
+              Tmhrt Eligible (Grade ≥{thresholds.min_grade}% & Att. ≥{thresholds.min_attendance}%)
             </p>
           </div>
           <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center text-brand-600">
@@ -604,7 +602,7 @@ export default function StudentPromotion() {
             <select
               value={selectedSection}
               onChange={(e) => setSelectedSection(e.target.value)}
-              className="text-xs font-bold py-2.5 px-3 rounded-xl border border-slate-200 bg-white/80 focus:ring-2 focus:ring-brand-500 focus:outline-none"
+              className="text-xs font-bold py-2.5 px-3 rounded-xl border border-slate-200 bg-white/90 focus:ring-2 focus:ring-brand-500 focus:outline-none hover:border-brand-400 transition-all shadow-xs"
             >
               <option value="all">ሁሉም ክፍሎች (All Sections)</option>
               {sections.map((s) => (
@@ -623,7 +621,7 @@ export default function StudentPromotion() {
             <select
               value={minGradeFilter}
               onChange={(e) => setMinGradeFilter(e.target.value)}
-              className="text-xs font-bold py-2.5 px-3 rounded-xl border border-slate-200 bg-white/80 focus:ring-2 focus:ring-brand-500 focus:outline-none text-slate-700"
+              className="text-xs font-bold py-2.5 px-3 rounded-xl border border-slate-200 bg-white/90 focus:ring-2 focus:ring-brand-500 focus:outline-none text-slate-700 hover:border-brand-400 transition-all shadow-xs"
             >
               <option value="all">ሁሉም ውጤት (All Grades)</option>
               <option value="75">⭐ ከፍተኛ / Distinction (≥ 75%)</option>
@@ -640,7 +638,7 @@ export default function StudentPromotion() {
             <select
               value={minAttendanceFilter}
               onChange={(e) => setMinAttendanceFilter(e.target.value)}
-              className="text-xs font-bold py-2.5 px-3 rounded-xl border border-slate-200 bg-white/80 focus:ring-2 focus:ring-brand-500 focus:outline-none text-slate-700"
+              className="text-xs font-bold py-2.5 px-3 rounded-xl border border-slate-200 bg-white/90 focus:ring-2 focus:ring-brand-500 focus:outline-none text-slate-700 hover:border-brand-400 transition-all shadow-xs"
             >
               <option value="all">ሁሉም መገኘት (All Attendance)</option>
               <option value="80">🟢 ከፍተኛ መገኘት (≥ 80%)</option>
@@ -649,6 +647,44 @@ export default function StudentPromotion() {
             </select>
           </div>
         </div>
+
+        {/* Eligibility quick-tabs (Level 1 shows eligible + non-eligible together) */}
+        {activeTab === "level1" && (
+          <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-slate-100">
+            <span className="text-[11px] font-extrabold uppercase text-slate-400 flex items-center gap-1">
+              <Filter className="w-3.5 h-3.5" /> ብቁነት:
+            </span>
+            {[
+              { key: "all", label: "ሁሉም (All)", count: candidates.length },
+              {
+                key: "eligible",
+                label: "✅ ብቁ (Eligible)",
+                count: candidates.filter((c) => c.is_eligible).length,
+              },
+              {
+                key: "ineligible",
+                label: "⚠️ ያልበቁ (Not Eligible)",
+                count: candidates.filter((c) => !c.is_eligible).length,
+              },
+            ].map((f) => (
+              <button
+                key={f.key}
+                onClick={() => setEligibilityFilter(f.key)}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  eligibilityFilter === f.key
+                    ? f.key === "eligible"
+                      ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                      : f.key === "ineligible"
+                        ? "bg-rose-100 text-rose-800 border border-rose-300"
+                        : "bg-brand-100 text-brand-800 border border-brand-300"
+                    : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-transparent"
+                }`}
+              >
+                {f.label} <span className="opacity-60">({f.count})</span>
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Quick Selection Helpers */}
         <div className="flex flex-wrap items-center justify-between pt-3 border-t border-slate-100 text-xs font-bold">
@@ -697,10 +733,10 @@ export default function StudentPromotion() {
                     <button
                       onClick={handleSelectAll}
                       className="text-slate-400 hover:text-brand-600 transition-colors"
-                      title="Toggle Select All"
+                      title="Toggle Select All (eligible candidates)"
                     >
                       {selectedIds.length > 0 &&
-                      selectedIds.length === filteredCandidates.length ? (
+                      selectedIds.length === selectableCandidates.length ? (
                         <CheckSquare className="w-5 h-5 text-brand-600" />
                       ) : (
                         <Square className="w-5 h-5" />
@@ -768,19 +804,32 @@ export default function StudentPromotion() {
                   const isSelected = selectedIds.includes(c.id);
                   const grade = c.overall_grade_avg;
                   const att = c.overall_attendance_avg;
+                  // On Level 1, students who don't meet thresholds are shown
+                  // for visibility but cannot be selected for nomination.
+                  const isSelectable = activeTab !== "level1" || c.is_eligible;
 
                   return (
                     <tr
                       key={c.id}
                       className={`group transition-all ${
-                        isSelected ? "bg-brand-50/40" : "hover:bg-slate-50/70"
+                        isSelected
+                          ? "bg-brand-50/40"
+                          : !isSelectable
+                            ? "bg-rose-50/30 hover:bg-rose-50/50"
+                            : "hover:bg-slate-50/70"
                       }`}
                     >
                       {activeTab !== "history" && (
                         <td className="px-5 py-4 text-center">
                           <button
-                            onClick={() => handleToggleSelect(c.id)}
-                            className="text-slate-300 group-hover:text-brand-500 transition-colors"
+                            onClick={() => isSelectable && handleToggleSelect(c.id)}
+                            disabled={!isSelectable}
+                            title={!isSelectable ? "Not eligible — thresholds not met" : "Select"}
+                            className={`transition-colors ${
+                              isSelectable
+                                ? "text-slate-300 group-hover:text-brand-500"
+                                : "text-slate-200 cursor-not-allowed"
+                            }`}
                           >
                             {isSelected ? (
                               <CheckSquare className="w-5 h-5 text-brand-600" />
@@ -890,10 +939,14 @@ export default function StudentPromotion() {
                           </span>
                         )}
 
-                        {c.promotion_notes && (
-                          <div className="text-[10px] text-slate-500 italic mt-1 max-w-xs truncate">
-                            "{c.promotion_notes}"
-                          </div>
+                        {(c.promotion_notes || c.endorsement_notes) && (
+                          <button
+                            onClick={() => setActiveNotesStudent(c)}
+                            className="text-[10px] text-slate-500 italic mt-1 max-w-xs truncate hover:text-brand-700 hover:underline text-left"
+                            title="Click to view the full note / return reason"
+                          >
+                            📝 "{c.promotion_notes || c.endorsement_notes}"
+                          </button>
                         )}
                       </td>
 
@@ -953,10 +1006,10 @@ export default function StudentPromotion() {
                                 "Attendance missing. "}
                               {c.eligibility_reasons?.has_results &&
                                 !c.eligibility_reasons?.grade_passed &&
-                                "Grade below 50%. "}
+                                `Grade below ${thresholds.min_grade}%. `}
                               {c.eligibility_reasons?.has_attendance &&
                                 !c.eligibility_reasons?.attendance_passed &&
-                                "Attendance below 70%."}
+                                `Attendance below ${thresholds.min_attendance}%.`}
                             </p>
                           </div>
                         )}
@@ -1448,6 +1501,71 @@ export default function StudentPromotion() {
                 className="px-6 py-2.5 bg-rose-700 hover:bg-rose-600 text-white font-black text-xs rounded-xl shadow-md transition-all disabled:opacity-50"
               >
                 {actionLoading ? "እየተላከ ነው..." : "መልስ (Return to Tmhrt)"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 5: Full Note / Return Reason Viewer */}
+      {activeNotesStudent && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-100 animate-scale-in">
+            <div className="p-6 bg-gradient-to-r from-slate-900 to-slate-950 text-white">
+              <h3 className="text-xl font-black flex items-center gap-2">
+                <FileText className="w-5 h-5 text-gold-400" />
+                የእድገት ማስታወሻዎች (Promotion Notes)
+              </h3>
+              <p className="text-xs text-slate-300 mt-1">
+                {activeNotesStudent.name} ({activeNotesStudent.student_id})
+              </p>
+            </div>
+
+            <div className="p-6 space-y-4 text-xs">
+              {activeNotesStudent.promotion_notes && (
+                <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-rose-700 mb-1.5">
+                    የመመለሻ / የትምህርት ክፍል ማስታወሻ (Return Reason / Note)
+                  </p>
+                  <p className="text-sm font-medium text-slate-800 whitespace-pre-wrap leading-relaxed">
+                    {activeNotesStudent.promotion_notes}
+                  </p>
+                </div>
+              )}
+              {activeNotesStudent.endorsement_notes && (
+                <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-amber-700 mb-1.5">
+                    የሰው ሀብት ማረጋገጫ ማስታወሻ (Endorsement Note)
+                  </p>
+                  <p className="text-sm font-medium text-slate-800 whitespace-pre-wrap leading-relaxed">
+                    {activeNotesStudent.endorsement_notes}
+                  </p>
+                </div>
+              )}
+              <div className="text-[11px] text-slate-500 space-y-1 border-t border-slate-100 pt-3">
+                {activeNotesStudent.nominator && (
+                  <p>
+                    <span className="font-bold text-slate-600">ያቀረበው (Nominated by):</span>{" "}
+                    {activeNotesStudent.nominator}
+                    {activeNotesStudent.nominated_at ? ` — ${activeNotesStudent.nominated_at}` : ""}
+                  </p>
+                )}
+                {activeNotesStudent.endorser && (
+                  <p>
+                    <span className="font-bold text-slate-600">ያጸደቀው (Endorsed by):</span>{" "}
+                    {activeNotesStudent.endorser}
+                    {activeNotesStudent.endorsed_at ? ` — ${activeNotesStudent.endorsed_at}` : ""}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+              <button
+                onClick={() => setActiveNotesStudent(null)}
+                className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all"
+              >
+                ዝጋ (Close)
               </button>
             </div>
           </div>

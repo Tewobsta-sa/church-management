@@ -1,14 +1,32 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { X, Download, Printer, QrCode, Moon } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 import jsPDF from "jspdf";
 import { captureElement } from "../../utils/pdfCapture";
+import { useFeedback } from "../../context/FeedbackContext";
+
+const PREVIEW_BATCH = 45;
+// Large exports: lower raster scale + JPEG quality keep hundreds of pages fast
+// and the resulting PDF at a reasonable size, with no visible quality loss.
+const LARGE_PAGE_COUNT = 20;
 
 export default function IdCardExportModal({ isOpen, onClose, students = [] }) {
+  const { notify } = useFeedback();
   const [downloading, setDownloading] = useState(false);
+  const [printing, setPrinting] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0 });
+  // Hidden A4 sheets mount lazily (on export/print) so opening the modal with
+  // hundreds of students doesn't render N extra QR codes + photos up front.
+  const [sheetsMounted, setSheetsMounted] = useState(false);
+  // Visible preview renders in batches for the same reason.
+  const [previewLimit, setPreviewLimit] = useState(PREVIEW_BATCH);
   const containerRef = useRef(null);
   const exportPagesRef = useRef(null);
+
+  useEffect(() => {
+    setPreviewLimit(PREVIEW_BATCH);
+    setSheetsMounted(false);
+  }, [students, isOpen]);
 
   // Group students in chunks of 9 for exact 9 IDs per A4 page
   const chunkedPages = students.reduce((acc, st, i) => {
@@ -98,66 +116,97 @@ export default function IdCardExportModal({ isOpen, onClose, students = [] }) {
     };
   };
 
+  // Mount the hidden A4 sheets (if not yet) and wait for React to commit them.
+  const ensureSheetsMounted = async () => {
+    setSheetsMounted(true);
+    for (
+      let i = 0;
+      i < 120 && !exportPagesRef.current?.querySelector(".id-card-a4-sheet");
+      i++
+    ) {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    }
+    await document.fonts?.ready;
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  };
+
   const handleDownloadPDF = async () => {
-    if (!exportPagesRef.current || chunkedPages.length === 0) return;
+    if (downloading || chunkedPages.length === 0) return;
     setDownloading(true);
-    setDownloadProgress({ current: 0, total: chunkedPages.length });
 
     try {
-      await document.fonts?.ready;
-      await new Promise((resolve) => setTimeout(resolve, 150));
-
-      // Standard A4 Portrait (210mm x 297mm)
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4",
-        compress: true,
-      });
+      await ensureSheetsMounted();
 
       const pageElements = Array.from(
-        exportPagesRef.current.querySelectorAll(".id-card-a4-sheet")
+        exportPagesRef.current?.querySelectorAll(".id-card-a4-sheet") || []
       );
 
       if (pageElements.length === 0) {
         throw new Error("No ID card pages found to export");
       }
 
+      setDownloadProgress({ current: 0, total: pageElements.length });
+
+      // A4 Landscape (297mm x 210mm) — cards are wider than tall
+      const pdf = new jsPDF({
+        orientation: "landscape",
+        unit: "mm",
+        format: "a4",
+        compress: true,
+      });
+
+      const large = pageElements.length > LARGE_PAGE_COUNT;
+      const scale = large ? 2 : 2.5;
+      const jpegQuality = large ? 0.9 : 0.95;
+
       for (let p = 0; p < pageElements.length; p++) {
         setDownloadProgress({ current: p + 1, total: pageElements.length });
         const sheetEl = pageElements[p];
 
         const canvas = await captureElement(sheetEl, {
-          scale: 2.5,
+          scale,
           scrollX: 0,
           scrollY: 0,
+          // Skip the preview grid and all sibling sheets so each capture clones
+          // only ~9 cards instead of the whole document (critical for 100+ pages).
+          ignoreElements: (node) =>
+            node.nodeType === 1 &&
+            (node.id === "id-cards-print-section" ||
+              (node.classList?.contains("id-card-a4-sheet") &&
+                node !== sheetEl)),
         });
 
         if (!canvas.width || !canvas.height) {
           throw new Error(`ID card page ${p + 1} captured as empty canvas`);
         }
 
-        const imgData = canvas.toDataURL("image/jpeg", 0.95);
+        const imgData = canvas.toDataURL("image/jpeg", jpegQuality);
 
         if (p > 0) {
           pdf.addPage();
         }
 
-        pdf.addImage(imgData, "JPEG", 0, 0, 210, 297);
+        pdf.addImage(imgData, "JPEG", 0, 0, 297, 210);
       }
 
       pdf.save(`Sunday_School_ID_Cards_${new Date().toISOString().slice(0, 10)}.pdf`);
     } catch (err) {
       console.error("Failed to generate PDF", err);
-      alert("Failed to export ID cards PDF. Please try printing directly.");
+      notify("Failed to export ID cards PDF. Please try printing directly.", "error");
     } finally {
       setDownloading(false);
       setDownloadProgress({ current: 0, total: 0 });
     }
   };
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    setPrinting(true);
+    try {
+      await ensureSheetsMounted();
+      window.print();
+    } finally {
+      setPrinting(false);
+    }
   };
 
   return (
@@ -191,16 +240,19 @@ export default function IdCardExportModal({ isOpen, onClose, students = [] }) {
                 <Download className="w-4 h-4" />
               )}
               {downloading
-                ? `ፒዲኤፍ እየተዘጋጀ ነው (${downloadProgress.current}/${downloadProgress.total})...`
+                ? downloadProgress.total === 0
+                  ? "ፒዲኤፍ እየተዘጋጀ ነው (preparing pages)..."
+                  : `ፒዲኤፍ እየተዘጋጀ ነው (${downloadProgress.current}/${downloadProgress.total})...`
                 : "Download PDF (9 per A4)"}
             </button>
 
             <button
               onClick={handlePrint}
-              className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs uppercase tracking-wider transition-all"
+              disabled={printing}
+              className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50"
             >
               <Printer className="w-4 h-4" />
-              Print
+              {printing ? "Preparing..." : "Print"}
             </button>
 
             <button
@@ -212,42 +264,37 @@ export default function IdCardExportModal({ isOpen, onClose, students = [] }) {
           </div>
         </div>
 
-        {/* Print Stylesheet for 9 IDs per page (3x3 grid) */}
+        {/* Print Stylesheet: prints the exact A4 landscape export sheets (same size for 1 or 9 IDs) */}
         <style>{`
           @media print {
+            @page {
+              size: A4 landscape;
+              margin: 0;
+            }
             body * {
               visibility: hidden !important;
             }
-            #id-cards-print-section,
-            #id-cards-print-section * {
+            #id-cards-a4-section,
+            #id-cards-a4-section * {
               visibility: visible !important;
             }
-            #id-cards-print-section {
+            #id-cards-a4-section {
               position: absolute !important;
               left: 0 !important;
               top: 0 !important;
-              width: 100% !important;
+              width: 297mm !important;
               margin: 0 !important;
-              padding: 6mm !important;
+              padding: 0 !important;
               background: #ffffff !important;
+              z-index: 9999 !important;
             }
-            .id-card-grid {
-              display: grid !important;
-              grid-template-columns: repeat(3, 63mm) !important;
-              grid-gap: 5mm !important;
-              justify-content: center !important;
-            }
-            .id-card-item {
-              width: 63mm !important;
-              height: 43mm !important;
-              break-inside: avoid !important;
-              page-break-inside: avoid !important;
-              box-shadow: none !important;
-              border: 1px solid #cbd5e1 !important;
-            }
-            .page-break-9 {
+            .id-card-a4-sheet {
               page-break-after: always !important;
               break-after: page !important;
+            }
+            .id-card-a4-sheet:last-child {
+              page-break-after: auto !important;
+              break-after: auto !important;
             }
           }
         `}</style>
@@ -261,7 +308,7 @@ export default function IdCardExportModal({ isOpen, onClose, students = [] }) {
             ref={containerRef}
             className="id-card-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto"
           >
-            {students.map((st) => (
+            {students.slice(0, previewLimit).map((st) => (
               <IdCardItem
                 key={st.id}
                 st={st}
@@ -270,35 +317,53 @@ export default function IdCardExportModal({ isOpen, onClose, students = [] }) {
               />
             ))}
           </div>
+          {previewLimit < students.length && (
+            <div className="flex justify-center mt-4">
+              <button
+                onClick={() =>
+                  setPreviewLimit((c) =>
+                    Math.min(c + PREVIEW_BATCH, students.length)
+                  )
+                }
+                className="px-5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl font-bold text-xs uppercase tracking-wider shadow-sm transition-all"
+              >
+                Show more ({students.length - previewLimit} remaining — all{" "}
+                {students.length} are included in the export)
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Off-screen A4 Pages for exact 9-IDs-per-page PDF export (placed at top:0, left:0 behind modal z-50 backdrop) */}
+        {/* Off-screen A4 landscape pages: 9 wide IDs per page for PDF export and browser print.
+            Parked at left:-10000px — negative z-index still paints over the translucent
+            modal backdrop, so position it off-screen instead. The @media print rule
+            below re-pins it to left:0 for printing. */}
         <div
+          id="id-cards-a4-section"
           aria-hidden="true"
           style={{
             position: "fixed",
-            left: 0,
+            left: "-10000px",
             top: 0,
-            width: "210mm",
+            width: "297mm",
             pointerEvents: "none",
-            zIndex: -20,
             backgroundColor: "#ffffff",
           }}
         >
           <div ref={exportPagesRef}>
-            {chunkedPages.map((pageStudents, pIdx) => (
+            {sheetsMounted && chunkedPages.map((pageStudents, pIdx) => (
               <div
                 key={pIdx}
                 className="id-card-a4-sheet bg-white"
                 style={{
-                  width: "210mm",
-                  height: "297mm",
+                  width: "297mm",
+                  height: "210mm",
                   boxSizing: "border-box",
-                  padding: "12mm 8mm",
+                  padding: "10mm 12mm",
                   backgroundColor: "#ffffff",
                   display: "grid",
-                  gridTemplateColumns: "repeat(3, 62mm)",
-                  gridTemplateRows: "repeat(3, 86mm)",
+                  gridTemplateColumns: "repeat(3, 88mm)",
+                  gridTemplateRows: "repeat(3, 58mm)",
                   columnGap: "4mm",
                   rowGap: "6mm",
                   justifyContent: "center",
@@ -353,7 +418,7 @@ function IdCardItem({ st, theme, isExportMode = false }) {
       className={`id-card-item bg-white rounded-xl shadow-sm border-2 ${theme.borderClass} overflow-hidden flex flex-col relative select-none`}
       style={
         isExportMode
-          ? { width: "62mm", height: "86mm", margin: "0 auto", boxSizing: "border-box" }
+          ? { width: "88mm", height: "58mm", margin: "0 auto", boxSizing: "border-box" }
           : { width: "340px", height: "220px", margin: "0 auto" }
       }
     >
@@ -425,6 +490,7 @@ function IdCardItem({ st, theme, isExportMode = false }) {
             <img
               src={st.picture_url}
               alt={st.name}
+              loading={isExportMode ? "eager" : "lazy"}
               className={`${
                 isExportMode ? "rounded-lg" : "rounded-xl"
               } object-cover border border-slate-300 shadow-sm`}

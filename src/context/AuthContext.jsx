@@ -1,11 +1,28 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import api from "../services/api";
+import { useFeedback } from "./FeedbackContext";
 
 const AuthContext = createContext();
+
+const ACTIVITY_KEY = "last_activity_at";
+const INACTIVITY_LIMIT_MS = 10 * 60 * 1000; // 10 minutes
+
+const clearSession = () => {
+  localStorage.removeItem("token");
+  localStorage.removeItem("refresh_token");
+  localStorage.removeItem("user");
+  localStorage.removeItem(ACTIVITY_KEY);
+};
+
+const isSessionExpired = () => {
+  const last = Number(localStorage.getItem(ACTIVITY_KEY)) || 0;
+  return last > 0 && Date.now() - last >= INACTIVITY_LIMIT_MS;
+};
 
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
+  const { alertAction } = useFeedback();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(null); // null until API returns
@@ -15,13 +32,11 @@ export const AuthProvider = ({ children }) => {
     const token = localStorage.getItem("token");
     const storedUser = localStorage.getItem("user");
 
-    if (token && storedUser) {
+    if (token && storedUser && !isSessionExpired()) {
       setUser(JSON.parse(storedUser));
     } else {
-      // Clear stale data
-      localStorage.removeItem("token");
-      localStorage.removeItem("refresh_token");
-      localStorage.removeItem("user");
+      // Clear stale or expired session data
+      clearSession();
       setUser(null);
     }
   };
@@ -62,6 +77,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem("token", res.data.access_token);
     localStorage.setItem("refresh_token", res.data.refresh_token);
     localStorage.setItem("user", JSON.stringify(res.data.user));
+    localStorage.setItem(ACTIVITY_KEY, String(Date.now()));
     setUser(res.data.user);
 
     // refresh system status
@@ -72,39 +88,64 @@ export const AuthProvider = ({ children }) => {
 
   // Logout
   const logout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("refresh_token");
-    localStorage.removeItem("user");
+    clearSession();
     setUser(null);
     window.location.href = "/";
   };
 
-  // Inactivity auto-logout: 25 minutes of idle time without user interaction
+  // Inactivity auto-logout: 10 minutes of idle time without user interaction.
+  // Last activity is persisted in localStorage so the limit also applies
+  // after the tab is closed, the browser restarts, or the device sleeps.
   useEffect(() => {
     if (!user) return;
 
-    const INACTIVITY_LIMIT_MS = 25 * 60 * 1000; // 25 minutes
-    let lastActive = Date.now();
-
-    const updateActivity = () => {
-      lastActive = Date.now();
+    const expire = async () => {
+      clearSession();
+      setUser(null);
+      await alertAction(
+        "የእርስዎ ክፍለ-ጊዜ በ10 ደቂቃ እንቅስቃሴ ባለመኖሩ ምክንያት ተዘግቷል። እባክዎ እንደገና ይግቡ።\n(Your session has timed out due to 10 minutes of inactivity. Please sign in again.)",
+        { title: "ክፍለ-ጊዜ አልቋል (Session Expired)", type: "warning" },
+      );
+      window.location.href = "/";
     };
 
-    const events = ["mousedown", "mousemove", "keydown", "touchstart", "scroll", "click"];
-    events.forEach((evt) => window.addEventListener(evt, updateActivity, { passive: true }));
+    // If the session already expired while away, log out immediately.
+    if (isSessionExpired()) {
+      expire();
+      return;
+    }
 
-    const intervalId = setInterval(() => {
-      if (Date.now() - lastActive >= INACTIVITY_LIMIT_MS) {
-        clearInterval(intervalId);
-        events.forEach((evt) => window.removeEventListener(evt, updateActivity));
-        alert("የእርስዎ ክፍለ-ጊዜ በ25 ደቂቃ እንቅስቃሴ ባለመኖሩ ምክንያት ተዘግቷል። እባክዎ እንደገና ይግቡ።\n(Your session has timed out due to 25 minutes of inactivity. Please sign in again.)");
-        logout();
+    let lastWrite = 0;
+    const markActive = () => {
+      const now = Date.now();
+      // Throttle localStorage writes to at most once every 5 seconds.
+      if (now - lastWrite >= 5000) {
+        lastWrite = now;
+        localStorage.setItem(ACTIVITY_KEY, String(now));
       }
-    }, 15000); // check every 15 seconds
+    };
+
+    markActive();
+
+    const events = ["mousedown", "mousemove", "keydown", "touchstart", "scroll", "click"];
+    events.forEach((evt) => window.addEventListener(evt, markActive, { passive: true }));
+
+    const checkIdle = () => {
+      if (isSessionExpired()) expire();
+    };
+
+    // Re-check promptly when the user returns to the tab (covers sleep/suspend).
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") checkIdle();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    const intervalId = setInterval(checkIdle, 15000); // check every 15 seconds
 
     return () => {
       clearInterval(intervalId);
-      events.forEach((evt) => window.removeEventListener(evt, updateActivity));
+      events.forEach((evt) => window.removeEventListener(evt, markActive));
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [user]);
 

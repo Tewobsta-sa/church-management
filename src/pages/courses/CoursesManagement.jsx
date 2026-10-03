@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Plus, Edit2, Trash2, Search, Filter, BookOpen } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../../context/AuthContext";
+import { useFeedback } from "../../context/FeedbackContext";
 import { courseService } from "../../services/courseService";
 import { sectionService } from "../../services/sectionService";
 import CourseModal from "./CourseModal";
@@ -10,6 +11,7 @@ import { translateTrack } from "../../i18n/tracks";
 export default function CoursesManagement() {
   const { t } = useTranslation();
   const { hasRole } = useAuth();
+  const { notify, confirmAction } = useFeedback();
 
   const [courses, setCourses] = useState([]);
   const [programTypes, setProgramTypes] = useState([]);
@@ -59,12 +61,18 @@ export default function CoursesManagement() {
   }, [courses, search, programFilter]);
 
   const handleDelete = async (course) => {
-    if (!window.confirm(t("courses.confirmDelete"))) return;
+    const confirmed = await confirmAction({
+      title: t("courses.delete", "Delete Course"),
+      message: t("courses.confirmDelete"),
+      confirmLabel: t("common.delete", "Delete"),
+      danger: true,
+    });
+    if (!confirmed) return;
     try {
       await courseService.remove(course.id);
       fetchCourses();
     } catch (err) {
-      alert(err.response?.data?.message || t("common.serverError"));
+      notify(err.response?.data?.message || t("common.serverError"), "error");
     }
   };
 

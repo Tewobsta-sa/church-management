@@ -155,6 +155,10 @@
     "bulkStatusUpdate": "ወደ መደበኛ ሁኔታ ቀይር",
     "bulkStatusSuccess": "ለ {{count}} ተማሪዎች ሁኔታቸው ወደ መደበኛ በተሳካ ሁኔታ ተቀይሯል።",
     "printIdCards": "የመታወቂያ ካርዶች አትም",
+    "trackPreKG": "ቅድመ-ሕፃናት (Pre-KG)",
+    "trackRegular": "መደበኛ ትምህርት (Regular)",
+    "trackDistance": "የርቀት ትምህርት (Distance)",
+    "trackYoung": "የወጣቶች መርሃ-ግብር (Young)",
     "classifications": {
       "all": "ሁሉም ምድቦች",
       "prekg": "ቅድመ-መደበኛ (PreKG)",
@@ -226,6 +230,7 @@
     "editCourse": "ኮርስ አርትዕ",
     "deleteCourse": "ኮርስ ሰርዝ",
     "noCourses": "እስካሁን ምንም ኮርስ አልተዋቀረም",
+    "confirmDelete": "ይህን ኮርስ መሰረዝ ይፈልጋሉ?",
     "fields": {
       "name": "የኮርሱ ስም",
       "creditHour": "የክሬዲት ሰዓት",
@@ -240,6 +245,8 @@
       "titleField": "ርዕስ",
       "maxScore": "ከፍተኛ ነጥብ",
       "weight": "ክብደት (%)",
+      "typeField": "አይነት",
+      "empty": "ምንም ግምገማዎች አልተጨመሩም",
       "totalWeight": "ጠቅላላ ክብደት",
       "weightsMustSum": "ክብደቶቹ ድምር በትክክል 100% መሆን አለበት። አሁን: {{sum}}%"
     }
@@ -251,7 +258,17 @@
     "selectCourse": "ኮርስ ይምረጡ",
     "noCourseSelected": "ነጥብ ለማስገባት መጀመሪያ ኮርስ ይምረጡ።",
     "saveGrades": "ውጤቶችን አስቀምጥ",
-    "saved": "ውጤቶች በተሳካ ሁኔታ ተቀምጠዋል"
+    "saved": "ውጤቶች በተሳካ ሁኔታ ተቀምጠዋል",
+    "student": "ተማሪ",
+    "total": "ጠቅላላ",
+    "letter": "ደረጃ",
+    "noStudents": "በዚህ ኮርስ ምንም ተማሪ አልተመዘገበም",
+    "noCourses": "ምንም ኮርስ የለም",
+    "searchStudent": "ተማሪ ፈልግ…",
+    "noChanges": "ለማስቀመጥ የተለየ የውጤት ለውጥ የለም",
+    "savedCount": "{{count}} የውጤት መዝገቦች ተቀምጠዋል",
+    "weightWarning": "የግምገማ ክብደቶች ድምር 100% መሆን አለበት። አሁኑ ድምር፦ {{sum}}%",
+    "maxShort": "ከፍተኛ"
   },
   "schedule": {
     "title": "መርሃ-ግብር እና የጊዜ ሰሌዳ",

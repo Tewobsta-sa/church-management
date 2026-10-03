@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { X, Save, Lock, Shield, Settings } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { useFeedback } from "../../context/FeedbackContext";
 import api from "../../services/api";
 
 export default function ProfileModal({ isOpen, onClose }) {
   const { user, login } = useAuth(); // We might need to refresh user context after updating name
+  const { notify } = useFeedback();
   const [activeTab, setActiveTab] = useState("general");
   
   const [generalData, setGeneralData] = useState({
@@ -42,7 +44,7 @@ export default function ProfileModal({ isOpen, onClose }) {
     setIsSubmitting(true);
     try {
       const response = await api.post(path, data);
-      alert(response.data.message || "Profile updated successfully!");
+      notify(response.data.message || "Profile updated successfully!", "success");
       if (path === "/profile/info") {
          // Reload page to reflect new name in context
          window.location.reload(); 
@@ -50,7 +52,7 @@ export default function ProfileModal({ isOpen, onClose }) {
       onClose();
     } catch (err) {
       const msg = err.response?.data?.error || err.response?.data?.message || "Operation failed";
-      alert(msg);
+      notify(msg, "error");
     } finally {
       setIsSubmitting(false);
     }

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { studentService } from "../../services/studentService";
+import { formatApiError } from "../../services/api";
 import {
   Edit2,
   Trash2,
@@ -22,6 +23,7 @@ import {
   Sun,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { useFeedback } from "../../context/FeedbackContext";
 import { useTranslation } from "react-i18next";
 import StudentModal from "./StudentModal";
 import BulkImportModal from "./BulkImportModal";
@@ -43,6 +45,7 @@ const REGULAR_SUB_FILTERS = [
 
 export default function StudentsList() {
   const { hasRole } = useAuth();
+  const { notify, confirmAction } = useFeedback();
   const { t } = useTranslation();
 
   const [students, setStudents] = useState([]);
@@ -69,6 +72,8 @@ export default function StudentsList() {
   const [modalMode, setModalMode] = useState("view");
   const [importOpen, setImportOpen] = useState(false);
   const [idCardModalOpen, setIdCardModalOpen] = useState(false);
+  const [idCardStudents, setIdCardStudents] = useState([]);
+  const [idCardLoading, setIdCardLoading] = useState(false);
 
   // Permissions
   const isSuperAdmin = hasRole("super_admin");
@@ -81,6 +86,8 @@ export default function StudentsList() {
   const canImport = canCreate;
   const canBulkUpdate = canCreate;
   const canFlag = isYesewHabt || isSuperAdmin;
+  // ID card export is restricted to Ye Sew Habt (and super admin) per policy
+  const canExportIdCards = hasRole("yesew_habt") || isSuperAdmin;
 
   // Flagging modal state (Ye Sew Habt mandatory reason)
   const [flagModalOpen, setFlagModalOpen] = useState(false);
@@ -118,7 +125,7 @@ export default function StudentsList() {
       setTotalPages(data?.last_page || 1);
       setTotal(data?.total || 0);
     } catch (err) {
-      setError(t("common.serverError"));
+      setError(formatApiError(err));
       setStudents([]);
     } finally {
       setLoading(false);
@@ -152,27 +159,26 @@ export default function StudentsList() {
 
   const handleBulkUpdateStatus = async () => {
     if (selectedIds.length === 0) {
-      alert("Please select at least one student to update.");
+      notify("Please select at least one student to update.", "warning");
       return;
     }
 
-    if (
-      !confirm(
-        `Are you sure you want to change the status of ${selectedIds.length} student(s) from 'New' to 'Regular'?`
-      )
-    ) {
-      return;
-    }
+    const confirmed = await confirmAction({
+      title: "Update Student Statuses",
+      message: `Are you sure you want to change the status of ${selectedIds.length} student(s) from 'New' to 'Regular'?`,
+      confirmLabel: "Update Status",
+    });
+    if (!confirmed) return;
 
     setBulkLoading(true);
     try {
       await studentService.bulkUpdateStatus(selectedIds, "regular");
-      alert(`Successfully updated ${selectedIds.length} student(s) to Regular status.`);
+      notify(`Successfully updated ${selectedIds.length} student(s) to Regular status.`, "success");
       setSelectedIds([]);
       fetchStudents();
     } catch (err) {
       console.error(err);
-      alert("Failed to update status. Please try again.");
+      notify(formatApiError(err, "Failed to update status. Please try again."), "error");
     } finally {
       setBulkLoading(false);
     }
@@ -185,12 +191,19 @@ export default function StudentsList() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this student record?")) return;
+    const confirmed = await confirmAction({
+      title: "Delete Student Record",
+      message: "Are you sure you want to delete this student record? This action cannot be undone.",
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!confirmed) return;
     try {
       await studentService.deleteStudent(id);
+      notify("Student record deleted.", "success");
       fetchStudents();
     } catch (err) {
-      alert("Failed to delete student");
+      notify(formatApiError(err, "Failed to delete student"), "error");
     }
   };
 
@@ -203,7 +216,7 @@ export default function StudentsList() {
   const handleConfirmFlag = async () => {
     if (!studentToFlag) return;
     if (!flagReason.trim()) {
-      alert("Please provide a mandatory reason for flagging the student.");
+      notify("Please provide a mandatory reason for flagging the student.", "warning");
       return;
     }
     try {
@@ -212,31 +225,81 @@ export default function StudentsList() {
       setFlagModalOpen(false);
       setStudentToFlag(null);
       setFlagReason("");
+      notify("Student flagged successfully.", "success");
       fetchStudents();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to flag student.");
+      notify(formatApiError(err, "Failed to flag student."), "error");
     } finally {
       setFlagLoading(false);
     }
   };
 
   const handleUnflag = async (student) => {
-    if (!window.confirm(`Are you sure you want to lift the flag / suspension for ${student.name}?`)) {
-      return;
-    }
+    const confirmed = await confirmAction({
+      title: "Lift Flag / Suspension",
+      message: `Are you sure you want to lift the flag / suspension for ${student.name}?`,
+      confirmLabel: "Unflag",
+    });
+    if (!confirmed) return;
     try {
       setFlagLoading(true);
       await studentService.unflagStudent(student.id);
+      notify("Flag lifted.", "success");
       fetchStudents();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to unflag student.");
+      notify(formatApiError(err, "Failed to unflag student."), "error");
     } finally {
       setFlagLoading(false);
     }
   };
 
   const selectedStudentsData = students.filter((s) => selectedIds.includes(s.id));
-  const studentsForIdCards = selectedStudentsData.length > 0 ? selectedStudentsData : students;
+
+  // With checkboxes selected, export exactly those (current page). With none,
+  // fetch every student matching the active tab/filters via the dedicated
+  // unpaginated ID-card endpoint — the paginated list only holds one page.
+  const handleExportIdCards = async () => {
+    if (selectedIds.length > 0) {
+      setIdCardStudents(selectedStudentsData);
+      setIdCardModalOpen(true);
+      return;
+    }
+
+    setIdCardLoading(true);
+    try {
+      const params = {
+        track: { prekg: "PreKG", regular: "Regular", distance: "Distance" }[activeTab],
+      };
+      if (activeTab === "regular" && regularSubFilter !== "all") {
+        params.classification = regularSubFilter;
+      }
+      if (statusFilter !== "all") {
+        params.status = statusFilter;
+      }
+      if (shiftFilter !== "all") {
+        params.is_night = shiftFilter === "night";
+      }
+      if (search.trim()) {
+        params.search = search.trim();
+      }
+
+      const data = await studentService.getIdCardsData(params);
+      const list = Array.isArray(data) ? data : data?.data || [];
+
+      if (list.length === 0) {
+        notify("No students found for ID card export.", "warning");
+        return;
+      }
+
+      setIdCardStudents(list);
+      setIdCardModalOpen(true);
+    } catch (err) {
+      console.error(err);
+      notify(formatApiError(err, "Failed to load students for ID card export."), "error");
+    } finally {
+      setIdCardLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6 animate-[fade-in_0.3s_ease-out]">
@@ -252,15 +315,23 @@ export default function StudentsList() {
         </div>
 
         <div className="flex gap-2 flex-wrap items-center">
-          {/* Export ID Cards Button */}
-          <button
-            onClick={() => setIdCardModalOpen(true)}
-            disabled={students.length === 0}
-            className="flex items-center gap-2 bg-white text-brand-700 border border-brand-200 px-4 py-2.5 rounded-xl font-bold shadow-sm hover:bg-brand-50 transition-all text-xs uppercase tracking-wider disabled:opacity-40"
-          >
-            <QrCode className="w-4 h-4 text-brand-600" />
-            Export ID Cards ({selectedIds.length > 0 ? selectedIds.length : "All"})
-          </button>
+          {/* Export ID Cards Button (Ye Sew Habt / Super Admin only) */}
+          {canExportIdCards && (
+            <button
+              onClick={handleExportIdCards}
+              disabled={students.length === 0 || idCardLoading}
+              className="flex items-center gap-2 bg-white text-brand-700 border border-brand-200 px-4 py-2.5 rounded-xl font-bold shadow-sm hover:bg-brand-50 transition-all text-xs uppercase tracking-wider disabled:opacity-40"
+            >
+              {idCardLoading ? (
+                <div className="w-4 h-4 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <QrCode className="w-4 h-4 text-brand-600" />
+              )}
+              {idCardLoading
+                ? "Loading Students..."
+                : `Export ID Cards (${selectedIds.length > 0 ? selectedIds.length : `All ${total}`})`}
+            </button>
+          )}
 
           {/* Import Button */}
           {canImport && (
@@ -354,7 +425,7 @@ export default function StudentsList() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none cursor-pointer"
+            className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none hover:border-brand-400 focus:ring-2 focus:ring-brand-500/15 focus:border-brand-500 transition-all shadow-xs cursor-pointer"
           >
             <option value="all">All Statuses</option>
             <option value="new">New Students</option>
@@ -371,7 +442,7 @@ export default function StudentsList() {
               setShiftFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none cursor-pointer"
+            className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none hover:border-brand-400 focus:ring-2 focus:ring-brand-500/15 focus:border-brand-500 transition-all shadow-xs cursor-pointer"
           >
             <option value="all">All Shifts (ሁሉም ፈረቃ)</option>
             <option value="day">☀️ ቀን (Day)</option>
@@ -407,13 +478,15 @@ export default function StudentsList() {
               {bulkLoading ? "Updating..." : "Bulk Update Status (New → Regular)"}
             </button>
 
-            <button
-              onClick={() => setIdCardModalOpen(true)}
-              className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all"
-            >
-              <QrCode className="w-4 h-4" />
-              Export Selected IDs
-            </button>
+            {canExportIdCards && (
+              <button
+                onClick={handleExportIdCards}
+                className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all"
+              >
+                <QrCode className="w-4 h-4" />
+                Export Selected IDs
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -693,7 +766,7 @@ export default function StudentsList() {
       <IdCardExportModal
         isOpen={idCardModalOpen}
         onClose={() => setIdCardModalOpen(false)}
-        students={studentsForIdCards}
+        students={idCardStudents}
       />
 
       {/* Ye Sew Habt Student Flagging Modal (Mandatory Reason) */}

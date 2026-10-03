@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   ETHIOPIAN_MONTHS,
@@ -20,11 +21,14 @@ export default function EthiopianDateInput({
   max,
 }) {
   const wrapperRef = useRef(null);
+  const triggerRef = useRef(null);
+  const popupRef = useRef(null);
   const selected = value
     ? toEthiopianDate(`${value}T00:00:00`)
     : toEthiopianDate(new Date());
   const today = toEthiopianDate(new Date());
   const [open, setOpen] = useState(false);
+  const [popupStyle, setPopupStyle] = useState({});
   const [view, setView] = useState({
     year: selected.year,
     month: selected.month,
@@ -39,11 +43,50 @@ export default function EthiopianDateInput({
 
   useEffect(() => {
     const close = (event) => {
-      if (!wrapperRef.current?.contains(event.target)) setOpen(false);
+      if (
+        !wrapperRef.current?.contains(event.target) &&
+        !popupRef.current?.contains(event.target)
+      ) {
+        setOpen(false);
+      }
     };
     document.addEventListener("mousedown", close);
     return () => document.removeEventListener("mousedown", close);
   }, []);
+
+  // The calendar popup is rendered in a body-level portal so it is never
+  // clipped by modal containers that use overflow-hidden. Position it under
+  // the trigger, flipping upward when there isn't enough room below.
+  useEffect(() => {
+    if (!open) return;
+
+    const position = () => {
+      const rect = triggerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const popupWidth = Math.min(336, window.innerWidth - 32);
+      const popupHeight = popupRef.current?.offsetHeight || 360;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const flipUp = spaceBelow < popupHeight + 8 && rect.top > popupHeight + 8;
+      setPopupStyle({
+        position: "fixed",
+        top: flipUp ? rect.top - popupHeight - 8 : rect.bottom + 8,
+        left: Math.max(
+          8,
+          Math.min(rect.left, window.innerWidth - popupWidth - 8),
+        ),
+        width: popupWidth,
+        zIndex: 9999,
+      });
+    };
+
+    position();
+    window.addEventListener("resize", position);
+    window.addEventListener("scroll", position, true);
+    return () => {
+      window.removeEventListener("resize", position);
+      window.removeEventListener("scroll", position, true);
+    };
+  }, [open, view]);
 
   const days = useMemo(() => {
     const total = getEthiopianMonthDays(view.year, view.month);
@@ -90,6 +133,7 @@ export default function EthiopianDateInput({
         {label} {required && <span className="text-red-500">*</span>}
       </label>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((current) => !current)}
         className={`mt-1.5 w-full flex items-center gap-3 px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-left hover:border-brand-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 transition-all ${className}`}
@@ -104,8 +148,9 @@ export default function EthiopianDateInput({
         </span>
       </button>
 
-      {open && (
-        <div className="absolute z-50 mt-2 w-[min(21rem,calc(100vw-2rem))] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl shadow-slate-900/15">
+      {open &&
+        createPortal(
+        <div ref={popupRef} style={popupStyle} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl shadow-slate-900/15">
           <div className="flex items-center justify-between gap-2 mb-4">
             <button
               type="button"
@@ -199,7 +244,8 @@ export default function EthiopianDateInput({
           <div className="mt-3 pt-3 border-t border-slate-100 text-center text-[11px] font-semibold text-slate-500">
             {value ? displayValue : "Choose a day from the Ethiopian calendar"}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

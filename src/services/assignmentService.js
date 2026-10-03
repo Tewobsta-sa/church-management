@@ -25,5 +25,10 @@ export const assignmentService = {
   deleteAssignment: async (id) => {
     const response = await api.delete(`/assignments/${id}`);
     return response.data;
+  },
+
+  endSemester: async (type = null) => {
+    const response = await api.post("/assignments/end-semester", type ? { type } : {});
+    return response.data;
   }
 };

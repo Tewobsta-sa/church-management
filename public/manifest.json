@@ -3,7 +3,7 @@
   "short_name": "JKM Attendance",
   "description": "ጃቴ ኪዳነ ምሕረት ፍኖተ ሰማዕታት ሰንበት ትምህርት ቤት የሞባይል መገኘት መመዝገቢያ እና መመልከቻ አፕሊኬሽን | Mobile Attendance Scanning & Viewing App",
   "start_url": "/attendance/scanner",
-  "scope": "/",
+  "scope": "/attendance",
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#9f1239",
