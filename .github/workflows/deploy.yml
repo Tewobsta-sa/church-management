@@ -1,0 +1,52 @@
+name: Deploy Frontend (React) to cPanel
+
+on:
+  push:
+    branches:
+      - the-so-called-done
+  workflow_dispatch:
+
+jobs:
+  ftp-deploy:
+    name: Build & Deploy via FTP
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # VITE_API_BASE_URL is baked into the bundle at build time.
+      # Set it as a GitHub repo secret (e.g. https://api.yourdomain.com/api).
+      - name: Build frontend
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+
+      # Upload the static bundle into the frontend's docroot
+      # (e.g. /home/cpaneluser/public_html/ or a subdomain directory).
+      - name: Deploy via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.3
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          server-dir: ${{ secrets.FTP_PATH }} # e.g. /home/cpaneluser/public_html/ — must end with '/'
+          local-dir: ./dist/
+          exclude: |
+            **/.git*
+
+# ────────────────────────────────────────────────────────────────────────────
+# NOTES:
+# - public/.htaccess ships with the build and rewrites deep links to
+#   index.html (React Router needs it on Apache). If the frontend and API
+#   share one docroot, add a rule to exclude the /api path instead.
+# ────────────────────────────────────────────────────────────────────────────
