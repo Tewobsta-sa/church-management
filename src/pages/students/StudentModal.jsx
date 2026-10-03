@@ -13,6 +13,7 @@ import {
   Paperclip,
   CheckCircle2,
   ExternalLink,
+  Flag,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { studentService } from "../../services/studentService";
@@ -88,9 +89,28 @@ export default function StudentModal({
 
   const [sections, setSections] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [flagHistory, setFlagHistory] = useState(null);
 
   const isCreate = mode === "create" || !student;
   const isEdit = mode === "edit" || isCreate;
+  const canSeeFlagHistory = hasRole("super_admin") || hasRole("yesew_habt");
+
+  // List rows don't include flag_history — fetch the full profile in view
+  // mode, but only for roles the backend allows to see it.
+  useEffect(() => {
+    setFlagHistory(null);
+    if (
+      isOpen &&
+      mode === "view" &&
+      student?.id &&
+      canSeeFlagHistory
+    ) {
+      studentService
+        .getStudent(student.id)
+        .then((s) => setFlagHistory(s.flag_history ?? []))
+        .catch(() => setFlagHistory([]));
+    }
+  }, [isOpen, mode, student?.id, canSeeFlagHistory]);
 
   useEffect(() => {
     if (student) {
@@ -650,6 +670,35 @@ export default function StudentModal({
                         </div>
                       </div>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {/* Flag History — fetched for Ye Sew Habt / Super Admin only */}
+              {flagHistory?.length > 0 && (
+                <div className="p-5 rounded-2xl bg-rose-50/60 border border-rose-200/70">
+                  <h4 className="text-xs font-black text-rose-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                    <Flag className="w-3.5 h-3.5" /> የእገዳ ታሪክ (Flag History)
+                  </h4>
+                  <div className="space-y-2.5">
+                    {flagHistory.map((evt) => (
+                      <div
+                        key={evt.id}
+                        className="bg-white rounded-xl border border-rose-100 px-4 py-3 text-xs"
+                      >
+                        <p className="font-bold text-slate-800">{evt.reason}</p>
+                        <p className="text-slate-500 mt-1">
+                          ታግዷል (Flagged)
+                          {evt.flagged_by ? ` by ${evt.flagged_by}` : ""}
+                          {evt.flagged_at
+                            ? ` • ${new Date(evt.flagged_at).toLocaleDateString()}`
+                            : ""}
+                          {evt.unflagged_at
+                            ? ` — እገዳ ተነስቷል (Cleared)${evt.unflagged_by ? ` by ${evt.unflagged_by}` : ""} • ${new Date(evt.unflagged_at).toLocaleDateString()}`
+                            : " — still active"}
+                        </p>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}

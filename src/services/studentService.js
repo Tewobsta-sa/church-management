@@ -31,6 +31,11 @@ export const studentService = {
     return response.data;
   },
 
+  getStudent: async (id) => {
+    const response = await api.get(`/students/${id}`);
+    return response.data;
+  },
+
   createStudent: async (data, track = "regular") => {
     // If data is FormData, send multipart
     if (data instanceof FormData) {
