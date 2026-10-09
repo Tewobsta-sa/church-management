@@ -1,7 +1,15 @@
-# Apache/cPanel — send all non-file requests to index.html so
-# React Router (BrowserRouter) deep links and refreshes work.
 <IfModule mod_rewrite.c>
   RewriteEngine On
+
+  # Force one canonical URL: https + non-www. The API's CORS allowlist only
+  # permits https://fenotesemaetat.com, so users on www or plain http get
+  # blocked API calls (login "server error") unless we redirect them first.
+  RewriteCond %{HTTPS} off [OR]
+  RewriteCond %{HTTP_HOST} ^www\. [NC]
+  RewriteRule ^ https://fenotesemaetat.com%{REQUEST_URI} [R=301,L]
+
+  # Apache/cPanel — send all non-file requests to index.html so
+  # React Router (BrowserRouter) deep links and refreshes work.
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule ^ index.html [L]

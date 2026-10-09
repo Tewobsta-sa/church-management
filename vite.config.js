@@ -7,6 +7,12 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     proxy: {
+      // Forward API calls to Laravel. Host header is passed through
+      // (no changeOrigin) so url() in Laravel returns URLs that route
+      // back through this dev server — works on phones via LAN too.
+      "/api": {
+        target: "http://localhost:8000",
+      },
       // Same-origin fallback for legacy /storage URLs during PDF capture
       "/storage": {
         target: "http://localhost:8000",
