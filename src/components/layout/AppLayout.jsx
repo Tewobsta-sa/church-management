@@ -1,6 +1,7 @@
 import { Outlet, Navigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
+import { isStandalone } from "../../utils/device";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 
@@ -28,6 +29,15 @@ export default function AppLayout() {
   // Not logged in
   if (!token) {
     return <Navigate to="/" replace />;
+  }
+
+  // Installed PWA: fullscreen attendance-only app — no sidebar/topbar chrome
+  if (isStandalone()) {
+    return (
+      <main className="min-h-screen bg-slate-950 text-slate-100">
+        <Outlet />
+      </main>
+    );
   }
 
   return (

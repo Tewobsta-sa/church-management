@@ -1,5 +1,5 @@
 // St. Kidane Mehret Finote Semaetat Service Worker for Mobile Attendance PWA
-const CACHE_NAME = 'jkm-attendance-v1';
+const CACHE_NAME = 'jkm-attendance-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -37,12 +37,25 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
+  // Network-first: always try to serve the freshest build so deployed
+  // fixes reach installed PWAs. Fall back to cache when offline.
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      return cachedResponse || fetch(event.request).catch(() => {
-        // Offline fallback if needed
-        return caches.match('/index.html');
-      });
-    })
+    fetch(event.request)
+      .then((response) => {
+        if (response.ok && event.request.url.startsWith(self.location.origin)) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
+        return response;
+      })
+      .catch(() => {
+        return caches.match(event.request).then((cachedResponse) => {
+          return cachedResponse || caches.match('/index.html');
+        });
+      })
   );
 });

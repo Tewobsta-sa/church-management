@@ -1,3 +1,10 @@
+# The host injects "Permissions-Policy: camera=()" on every response, which
+# disables the camera silently — no permission prompt and no entry in site
+# settings. Re-allow camera for our own origin so the QR scanner works.
+<IfModule mod_headers.c>
+  Header always set Permissions-Policy "camera=(self), microphone=(), geolocation=()"
+</IfModule>
+
 <IfModule mod_rewrite.c>
   RewriteEngine On
 

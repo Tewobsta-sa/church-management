@@ -123,6 +123,20 @@ export default function MobileAttendanceScanner() {
   const startCamera = async () => {
     setScannerError("");
     try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setScannerError(
+          "ይህ አሳሽ ካሜራ አይደግፍም። እባክዎ ሰፕፖ/Chrome/Safari ወይም HTTPS ላይ ይክፈቱ። (This browser does not support camera access.)"
+        );
+        return;
+      }
+
+      // Explicitly request the camera first so the OS/browser permission
+      // prompt appears reliably — including inside the installed PWA.
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: cameraFacing },
+      });
+      stream.getTracks().forEach((t) => t.stop());
+
       if (!html5QrCodeRef.current) {
         html5QrCodeRef.current = new Html5Qrcode("qr-reader");
       }
@@ -143,7 +157,18 @@ export default function MobileAttendanceScanner() {
       setIsScanning(true);
     } catch (err) {
       console.error("Camera start failed", err);
-      setScannerError("ካሜራውን መክፈት አልተቻለም። እባክዎ የካሜራ ፈቃድ (Camera Permission) ያረጋግጡ።");
+      const name = err?.name || "";
+      if (name === "NotAllowedError" || name === "PermissionDeniedError" || name === "SecurityError") {
+        setScannerError(
+          "የካሜራ ፈቃድ ተከልክሏል። Settings → Apps → JKM Attendance → Permissions → Camera ላይ ይፍቀዱ። ፈቃዱ ከሌለ እባክዎ መተግበሪያውን ያስወግተው እና እንደገና ይጫኑ። (Camera permission is blocked. Enable it in app/site settings; if no Camera option appears, uninstall and reinstall the app.)"
+        );
+      } else if (name === "NotFoundError" || name === "DevicesNotFoundError" || name === "OverconstrainedError") {
+        setScannerError("ካሜራ አልተገኘም። (No camera found on this device.)");
+      } else if (name === "NotReadableError" || name === "TrackStartError") {
+        setScannerError("ካሜራው በሌላ መተግበሪያ ላይ ጥቅም ላይ ነው። እባክዎ ሌሎች መተግበሪያዎችን ይዝጉ። (Camera is busy in another app.)");
+      } else {
+        setScannerError("ካሜራውን መክፈት አልተቻለም። እባክዎ የካሜራ ፈቃድ (Camera Permission) ያረጋግጡ።");
+      }
       setIsScanning(false);
     }
   };
