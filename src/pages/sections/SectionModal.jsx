@@ -2,9 +2,12 @@ import { useState, useEffect } from 'react';
 import { X, Save } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { translateTrack } from '../../i18n/tracks';
+import { formatApiError } from '../../services/api';
+import { useFeedback } from '../../context/FeedbackContext';
 
 export default function SectionModal({ isOpen, onClose, section = null, programTypes = [], onSave }) {
   const { t } = useTranslation();
+  const { notify } = useFeedback();
   const [formData, setFormData] = useState({
     name: '',
     program_type_id: '',
@@ -38,7 +41,7 @@ export default function SectionModal({ isOpen, onClose, section = null, programT
       await onSave(formData, isEdit ? section.id : null);
       onClose();
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to save section');
+      notify(formatApiError(err, 'Failed to save section'), 'error');
     } finally {
       setIsSubmitting(false);
     }

@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
-import { Search, Save, BookOpen } from "lucide-react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { Search, Save, BookOpen, Download, Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../../context/AuthContext";
 import { courseService } from "../../services/courseService";
 import { gradeService } from "../../services/gradeService";
 import { translateTrack } from "../../i18n/tracks";
+import { formatApiError, humanizeFieldKeys } from "../../services/api";
 
 /**
  * Letter grade based on percentage (0-100).
@@ -23,16 +24,22 @@ function getLetterGrade(pct) {
 }
 
 function getGradeColor(grade) {
-  if (grade.startsWith("A")) return "text-green-600 bg-green-50 border-green-200";
-  if (grade.startsWith("B")) return "text-brand-600 bg-brand-50 border-brand-200";
-  if (grade.startsWith("C")) return "text-amber-600 bg-amber-50 border-amber-200";
+  if (grade.startsWith("A"))
+    return "text-green-600 bg-green-50 border-green-200";
+  if (grade.startsWith("B"))
+    return "text-brand-600 bg-brand-50 border-brand-200";
+  if (grade.startsWith("C"))
+    return "text-amber-600 bg-amber-50 border-amber-200";
   return "text-red-600 bg-red-50 border-red-200";
 }
 
 export default function Grades() {
   const { t } = useTranslation();
   const { hasRole } = useAuth();
-  const isTeacher = hasRole("teacher") && !hasRole("tmhrt_office_admin") && !hasRole("super_admin");
+  const isTeacher =
+    hasRole("teacher") &&
+    !hasRole("tmhrt_office_admin") &&
+    !hasRole("super_admin");
 
   const [myCourses, setMyCourses] = useState([]);
   const [selected, setSelected] = useState(null); // { course_id, section_id }
@@ -43,9 +50,12 @@ export default function Grades() {
   const [grades, setGrades] = useState({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importErrors, setImportErrors] = useState([]);
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
   const [search, setSearch] = useState("");
+  const fileInputRef = useRef(null);
 
   // Load the teacher's courses (or admin view: all courses with assessments)
   useEffect(() => {
@@ -58,23 +68,24 @@ export default function Grades() {
           setMyCourses(Array.isArray(data) ? data : data?.data || []);
         } else {
           const data = await courseService.list();
-          const list = (Array.isArray(data) ? data : data?.data || []).map((c) => ({
-            course_id: c.id,
-            course_name: c.name,
-            section_id: null,
-            section_name: null,
-            program_type: c.program_type?.name || c.programType?.name || "",
-          }));
+          const list = (Array.isArray(data) ? data : data?.data || []).map(
+            (c) => ({
+              course_id: c.id,
+              course_name: c.name,
+              section_id: null,
+              section_name: null,
+              program_type: c.program_type?.name || c.programType?.name || "",
+            }),
+          );
           setMyCourses(list);
         }
       } catch (err) {
-        setError(err.response?.data?.message || t("common.serverError"));
+        setError(formatApiError(err));
       } finally {
         setLoading(false);
       }
     };
     load();
-     
   }, [isTeacher]);
 
   // Auto-pick first course when list loads
@@ -85,45 +96,103 @@ export default function Grades() {
     }
   }, [myCourses, selected]);
 
-  // When selected changes, load assessments + students
-  useEffect(() => {
-    if (!selected) return;
-    const load = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        setSuccessMsg(null);
-        const [assessRes, studentsRes] = await Promise.all([
-          courseService.assessments(selected.course_id),
-          courseService.courseStudents(selected.course_id, selected.section_id),
-        ]);
-        const assessList = Array.isArray(assessRes) ? assessRes : assessRes?.data || [];
-        const studentList = studentsRes?.students || [];
-        setAssessments(assessList);
-        setStudents(studentList);
+  // Load assessments + students for currently selected course
+  const loadCourseData = useCallback(async () => {
+    if (!selected?.course_id) return;
+    try {
+      setLoading(true);
+      setError(null);
+      const [assessRes, studentsRes] = await Promise.all([
+        courseService.assessments(selected.course_id),
+        courseService.courseStudents(selected.course_id, selected.section_id),
+      ]);
+      const assessList = Array.isArray(assessRes)
+        ? assessRes
+        : assessRes?.data || [];
+      const studentList = studentsRes?.students || [];
+      setAssessments(assessList);
+      setStudents(studentList);
 
-        // Build initial grades map from students[].grades[]
-        const initial = {};
-        studentList.forEach((s) => {
-          initial[s.id] = {};
-          (s.grades || []).forEach((g) => {
-            initial[s.id][g.assessment_id] = g.score;
-          });
+      // Build initial grades map from students[].grades[]
+      const initial = {};
+      studentList.forEach((s) => {
+        initial[s.id] = {};
+        (s.grades || []).forEach((g) => {
+          initial[s.id][g.assessment_id] = g.score;
         });
-        setGrades(initial);
-      } catch (err) {
-        setError(err.response?.data?.message || t("common.serverError"));
-      } finally {
-        setLoading(false);
+      });
+      setGrades(initial);
+    } catch (err) {
+      setError(formatApiError(err));
+    } finally {
+      setLoading(false);
+    }
+  }, [selected, t]);
+
+  useEffect(() => {
+    loadCourseData();
+  }, [loadCourseData]);
+
+  const handleDownloadTemplate = async () => {
+    if (!selected?.course_id) return;
+    try {
+      setLoading(true);
+      const blob = await gradeService.downloadTemplate(
+        selected.course_id,
+        selected.section_id,
+      );
+      const url = window.URL.createObjectURL(new Blob([blob]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute(
+        "download",
+        `grades_template_course_${selected.course_id}.csv`,
+      );
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to download template");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !selected?.course_id) return;
+
+    // Reset so same file can be selected again
+    e.target.value = "";
+
+    try {
+      setImporting(true);
+      setError(null);
+      setSuccessMsg(null);
+      setImportErrors([]);
+
+      const res = await gradeService.importGrades(selected.course_id, file);
+      setSuccessMsg(res.message || "Grades imported successfully!");
+      if (res.errors && res.errors.length > 0) {
+        setImportErrors(res.errors);
       }
-    };
-    load();
-     
-  }, [selected]);
+      await loadCourseData();
+    } catch (err) {
+      setError(
+        formatApiError(
+          err,
+          "Failed to import grades. Please check your CSV format.",
+        ),
+      );
+    } finally {
+      setImporting(false);
+    }
+  };
 
   const totalWeight = useMemo(
     () => assessments.reduce((acc, a) => acc + (Number(a.weight) || 0), 0),
-    [assessments]
+    [assessments],
   );
 
   const computeWeightedScore = (studentId) => {
@@ -132,7 +201,8 @@ export default function Grades() {
     assessments.forEach((a) => {
       const raw = grades[studentId]?.[a.id];
       if (raw === undefined || raw === null || raw === "") return;
-      const pct = Math.max(0, Math.min(1, Number(raw) / Number(a.max_score))) || 0;
+      const pct =
+        Math.max(0, Math.min(1, Number(raw) / Number(a.max_score))) || 0;
       sum += pct * Number(a.weight);
     });
     return Math.round(sum * 100) / 100;
@@ -173,14 +243,17 @@ export default function Grades() {
       if (errs.length > 0) {
         setError(
           errs
-            .map((e) => `${e.assessment_id ?? ""}/${e.student_id ?? ""}: ${e.message || ""}`)
-            .join("\n")
+            .map(
+              (e) =>
+                `Row ${(e.index ?? 0) + 1}: ${humanizeFieldKeys(e.message) || "Validation failed"}`,
+            )
+            .join("\n"),
         );
       } else {
         setSuccessMsg(t("grades.savedCount", { count: okCount }));
       }
     } catch (err) {
-      setError(err.response?.data?.message || t("common.serverError"));
+      setError(formatApiError(err));
     } finally {
       setSaving(false);
     }
@@ -192,43 +265,82 @@ export default function Grades() {
     return students.filter(
       (s) =>
         s.name?.toLowerCase().includes(q) ||
-        s.student_id?.toLowerCase().includes(q)
+        s.student_id?.toLowerCase().includes(q),
     );
   }, [students, search]);
 
   const activeCourse = myCourses.find(
-    (c) => c.course_id === selected?.course_id && c.section_id === selected?.section_id
+    (c) =>
+      c.course_id === selected?.course_id &&
+      c.section_id === selected?.section_id,
   );
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">{t("grades.title")}</h1>
-          <p className="text-slate-500 font-medium mt-1">{t("grades.subtitle")}</p>
+          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">
+            {t("grades.title")}
+          </h1>
+          <p className="text-slate-500 font-medium mt-1">
+            {t("grades.subtitle")}
+          </p>
         </div>
-        <button
-          onClick={handleSave}
-          disabled={saving || !selected || students.length === 0}
-          className="flex items-center gap-2 bg-gradient-to-r from-brand-600 to-brand-500 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-brand-500/30 hover:-translate-y-0.5 transition-all disabled:opacity-50"
-        >
-          <Save className="w-5 h-5" />
-          {saving ? t("common.saving") : t("grades.saveGrades")}
-        </button>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept=".csv,text/csv"
+            className="hidden"
+          />
+          <button
+            type="button"
+            onClick={handleDownloadTemplate}
+            disabled={loading || !selected?.course_id}
+            title="Download CSV template prefilled with enrolled students and assessment columns"
+            className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-4 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all disabled:opacity-50"
+          >
+            <Download className="w-4 h-4 text-brand-600" />
+            <span>Download CSV Template</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importing || loading || !selected?.course_id}
+            title="Upload CSV to bulk import grades for this course"
+            className="flex items-center gap-2 bg-white border border-brand-200 text-brand-700 hover:bg-brand-50 px-4 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all disabled:opacity-50"
+          >
+            <Upload className="w-4 h-4 text-brand-600" />
+            <span>{importing ? "Importing…" : "Import Grades (CSV)"}</span>
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving || !selected || students.length === 0}
+            className="flex items-center gap-2 bg-linear-to-r from-brand-600 to-brand-500 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-brand-500/30 hover:-translate-y-0.5 transition-all disabled:opacity-50"
+          >
+            <Save className="w-5 h-5" />
+            {saving ? t("common.saving") : t("grades.saveGrades")}
+          </button>
+        </div>
       </div>
 
-      <div className="glass-panel p-4 flex flex-wrap sm:flex-nowrap gap-4 items-center border-b-[3px] border-b-brand-500">
-        <div className="flex items-center gap-3 mr-auto">
-          <div className="w-12 h-12 bg-brand-50 rounded-xl flex items-center justify-center text-brand-600">
+      <div className="glass-panel p-4 flex flex-col lg:flex-row gap-4 items-stretch lg:items-center border-b-[3px] border-b-brand-500">
+        <div className="flex items-center gap-3 mr-auto min-w-0">
+          <div className="w-11 h-11 shrink-0 bg-brand-50 rounded-xl flex items-center justify-center text-brand-600">
             <BookOpen className="w-6 h-6" />
           </div>
-          <div>
+          <div className="min-w-0 flex-1">
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">
               {t("grades.activeCourse")}
             </label>
             <select
-              className="bg-transparent border-none outline-none font-black text-xl text-slate-800 p-0 cursor-pointer hover:text-brand-600 transition-colors"
-              value={selected ? `${selected.course_id}:${selected.section_id ?? ""}` : ""}
+              className="w-full max-w-full bg-white border border-slate-200 rounded-xl outline-none font-bold text-sm text-slate-800 px-3.5 py-2.5 cursor-pointer hover:border-brand-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 transition-all shadow-xs"
+              value={
+                selected
+                  ? `${selected.course_id}:${selected.section_id ?? ""}`
+                  : ""
+              }
               onChange={(e) => {
                 const [cid, sid] = e.target.value.split(":");
                 setSelected({
@@ -245,7 +357,8 @@ export default function Grades() {
                     key={`${c.course_id}:${c.section_id ?? ""}`}
                     value={`${c.course_id}:${c.section_id ?? ""}`}
                   >
-                    {c.course_name}{c.section_name ? ` · ${c.section_name}` : ""}
+                    {c.course_name}
+                    {c.section_name ? ` · ${c.section_name}` : ""}
                   </option>
                 ))
               )}
@@ -262,7 +375,7 @@ export default function Grades() {
             )}
           </div>
         </div>
-        <div className="relative w-full sm:w-64">
+        <div className="relative w-full lg:w-64 shrink-0">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
@@ -282,6 +395,16 @@ export default function Grades() {
       {successMsg && (
         <div className="bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg px-4 py-3">
           {successMsg}
+        </div>
+      )}
+      {importErrors.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 text-xs rounded-xl p-4 space-y-1">
+          <p className="font-bold">Some rows had issues during CSV import:</p>
+          <ul className="list-disc list-inside space-y-0.5 text-slate-700">
+            {importErrors.map((err, i) => (
+              <li key={i}>{err}</li>
+            ))}
+          </ul>
         </div>
       )}
 
@@ -305,20 +428,30 @@ export default function Grades() {
                     </span>
                   </th>
                 ))}
-                <th className="px-4 py-4 w-28 text-center">{t("grades.total")}</th>
-                <th className="px-4 py-4 w-20 text-center">{t("grades.letter")}</th>
+                <th className="px-4 py-4 w-28 text-center">
+                  {t("grades.total")}
+                </th>
+                <th className="px-4 py-4 w-20 text-center">
+                  {t("grades.letter")}
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={assessments.length + 3} className="px-6 py-12 text-center text-slate-500">
+                  <td
+                    colSpan={assessments.length + 3}
+                    className="px-6 py-12 text-center text-slate-500"
+                  >
                     {t("common.loading")}
                   </td>
                 </tr>
               ) : filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={assessments.length + 3} className="px-6 py-12 text-center text-slate-500">
+                  <td
+                    colSpan={assessments.length + 3}
+                    className="px-6 py-12 text-center text-slate-500"
+                  >
                     {t("grades.noStudents")}
                   </td>
                 </tr>
@@ -327,10 +460,15 @@ export default function Grades() {
                   const pct = computeWeightedScore(s.id);
                   const letter = getLetterGrade(pct);
                   return (
-                    <tr key={s.id} className="hover:bg-slate-50/50 transition-colors group">
+                    <tr
+                      key={s.id}
+                      className="hover:bg-slate-50/50 transition-colors group"
+                    >
                       <td className="px-6 py-4">
                         <p className="font-bold text-slate-800">{s.name}</p>
-                        <p className="text-xs font-semibold text-slate-500">{s.student_id}</p>
+                        <p className="text-xs font-semibold text-slate-500">
+                          {s.student_id}
+                        </p>
                       </td>
                       {assessments.map((a) => (
                         <td key={a.id} className="px-4 py-4">
@@ -340,21 +478,30 @@ export default function Grades() {
                             max={a.max_score}
                             step="0.01"
                             value={
-                              grades[s.id]?.[a.id] === undefined || grades[s.id]?.[a.id] === null
+                              grades[s.id]?.[a.id] === undefined ||
+                              grades[s.id]?.[a.id] === null
                                 ? ""
                                 : grades[s.id][a.id]
                             }
-                            onChange={(e) => handleGradeChange(s.id, a.id, e.target.value)}
+                            onChange={(e) =>
+                              handleGradeChange(s.id, a.id, e.target.value)
+                            }
                             className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-center font-bold text-slate-700 outline-none focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-500/20 transition-all"
                           />
                         </td>
                       ))}
                       <td className="px-4 py-4 text-center">
-                        <span className="text-xl font-black text-slate-800">{pct}</span>
-                        <span className="text-xs font-bold text-slate-400">/100</span>
+                        <span className="text-xl font-black text-slate-800">
+                          {pct}
+                        </span>
+                        <span className="text-xs font-bold text-slate-400">
+                          /100
+                        </span>
                       </td>
                       <td className="px-4 py-4 text-center">
-                        <span className={`inline-flex items-center justify-center w-10 h-10 rounded-xl border text-xl font-black ${getGradeColor(letter)}`}>
+                        <span
+                          className={`inline-flex items-center justify-center w-10 h-10 rounded-xl border text-xl font-black ${getGradeColor(letter)}`}
+                        >
                           {letter}
                         </span>
                       </td>

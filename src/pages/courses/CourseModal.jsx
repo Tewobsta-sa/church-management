@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { courseService } from "../../services/courseService";
 import { sectionService } from "../../services/sectionService";
 import { translateTrack } from "../../i18n/tracks";
+import { formatApiError } from "../../services/api";
 
 export default function CourseModal({ isOpen, onClose, course = null, onSuccess }) {
   const { t } = useTranslation();
@@ -11,7 +12,8 @@ export default function CourseModal({ isOpen, onClose, course = null, onSuccess 
 
   const [name, setName] = useState("");
   const [creditHour, setCreditHour] = useState(3);
-  const [duration, setDuration] = useState(16);
+  const [sem1, setSem1] = useState(true);
+  const [sem2, setSem2] = useState(false);
   const [programTypeName, setProgramTypeName] = useState("");
   const [assessments, setAssessments] = useState([]);
   const [programTypes, setProgramTypes] = useState([]);
@@ -30,7 +32,9 @@ export default function CourseModal({ isOpen, onClose, course = null, onSuccess 
     if (course) {
       setName(course.name || "");
       setCreditHour(course.credit_hour || 3);
-      setDuration(course.duration || 16);
+      const semStr = (course.semester || "").toLowerCase();
+      setSem1(semStr.includes("1") || !semStr);
+      setSem2(semStr.includes("2"));
       setProgramTypeName(course.program_type?.name || course.programType?.name || "");
       setAssessments(
         (course.assessments || []).map((a) => ({
@@ -44,7 +48,8 @@ export default function CourseModal({ isOpen, onClose, course = null, onSuccess 
     } else {
       setName("");
       setCreditHour(3);
-      setDuration(16);
+      setSem1(true);
+      setSem2(false);
       setProgramTypeName("");
       setAssessments([
         { title: "Mid Exam", max_score: 30, weight: 30, type: "exam" },
@@ -91,10 +96,12 @@ export default function CourseModal({ isOpen, onClose, course = null, onSuccess 
 
     setSubmitting(true);
     try {
+      const semLabel = [sem1 && "Semester 1", sem2 && "Semester 2"].filter(Boolean).join(" & ") || "Semester 1";
       const payload = {
         name,
         credit_hour: Number(creditHour),
-        duration: Number(duration),
+        duration: sem1 && sem2 ? 32 : 16,
+        semester: semLabel,
         program_type_name: programTypeName,
         assessments: assessments.map((a) => ({
           ...(a.id ? { id: a.id } : {}),
@@ -112,12 +119,7 @@ export default function CourseModal({ isOpen, onClose, course = null, onSuccess 
       onSuccess?.();
       onClose();
     } catch (err) {
-      const errs = err.response?.data?.errors;
-      setErrorMsg(
-        errs
-          ? Object.values(errs).flat().join("\n")
-          : err.response?.data?.message || t("common.serverError")
-      );
+      setErrorMsg(formatApiError(err));
     } finally {
       setSubmitting(false);
     }
@@ -161,15 +163,27 @@ export default function CourseModal({ isOpen, onClose, course = null, onSuccess 
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-600 uppercase tracking-widest mb-1">{t("courses.fields.duration")}</label>
-              <input
-                type="number"
-                min={1}
-                value={duration}
-                onChange={(e) => setDuration(e.target.value)}
-                required
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-              />
+              <label className="block text-xs font-bold text-slate-600 uppercase tracking-widest mb-2">ሴሚስተር / Semesters</label>
+              <div className="flex items-center gap-4 pt-1.5">
+                <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 cursor-pointer select-none bg-slate-50 hover:bg-slate-100 px-3 py-2 rounded-lg border border-slate-200 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={sem1}
+                    onChange={(e) => setSem1(e.target.checked)}
+                    className="w-4 h-4 text-brand-600 rounded border-slate-300 focus:ring-brand-500"
+                  />
+                  <span>ሴሚስተር 1 (Sem 1)</span>
+                </label>
+                <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 cursor-pointer select-none bg-slate-50 hover:bg-slate-100 px-3 py-2 rounded-lg border border-slate-200 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={sem2}
+                    onChange={(e) => setSem2(e.target.checked)}
+                    className="w-4 h-4 text-brand-600 rounded border-slate-300 focus:ring-brand-500"
+                  />
+                  <span>ሴሚስተር 2 (Sem 2)</span>
+                </label>
+              </div>
             </div>
             <div className="md:col-span-2">
               <label className="block text-xs font-bold text-slate-600 uppercase tracking-widest mb-1">{t("courses.fields.programType")}</label>
@@ -177,7 +191,7 @@ export default function CourseModal({ isOpen, onClose, course = null, onSuccess 
                 value={programTypeName}
                 onChange={(e) => setProgramTypeName(e.target.value)}
                 required
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 bg-white"
+                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl outline-none hover:border-brand-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 transition-all bg-white font-medium text-slate-800 shadow-xs"
               >
                 <option value="">{t("common.select")}…</option>
                 {programTypes.map((pt) => (

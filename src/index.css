@@ -1,22 +1,37 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/forms";
 
-/* Premium modern UI configuration for Tailwind v4 */
+/* Sacred Crimson & Cathedral Gold UI configuration for Tailwind v4 */
 @theme {
-  --font-sans: "Inter", system-ui, sans-serif;
+  --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 
-  /* Dark Green color scheme */
-  --color-brand-50: #f0fdf4;
-  --color-brand-100: #dcfce7;
-  --color-brand-200: #bbf7d0;
-  --color-brand-300: #86efac;
-  --color-brand-400: #4ade80;
-  --color-brand-500: #22c55e;
-  --color-brand-600: #16a34a;
-  --color-brand-700: #15803d;
-  --color-brand-800: #166534;
-  --color-brand-900: #0f4c3a;
-  --color-brand-950: #0a3326;
+  /* Sacred Crimson / Royal Burgundy Palette (Finote Semaetat) */
+  --color-brand-50: #fff1f2;
+  --color-brand-100: #ffe4e6;
+  --color-brand-200: #fecdd3;
+  --color-brand-300: #fda4af;
+  --color-brand-400: #fb7185;
+  --color-brand-500: #e11d48;
+  --color-brand-600: #be123c;
+  --color-brand-700: #9f1239;
+  --color-brand-800: #881337;
+  --color-brand-900: #700c2a;
+  --color-brand-950: #4c0519;
+
+  /* Cathedral Gold Accents */
+  --color-gold-50: #fffbeb;
+  --color-gold-100: #fef3c7;
+  --color-gold-200: #fde68a;
+  --color-gold-400: #fbbf24;
+  --color-gold-500: #f59e0b;
+  --color-gold-600: #d97706;
+  --color-gold-700: #b45309;
+
+  /* Celestial Blue Accents */
+  --color-celestial-100: #e0f2fe;
+  --color-celestial-400: #38bdf8;
+  --color-celestial-500: #0ea5e9;
+  --color-celestial-600: #0284c7;
 
   --color-surface-50: #f8fafc;
   --color-surface-100: #f1f5f9;
@@ -28,6 +43,7 @@
   /* Custom Box Shadows */
   --shadow-glass: 0 4px 30px rgba(0, 0, 0, 0.05);
   --shadow-glass-strong: 0 8px 32px rgba(0, 0, 0, 0.08);
+  --shadow-sacred: 0 10px 25px -5px rgba(159, 18, 57, 0.25), 0 8px 10px -6px rgba(159, 18, 57, 0.15);
 
   /* Animations */
   --animate-fade-in: fade-in 0.3s ease-out;
@@ -50,11 +66,152 @@
   to { transform: scale(1); opacity: 1; }
 }
 
+@keyframes toast-in {
+  from { transform: translateX(16px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
 /* Base structural overrides */
 @layer base {
   body {
     @apply bg-surface-50 text-slate-900 antialiased font-sans;
   }
+
+  /* Consistent, theme-aligned dropdowns across the app */
+  select {
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23be123c' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 0.95rem;
+    padding-right: 2.35rem !important;
+    font-size: 0.875rem;
+    font-weight: 600;
+    border-radius: 0.75rem;
+    transition: border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.15s ease;
+  }
+
+  /* Gentle brand hover on bordered selects */
+  select:hover:not(:disabled) {
+    border-color: var(--color-brand-400);
+  }
+
+  /* Polished focus ring with brand accent */
+  select:focus,
+  select:focus-visible {
+    outline: none !important;
+    border-color: var(--color-brand-600) !important;
+    box-shadow: 0 0 0 3px rgba(190, 18, 60, 0.12) !important;
+  }
+
+  select:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+    background-color: var(--color-surface-100);
+  }
+
+  select option {
+    color: var(--color-surface-900);
+    background-color: #ffffff;
+    font-weight: 500;
+    padding: 6px 10px;
+  }
+
+  /* When a custom chevron icon is rendered by a component */
+  select.bg-none {
+    background-image: none !important;
+  }
+
+  /* Light chevron for dropdowns rendered on dark surfaces */
+  select.select-on-dark {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23f1f5f9' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-color: #0f172a;
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+  select.select-on-dark option {
+    background-color: #1e293b;
+    color: #ffffff;
+  }
+
+  /* Sleek Modern Global Scrollbars */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(159, 18, 57, 0.25) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: rgba(159, 18, 57, 0.22);
+    border-radius: 9999px;
+    transition: background-color 0.2s ease;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(159, 18, 57, 0.55);
+  }
+
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+}
+
+/* Custom Scrollbar Utilities */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(159, 18, 57, 0.3) transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(159, 18, 57, 0.25);
+  border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(159, 18, 57, 0.6);
+}
+
+/* Dark context scrollbars */
+.glass-dark .custom-scrollbar,
+.glass-dark * {
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.glass-dark *::-webkit-scrollbar-thumb,
+.glass-dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.glass-dark *::-webkit-scrollbar-thumb:hover,
+.glass-dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* Custom Utilities */
@@ -66,17 +223,22 @@
 }
 
 @utility glass-dark {
-  background: rgba(15, 23, 42, 0.7);
+  background: rgba(15, 23, 42, 0.85);
   backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: var(--shadow-glass-strong);
 }
 
 @utility glass-panel {
-  @apply bg-white/80 backdrop-blur-xl border border-white/40 shadow-sm rounded-2xl;
+  @apply bg-white/85 backdrop-blur-xl border border-white/60 shadow-sm rounded-2xl;
 }
 
 @utility bg-gradient-brand {
-  @apply bg-linear-to-br from-brand-600 via-brand-700 to-brand-900;
+  @apply bg-linear-to-br from-brand-700 via-brand-800 to-brand-950;
 }
+
+@utility bg-gradient-gold {
+  @apply bg-linear-to-r from-amber-500 via-amber-600 to-amber-700;
+}
+
 

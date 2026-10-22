@@ -4,9 +4,11 @@ import { Plus, Edit2, Trash2, Eye, BookOpen, Users, UserCheck, Search, Filter } 
 import { useTranslation } from 'react-i18next';
 import SectionModal from './SectionModal';
 import { translateTrack } from '../../i18n/tracks';
+import { useFeedback } from '../../context/FeedbackContext';
 
 export default function SectionsManagement() {
   const { t } = useTranslation();
+  const { confirmAction } = useFeedback();
   const [sections, setSections] = useState([]);
   const [programTypes, setProgramTypes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -33,6 +35,14 @@ export default function SectionsManagement() {
     try {
       const data = await sectionService.getProgramTypes();
       setProgramTypes(data);
+      
+      // Auto-select "Young" track initially
+      if (!selectedProgramType) {
+        const young = data.find(pt => pt.name.toLowerCase().includes('young'));
+        if (young) {
+          setSelectedProgramType(young.id);
+        }
+      }
     } catch (e) {
       console.error(e);
     }
@@ -41,6 +51,7 @@ export default function SectionsManagement() {
   const loadSections = async () => {
     try {
       setLoading(true);
+      // We pass the current selectedProgramType or the one we just found
       const data = await sectionService.getSections(1, search, selectedProgramType);
       setSections(data.data || []);
     } catch (e) {
@@ -70,7 +81,13 @@ export default function SectionsManagement() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this section?')) return;
+    const confirmed = await confirmAction({
+      title: 'Delete Section',
+      message: 'Delete this section? This action cannot be undone.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!confirmed) return;
     await sectionService.deleteSection(id);
     loadSections();
   };
@@ -101,7 +118,9 @@ export default function SectionsManagement() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Academic Sections</h1>
+          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">
+            {selectedProgramType ? programTypes.find(pt => pt.id == selectedProgramType)?.name : 'Academic'} Sections
+          </h1>
           <p className="text-slate-500 font-medium mt-1">Organize student groups & classroom structures</p>
         </div>
         <button

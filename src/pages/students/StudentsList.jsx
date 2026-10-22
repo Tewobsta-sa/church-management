@@ -1,64 +1,131 @@
 import { useState, useEffect } from "react";
 import { studentService } from "../../services/studentService";
-import { Edit2, Trash2, Eye, Plus, Search, UserCheck, Upload } from "lucide-react";
+import { formatApiError } from "../../services/api";
+import {
+  Edit2,
+  Trash2,
+  Eye,
+  Plus,
+  Search,
+  UserCheck,
+  Upload,
+  QrCode,
+  CheckCircle2,
+  Filter,
+  CheckSquare,
+  Square,
+  ArrowRight,
+  Sparkles,
+  Flag,
+  FlagOff,
+  AlertTriangle,
+  Moon,
+  Sun,
+} from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { useFeedback } from "../../context/FeedbackContext";
 import { useTranslation } from "react-i18next";
 import StudentModal from "./StudentModal";
 import BulkImportModal from "./BulkImportModal";
+import IdCardExportModal from "./IdCardExportModal";
 import clsx from "clsx";
 
 const TABS = [
-  { key: "young", i18n: "students.trackYoung" },
-  { key: "regular", i18n: "students.trackRegular" },
-  { key: "distance", i18n: "students.trackDistance" },
+  { key: "prekg", label: "PreKG Program" },
+  { key: "regular", label: "Regular Program" },
+  { key: "distance", label: "Distance Learning" },
+];
+
+const REGULAR_SUB_FILTERS = [
+  { key: "all", label: "All Regular" },
+  { key: "htsanat", label: "Htsanat (1-4)" },
+  { key: "maekelawyan", label: "Maekelawyan (5-8)" },
+  { key: "wetatoch", label: "Wetatoch (9-12)" },
 ];
 
 export default function StudentsList() {
   const { hasRole } = useAuth();
+  const { notify, confirmAction } = useFeedback();
   const { t } = useTranslation();
 
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const [activeTab, setActiveTab] = useState("young"); // young | regular | distance
+  const [activeTab, setActiveTab] = useState("regular"); // prekg | regular | distance
+  const [regularSubFilter, setRegularSubFilter] = useState("all"); // all | htsanat | maekelawyan | wetatoch
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [shiftFilter, setShiftFilter] = useState("all"); // all | new | regular
+
   const [currentPage, setCurrentPage] = useState(1);
   const [search, setSearch] = useState("");
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+
+  // Selection state for bulk actions
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [modalMode, setModalMode] = useState("view");
   const [importOpen, setImportOpen] = useState(false);
+  const [idCardModalOpen, setIdCardModalOpen] = useState(false);
+  const [idCardStudents, setIdCardStudents] = useState([]);
+  const [idCardLoading, setIdCardLoading] = useState(false);
 
-  const canCreate =
-    (hasRole("young_gngnunet_admin") && activeTab === "young") ||
-    hasRole("gngnunet_office_admin") ||
-    (hasRole("distance_admin") && activeTab === "distance");
+  // Permissions
+  const isSuperAdmin = hasRole("super_admin");
+  const isYesewHabt = hasRole("yesew_habt") || hasRole("gngnunet_office_admin");
+  const isMereja = hasRole("mereja_kfl");
+
+  const canCreate = (isYesewHabt || isSuperAdmin) && !isMereja;
   const canEdit = canCreate;
   const canDelete = canCreate;
   const canImport = canCreate;
+  const canBulkUpdate = canCreate;
+  const canFlag = isYesewHabt || isSuperAdmin;
+  // ID card export is restricted to Ye Sew Habt (and super admin) per policy
+  const canExportIdCards = hasRole("yesew_habt") || isSuperAdmin;
+
+  // Flagging modal state (Ye Sew Habt mandatory reason)
+  const [flagModalOpen, setFlagModalOpen] = useState(false);
+  const [studentToFlag, setStudentToFlag] = useState(null);
+  const [flagReason, setFlagReason] = useState("");
+  const [flagLoading, setFlagLoading] = useState(false);
 
   const fetchStudents = async () => {
     try {
       setLoading(true);
       setError(null);
-      let data;
-      if (activeTab === "young") {
-        data = await studentService.getYoungStudents(currentPage, search);
-      } else if (activeTab === "regular") {
-        data = await studentService.getRegularStudents(currentPage, search);
-      } else if (activeTab === "distance") {
-        data = await studentService.getDistanceStudents(currentPage, search);
+
+      const filters = {};
+      if (activeTab === "regular" && regularSubFilter !== "all") {
+        filters.classification = regularSubFilter;
       }
+      if (statusFilter !== "all") {
+        filters.status = statusFilter;
+      }
+      if (shiftFilter !== "all") {
+        filters.is_night = shiftFilter === "night";
+      }
+
+      let data;
+      if (activeTab === "prekg") {
+        data = await studentService.getPreKGStudents(currentPage, search, filters);
+      } else if (activeTab === "regular") {
+        data = await studentService.getRegularStudents(currentPage, search, filters);
+      } else if (activeTab === "distance") {
+        data = await studentService.getDistanceStudents(currentPage, search, filters);
+      }
+
       setStudents(data?.data || []);
       setCurrentPage(data?.current_page || 1);
       setTotalPages(data?.last_page || 1);
       setTotal(data?.total || 0);
     } catch (err) {
-      setError(t("common.serverError"));
+      setError(formatApiError(err));
       setStudents([]);
     } finally {
       setLoading(false);
@@ -67,12 +134,54 @@ export default function StudentsList() {
 
   useEffect(() => {
     fetchStudents();
-     
-  }, [activeTab, currentPage, search]);
+    setSelectedIds([]);
+  }, [activeTab, regularSubFilter, statusFilter, shiftFilter, currentPage, search]);
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     setCurrentPage(1);
+    setSelectedIds([]);
+  };
+
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelectedIds(students.map((s) => s.id));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleToggleSelect = (id) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleBulkUpdateStatus = async () => {
+    if (selectedIds.length === 0) {
+      notify("Please select at least one student to update.", "warning");
+      return;
+    }
+
+    const confirmed = await confirmAction({
+      title: "Update Student Statuses",
+      message: `Are you sure you want to change the status of ${selectedIds.length} student(s) from 'New' to 'Regular'?`,
+      confirmLabel: "Update Status",
+    });
+    if (!confirmed) return;
+
+    setBulkLoading(true);
+    try {
+      await studentService.bulkUpdateStatus(selectedIds, "regular");
+      notify(`Successfully updated ${selectedIds.length} student(s) to Regular status.`, "success");
+      setSelectedIds([]);
+      fetchStudents();
+    } catch (err) {
+      console.error(err);
+      notify(formatApiError(err, "Failed to update status. Please try again."), "error");
+    } finally {
+      setBulkLoading(false);
+    }
   };
 
   const openModal = (student = null, mode = "view") => {
@@ -82,188 +191,558 @@ export default function StudentsList() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm(t("students.confirmDelete"))) return;
+    const confirmed = await confirmAction({
+      title: "Delete Student Record",
+      message: "Are you sure you want to delete this student record? This action cannot be undone.",
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!confirmed) return;
     try {
-      await studentService.deleteStudent(id, activeTab);
+      await studentService.deleteStudent(id);
+      notify("Student record deleted.", "success");
       fetchStudents();
     } catch (err) {
-      alert(t("students.deleteFailed"));
+      notify(formatApiError(err, "Failed to delete student"), "error");
+    }
+  };
+
+  const handleOpenFlagModal = (student) => {
+    setStudentToFlag(student);
+    setFlagReason("");
+    setFlagModalOpen(true);
+  };
+
+  const handleConfirmFlag = async () => {
+    if (!studentToFlag) return;
+    if (!flagReason.trim()) {
+      notify("Please provide a mandatory reason for flagging the student.", "warning");
+      return;
+    }
+    try {
+      setFlagLoading(true);
+      await studentService.flagStudent(studentToFlag.id, flagReason.trim());
+      setFlagModalOpen(false);
+      setStudentToFlag(null);
+      setFlagReason("");
+      notify("Student flagged successfully.", "success");
+      fetchStudents();
+    } catch (err) {
+      notify(formatApiError(err, "Failed to flag student."), "error");
+    } finally {
+      setFlagLoading(false);
+    }
+  };
+
+  const handleUnflag = async (student) => {
+    const confirmed = await confirmAction({
+      title: "Lift Flag / Suspension",
+      message: `Are you sure you want to lift the flag / suspension for ${student.name}?`,
+      confirmLabel: "Unflag",
+    });
+    if (!confirmed) return;
+    try {
+      setFlagLoading(true);
+      await studentService.unflagStudent(student.id);
+      notify("Flag lifted.", "success");
+      fetchStudents();
+    } catch (err) {
+      notify(formatApiError(err, "Failed to unflag student."), "error");
+    } finally {
+      setFlagLoading(false);
+    }
+  };
+
+  const selectedStudentsData = students.filter((s) => selectedIds.includes(s.id));
+
+  // With checkboxes selected, export exactly those (current page). With none,
+  // fetch every student matching the active tab/filters via the dedicated
+  // unpaginated ID-card endpoint — the paginated list only holds one page.
+  const handleExportIdCards = async () => {
+    if (selectedIds.length > 0) {
+      setIdCardStudents(selectedStudentsData);
+      setIdCardModalOpen(true);
+      return;
+    }
+
+    setIdCardLoading(true);
+    try {
+      const params = {
+        track: { prekg: "PreKG", regular: "Regular", distance: "Distance" }[activeTab],
+      };
+      if (activeTab === "regular" && regularSubFilter !== "all") {
+        params.classification = regularSubFilter;
+      }
+      if (statusFilter !== "all") {
+        params.status = statusFilter;
+      }
+      if (shiftFilter !== "all") {
+        params.is_night = shiftFilter === "night";
+      }
+      if (search.trim()) {
+        params.search = search.trim();
+      }
+
+      const data = await studentService.getIdCardsData(params);
+      const list = Array.isArray(data) ? data : data?.data || [];
+
+      if (list.length === 0) {
+        notify("No students found for ID card export.", "warning");
+        return;
+      }
+
+      setIdCardStudents(list);
+      setIdCardModalOpen(true);
+    } catch (err) {
+      console.error(err);
+      notify(formatApiError(err, "Failed to load students for ID card export."), "error");
+    } finally {
+      setIdCardLoading(false);
     }
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-[fade-in_0.3s_ease-out]">
+      {/* Page Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">{t("students.title")}</h1>
-          <p className="text-slate-500 font-medium mt-1">{t("students.subtitle")}</p>
+          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">
+            Student Management
+          </h1>
+          <p className="text-slate-500 font-medium mt-0.5">
+            Registration, classification progression, ID cards, and student records
+          </p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+
+        <div className="flex gap-2 flex-wrap items-center">
+          {/* Export ID Cards Button (Ye Sew Habt / Super Admin only) */}
+          {canExportIdCards && (
+            <button
+              onClick={handleExportIdCards}
+              disabled={students.length === 0 || idCardLoading}
+              className="flex items-center gap-2 bg-white text-brand-700 border border-brand-200 px-4 py-2.5 rounded-xl font-bold shadow-sm hover:bg-brand-50 transition-all text-xs uppercase tracking-wider disabled:opacity-40"
+            >
+              {idCardLoading ? (
+                <div className="w-4 h-4 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <QrCode className="w-4 h-4 text-brand-600" />
+              )}
+              {idCardLoading
+                ? "Loading Students..."
+                : `Export ID Cards (${selectedIds.length > 0 ? selectedIds.length : `All ${total}`})`}
+            </button>
+          )}
+
+          {/* Import Button */}
           {canImport && (
             <button
               onClick={() => setImportOpen(true)}
-              className="flex items-center gap-2 bg-white text-brand-700 border border-brand-200 px-4 py-2.5 rounded-xl font-semibold hover:bg-brand-50 transition-all"
+              className="flex items-center gap-2 bg-white text-slate-700 border border-slate-200 px-4 py-2.5 rounded-xl font-bold hover:bg-slate-50 transition-all text-xs uppercase tracking-wider"
             >
-              <Upload className="w-4 h-4" />
-              {t("students.import.button")}
+              <Upload className="w-4 h-4 text-slate-500" />
+              Bulk Import
             </button>
           )}
+
+          {/* Enroll New Student Button */}
           {canCreate && (
             <button
               onClick={() => openModal(null, "create")}
-              className="flex items-center gap-2 bg-gradient-to-r from-brand-600 to-brand-500 text-white px-5 py-2.5 rounded-xl font-semibold shadow-lg shadow-brand-500/30 hover:-translate-y-0.5 hover:shadow-brand-500/40 transition-all"
+              className="flex items-center gap-2 bg-gradient-to-r from-brand-600 to-brand-500 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-brand-500/25 hover:-translate-y-0.5 transition-all text-xs uppercase tracking-wider"
             >
-              <Plus className="w-5 h-5" />
-              {t("students.enrollNew")}
+              <Plus className="w-4 h-4" />
+              Enroll Student
             </button>
           )}
         </div>
       </div>
 
-      <div className="glass-panel p-2 flex flex-wrap sm:flex-nowrap gap-2 items-center justify-between">
-        <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
+      {/* Program Track Tabs */}
+      <div className="glass-panel p-2 flex flex-wrap sm:flex-nowrap gap-3 items-center justify-between">
+        <div className="flex gap-1.5 bg-slate-100/90 rounded-2xl p-1.5 overflow-x-auto">
           {TABS.map((tab) => (
             <button
               key={tab.key}
               onClick={() => handleTabChange(tab.key)}
               className={clsx(
-                "px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors",
+                "px-5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0",
                 activeTab === tab.key
-                  ? "bg-white text-brand-700 shadow"
-                  : "text-slate-500 hover:text-slate-700"
+                  ? "bg-white text-brand-700 shadow-md shadow-brand-900/5"
+                  : "text-slate-500 hover:text-slate-800"
               )}
             >
-              {t(tab.i18n)}
+              {tab.label}
             </button>
           ))}
         </div>
 
+        {/* Search Bar */}
         <div className="relative w-full sm:w-72">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
             <Search className="h-4 w-4" />
           </div>
           <input
             type="text"
-            placeholder={t("students.searchPlaceholder")}
+            placeholder="Search by name or ID..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl focus:border-brand-500 outline-none focus:ring-4 focus:ring-brand-500/10 transition-all bg-white text-sm font-medium"
+            className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl focus:border-brand-500 outline-none bg-white text-sm font-medium"
           />
         </div>
       </div>
 
+      {/* Sub-Filters for Regular Program (Htsanat, Maekelawyan, Wetatoch) & Status */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200/80 shadow-sm">
+        {/* Classification Sub-filters (if Regular) */}
+        {activeTab === "regular" ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-extrabold uppercase text-slate-400 mr-1 flex items-center gap-1">
+              <Filter className="w-3.5 h-3.5" /> Group:
+            </span>
+            {REGULAR_SUB_FILTERS.map((f) => (
+              <button
+                key={f.key}
+                onClick={() => setRegularSubFilter(f.key)}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  regularSubFilter === f.key
+                    ? "bg-brand-50 text-brand-700 border border-brand-200 font-extrabold"
+                    : "bg-slate-50 text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="text-xs font-bold text-slate-400 uppercase tracking-wide">
+            {activeTab === "prekg" ? "PreKG Early Childhood Sections" : "Distance Learning Students"}
+          </div>
+        )}
+
+        {/* Status Filter */}
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-extrabold uppercase text-slate-400">Status:</span>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none hover:border-brand-400 focus:ring-2 focus:ring-brand-500/15 focus:border-brand-500 transition-all shadow-xs cursor-pointer"
+          >
+            <option value="all">All Statuses</option>
+            <option value="new">New Students</option>
+            <option value="regular">Regular Students</option>
+          </select>
+        </div>
+
+        {/* Shift Filter (Day / Night) */}
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-extrabold uppercase text-slate-400">Shift:</span>
+          <select
+            value={shiftFilter}
+            onChange={(e) => {
+              setShiftFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none hover:border-brand-400 focus:ring-2 focus:ring-brand-500/15 focus:border-brand-500 transition-all shadow-xs cursor-pointer"
+          >
+            <option value="all">All Shifts (ሁሉም ፈረቃ)</option>
+            <option value="day">☀️ ቀን (Day)</option>
+            <option value="night">🌙 ማታ (Night)</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Bulk Action Bar (Visible when students selected) */}
+      {selectedIds.length > 0 && canBulkUpdate && (
+        <div className="bg-gradient-to-r from-brand-900 to-brand-800 text-white p-4 rounded-2xl shadow-xl flex flex-wrap items-center justify-between gap-4 animate-[slide-up_0.2s_ease-out]">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center font-bold text-amber-300">
+              {selectedIds.length}
+            </div>
+            <div>
+              <p className="font-bold text-sm">
+                {selectedIds.length} student(s) selected
+              </p>
+              <p className="text-xs text-brand-200">
+                Perform bulk status update or batch export
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleBulkUpdateStatus}
+              disabled={bulkLoading}
+              className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider shadow transition-all disabled:opacity-50"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              {bulkLoading ? "Updating..." : "Bulk Update Status (New → Regular)"}
+            </button>
+
+            {canExportIdCards && (
+              <button
+                onClick={handleExportIdCards}
+                className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all"
+              >
+                <QrCode className="w-4 h-4" />
+                Export Selected IDs
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Students Data Table */}
       <div className="glass-panel overflow-hidden border-slate-200/60 shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50/50 border-b border-slate-200/60 text-slate-500 text-sm tracking-wide">
-                <th className="px-6 py-4 font-semibold">{t("students.fields.studentId")}</th>
-                <th className="px-6 py-4 font-semibold">{t("students.fields.name")}</th>
-                <th className="px-6 py-4 font-semibold">{t("common.program")}</th>
-                <th className="px-6 py-4 font-semibold">{t("common.section")}</th>
-                <th className="px-6 py-4 font-semibold text-right">{t("common.actions")}</th>
+              <tr className="bg-slate-50/70 border-b border-slate-200/60 text-slate-500 text-xs tracking-wider uppercase font-bold">
+                <th className="px-5 py-4 w-10">
+                  <input
+                    type="checkbox"
+                    onChange={handleSelectAll}
+                    checked={
+                      students.length > 0 && selectedIds.length === students.length
+                    }
+                    className="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 cursor-pointer"
+                  />
+                </th>
+                <th className="px-4 py-4">Student</th>
+                <th className="px-4 py-4">Program & Class</th>
+                <th className="px-4 py-4">Contact / Address</th>
+                <th className="px-4 py-4">Status</th>
+                <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100 text-sm">
               {loading ? (
                 <tr>
-                  <td colSpan="5" className="px-6 py-12 text-center">
+                  <td colSpan="6" className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center justify-center">
-                       <div className="w-8 h-8 border-4 border-brand-100 border-t-brand-500 rounded-full animate-spin mb-3"></div>
-                       <p className="text-slate-500 font-medium">{t("common.loading")}</p>
+                      <div className="w-8 h-8 border-4 border-brand-200 border-t-brand-600 rounded-full animate-spin mb-3"></div>
+                      <p className="text-slate-500 font-medium">Loading student records...</p>
                     </div>
                   </td>
                 </tr>
               ) : error ? (
                 <tr>
-                   <td colSpan="5" className="px-6 py-8 text-center text-red-500 font-medium">{error}</td>
+                  <td colSpan="6" className="px-6 py-8 text-center text-red-500 font-medium">
+                    {error}
+                  </td>
                 </tr>
               ) : students.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="px-6 py-12 text-center">
-                     <UserCheck className="mx-auto w-12 h-12 text-slate-300 mb-3" />
-                     <p className="text-slate-500 font-medium text-lg">{t("students.noneFound")}</p>
+                  <td colSpan="6" className="px-6 py-12 text-center">
+                    <UserCheck className="mx-auto w-12 h-12 text-slate-300 mb-3" />
+                    <p className="text-slate-500 font-bold text-base">No students found in this category</p>
+                    <p className="text-xs text-slate-400 mt-1">Enroll new students or adjust your filters above.</p>
                   </td>
                 </tr>
               ) : (
-                students.map((student) => (
-                  <tr key={student.id} className="hover:bg-brand-50/30 transition-colors group">
-                    <td className="px-6 py-4 font-bold text-slate-700">
-                      {student.student_id || "-"}
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="font-semibold text-slate-800">{student.name}</p>
-                      {student.christian_name && <p className="text-xs text-slate-500 font-medium">{t("students.fields.christianName")}: {student.christian_name}</p>}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-700/10 uppercase tracking-wider">
-                        {t(`students.track${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}`)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-slate-600 font-medium">
-                      {student.section_name || t("common.none")}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex gap-2 justify-end opacity-70 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => openModal(student, "view")}
-                          className="p-2 hover:bg-brand-100 hover:text-brand-700 rounded-lg text-slate-400 transition-colors"
-                          title={t("common.view")}
-                        >
-                          <Eye className="w-5 h-5" />
-                        </button>
-                        {canEdit && (
-                          <button
-                            onClick={() => openModal(student, "edit")}
-                            className="p-2 hover:bg-amber-100 hover:text-amber-700 rounded-lg text-slate-400 transition-colors"
-                            title={t("common.edit")}
+                students.map((student) => {
+                  const isSelected = selectedIds.includes(student.id);
+
+                  return (
+                    <tr
+                      key={student.id}
+                      className={clsx(
+                        "transition-colors group",
+                        isSelected ? "bg-brand-50/40" : "hover:bg-slate-50/60"
+                      )}
+                    >
+                      {/* Checkbox */}
+                      <td className="px-5 py-4">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => handleToggleSelect(student.id)}
+                          className="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 cursor-pointer"
+                        />
+                      </td>
+
+                      {/* Photo & Name */}
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-3">
+                          {student.picture_url ? (
+                            <img
+                              src={student.picture_url}
+                              alt={student.name}
+                              className="w-10 h-10 rounded-xl object-cover border border-slate-200 shrink-0"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-xl bg-brand-50 border border-brand-100 flex items-center justify-center font-bold text-brand-700 shrink-0 text-sm">
+                              {student.name?.charAt(0) || "S"}
+                            </div>
+                          )}
+                          <div>
+                            <p className="font-extrabold text-slate-900 leading-tight">
+                              {student.name}
+                            </p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[11px] font-bold text-brand-600">
+                                {student.student_id}
+                              </span>
+                              {student.christian_name && (
+                                <span className="text-[11px] text-slate-400 font-medium truncate max-w-[120px]">
+                                  • {student.christian_name}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Program & Section */}
+                      <td className="px-4 py-4">
+                        <p className="font-bold text-slate-800 text-xs">
+                          {student.section?.name || student.section_name || "Unassigned"}
+                        </p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-600">
+                            {student.classification || student.section?.programType?.name || activeTab}
+                          </span>
+                          {student.is_night && (
+                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1">
+                              <Moon className="w-2.5 h-2.5 text-indigo-500" />
+                              ማታ
+                            </span>
+                          )}
+                          {student.grade_level && (
+                            <span className="text-[10px] font-bold text-slate-400">
+                              {student.grade_level}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Contact & Address */}
+                      <td className="px-4 py-4 text-xs text-slate-600">
+                        <p className="font-semibold text-slate-800">
+                          {student.phone_number || student.family_guardian_phone || "-"}
+                        </p>
+                        <p className="text-[11px] text-slate-400 truncate max-w-[180px]">
+                          {student.address?.subcity ? `${student.address.subcity}, W.${student.address.woreda || student.address.district || ""}` : "Addis Ababa"}
+                        </p>
+                      </td>
+
+                      {/* Status */}
+                      <td className="px-4 py-4">
+                        {student.is_flagged ? (
+                          <div>
+                            <span
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-100 text-rose-800 ring-1 ring-rose-600/30"
+                              title={student.flag_reason || "Flagged by Ye Sew Habt"}
+                            >
+                              <Flag className="w-3 h-3 text-rose-600 fill-rose-600" />
+                              ታግዷል (Flagged)
+                            </span>
+                            {student.flag_reason && (
+                              <p className="text-[10px] text-rose-600 font-medium truncate max-w-[130px] mt-0.5" title={student.flag_reason}>
+                                {student.flag_reason}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <span
+                            className={clsx(
+                              "inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
+                              student.status === "regular"
+                                ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20"
+                                : "bg-amber-50 text-amber-700 ring-1 ring-amber-600/20"
+                            )}
                           >
-                            <Edit2 className="w-5 h-5" />
-                          </button>
+                            {student.status || "new"}
+                          </span>
                         )}
-                        {canDelete && (
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex gap-1.5 justify-end opacity-80 group-hover:opacity-100 transition-opacity">
+                          {canFlag && (
+                            student.is_flagged ? (
+                              <button
+                                onClick={() => handleUnflag(student)}
+                                disabled={flagLoading}
+                                className="p-2 hover:bg-emerald-50 hover:text-emerald-700 rounded-lg text-rose-600 transition-colors"
+                                title="እገዳ አንሳ (Unflag Student)"
+                              >
+                                <FlagOff className="w-4 h-4 text-rose-600" />
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleOpenFlagModal(student)}
+                                disabled={flagLoading}
+                                className="p-2 hover:bg-rose-50 hover:text-rose-700 rounded-lg text-slate-400 transition-colors"
+                                title="እገድ / Flag Student (Ye Sew Habt)"
+                              >
+                                <Flag className="w-4 h-4 text-slate-400 hover:text-rose-600" />
+                              </button>
+                            )
+                          )}
                           <button
-                            onClick={() => handleDelete(student.id)}
-                            className="p-2 hover:bg-red-100 hover:text-red-700 rounded-lg text-slate-400 transition-colors"
-                            title={t("common.delete")}
+                            onClick={() => openModal(student, "view")}
+                            className="p-2 hover:bg-brand-50 hover:text-brand-700 rounded-lg text-slate-400 transition-colors"
+                            title="View Profile"
                           >
-                            <Trash2 className="w-5 h-5" />
+                            <Eye className="w-4 h-4" />
                           </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                          {canEdit && (
+                            <button
+                              onClick={() => openModal(student, "edit")}
+                              className="p-2 hover:bg-amber-50 hover:text-amber-700 rounded-lg text-slate-400 transition-colors"
+                              title="Edit"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                          )}
+                          {canDelete && (
+                            <button
+                              onClick={() => handleDelete(student.id)}
+                              className="p-2 hover:bg-red-50 hover:text-red-700 rounded-lg text-slate-400 transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
 
+        {/* Pagination */}
         {totalPages > 1 && (
-          <div className="bg-slate-50/50 px-6 py-4 border-t border-slate-200/60 flex justify-between items-center">
-            <span className="text-sm font-medium text-slate-500">
-              {t("common.page")} <span className="text-brand-600 font-bold">{currentPage}</span> {t("common.of")} {totalPages}
+          <div className="bg-slate-50/50 px-6 py-4 border-t border-slate-200/60 flex justify-between items-center text-xs">
+            <span className="font-semibold text-slate-500">
+              Page <strong className="text-brand-700">{currentPage}</strong> of{" "}
+              {totalPages} ({total} total students)
             </span>
             <div className="flex gap-2">
               <button
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className="px-4 py-2 border border-slate-200 bg-white rounded-lg text-sm font-bold text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-colors"
+                className="px-4 py-2 border border-slate-200 bg-white rounded-xl font-bold text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-colors"
               >
-                {t("common.previous")}
+                Previous
               </button>
               <button
                 onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
-                className="px-4 py-2 border border-slate-200 bg-white rounded-lg text-sm font-bold text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-colors"
+                className="px-4 py-2 border border-slate-200 bg-white rounded-xl font-bold text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-colors"
               >
-                {t("common.next")}
+                Next
               </button>
             </div>
           </div>
         )}
       </div>
 
+      {/* Student Details / Edit Modal */}
       <StudentModal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
@@ -275,12 +754,91 @@ export default function StudentsList() {
         canDelete={canDelete}
       />
 
+      {/* Bulk CSV Import Modal */}
       <BulkImportModal
         isOpen={importOpen}
         onClose={() => setImportOpen(false)}
         track={activeTab}
         onSuccess={fetchStudents}
       />
+
+      {/* Identification Card Export Modal */}
+      <IdCardExportModal
+        isOpen={idCardModalOpen}
+        onClose={() => setIdCardModalOpen(false)}
+        students={idCardStudents}
+      />
+
+      {/* Ye Sew Habt Student Flagging Modal (Mandatory Reason) */}
+      {flagModalOpen && studentToFlag && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-rose-100 animate-scale-in">
+            <div className="p-6 bg-gradient-to-r from-rose-900 to-slate-950 text-white flex justify-between items-start">
+              <div>
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-800/80 text-rose-200 text-[10px] font-black uppercase tracking-wider mb-2">
+                  <Flag className="w-3 h-3 text-rose-300 fill-rose-300" />
+                  የሰው ሀብት ክፍል / Ye Sew Habt
+                </div>
+                <h3 className="text-xl font-black">ተማሪውን እገድ (Flag Student)</h3>
+                <p className="text-xs text-rose-200 mt-1">
+                  {studentToFlag.name} ({studentToFlag.student_id})
+                </p>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4 text-xs font-bold">
+              <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-medium space-y-1">
+                <p className="font-extrabold flex items-center gap-1 text-amber-950">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  ማስጠንቀቂያ፡
+                </p>
+                <p>
+                  የታገደ ተማሪ በመዝሙርና በትምህርት ክፍል ፈተናዎች፣ የኮርስ ተሳትፎዎች እና የአገልግሎት ዘርፍ ምደባዎች ላይ በራስ-ሰር አይታይም።
+                </p>
+              </div>
+
+              <div>
+                <label className="text-slate-700 block mb-1 font-extrabold">
+                  የእገዳው ምክንያት <span className="text-rose-500">* (ግዴታ / Mandatory)</span>:
+                </label>
+                <textarea
+                  rows="4"
+                  value={flagReason}
+                  onChange={(e) => setFlagReason(e.target.value)}
+                  placeholder="እባክዎ ተማሪው የታገደበትን በቂ የሥነ-ምግባር ወይም የአስተዳደር ምክንያት በግልጽ ይግለጹ..."
+                  className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:ring-2 focus:ring-rose-500 focus:outline-none font-normal text-xs"
+                ></textarea>
+                <p className="text-[10px] text-slate-400 font-normal mt-1">
+                  የተፃፈው ምክንያት በሰው ሀብት ክፍል እና በበላይ አስተዳዳሪ ሪፖርቶች ላይ ይመዘገባል።
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setFlagModalOpen(false);
+                  setStudentToFlag(null);
+                  setFlagReason("");
+                }}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-200 rounded-xl transition-colors"
+              >
+                ይቅር (Cancel)
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmFlag}
+                disabled={flagLoading || !flagReason.trim()}
+                className="px-6 py-2.5 bg-gradient-to-r from-rose-700 to-rose-600 hover:from-rose-600 hover:to-rose-500 text-white font-black text-xs rounded-xl shadow-md transition-all disabled:opacity-50 flex items-center gap-1.5"
+              >
+                <Flag className="w-3.5 h-3.5 fill-white" />
+                {flagLoading ? "እየታገደ ነው..." : "እገድ (Confirm Flag)"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

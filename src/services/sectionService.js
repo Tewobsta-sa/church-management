@@ -8,10 +8,11 @@ export const sectionService = {
   },
 
   // Sections
-  getSections: async (page = 1, search = '', programTypeId = '') => {
-    const params = { page, search };
-    if (programTypeId) params.program_type_id = programTypeId;
-    const res = await api.get('/sections', { params });
+  getSections: async (params = { all: true }) => {
+    const res = await api.get("/sections", {
+      params: typeof params === 'object' ? params : { all: true },
+    });
+
     return res.data;
   },
 

@@ -1,13 +1,19 @@
 import api from "./api";
 
 export const studentService = {
-  getYoungStudents: async (page = 1, search = "", filters = {}) => {
+  getPreKGStudents: async (page = 1, search = "", filters = {}) => {
     const params = { page, search, ...filters };
-    const response = await api.get("/students/young", { params });
+    const response = await api.get("/students/prekg", { params });
     return response.data;
   },
-  
+
   getRegularStudents: async (page = 1, search = "", filters = {}) => {
+    const params = { page, search, ...filters };
+    const response = await api.get("/students/regular", { params });
+    return response.data;
+  },
+
+  getYoungStudents: async (page = 1, search = "", filters = {}) => {
     const params = { page, search, ...filters };
     const response = await api.get("/students/regular", { params });
     return response.data;
@@ -19,44 +25,100 @@ export const studentService = {
     return response.data;
   },
 
-  createStudent: async (data, track) => {
-    // track could be 'young', 'regular', 'distance'
-    const response = await api.post(`/students/${track}`, data);
+  getAllStudents: async (page = 1, search = "", filters = {}) => {
+    const params = { page, search, ...filters };
+    const response = await api.get("/students/all", { params });
     return response.data;
   },
 
-  updateStudent: async (id, data, track) => {
-    const response = await api.put(`/students/${track}/${id}`, data);
+  getStudent: async (id) => {
+    const response = await api.get(`/students/${id}`);
     return response.data;
   },
 
-  deleteStudent: async (id, track) => {
-    const response = await api.delete(`/students/${track}/${id}`);
+  createStudent: async (data, track = "regular") => {
+    // If data is FormData, send multipart
+    if (data instanceof FormData) {
+      const response = await api.post("/students/unified", data, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      return response.data;
+    }
+    const response = await api.post("/students/unified", { ...data, track });
     return response.data;
   },
 
-  /**
-   * Download a CSV template for bulk import of a given track.
-   * Returns a Blob which the caller can save as a file.
-   */
-  downloadImportTemplate: async (track) => {
+  updateStudent: async (id, data, track = "regular") => {
+    if (data instanceof FormData) {
+      const response = await api.post(`/students/unified/${id}`, data, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      return response.data;
+    }
+    const response = await api.put(`/students/unified/${id}`, data);
+    return response.data;
+  },
+
+  deleteStudent: async (id) => {
+    const response = await api.delete(`/students/${id}`);
+    return response.data;
+  },
+
+  bulkUpdateStatus: async (studentIds, status = "regular") => {
+    const response = await api.post("/students/bulk-status", {
+      student_ids: studentIds,
+      status,
+    });
+    return response.data;
+  },
+
+  getIdCardsData: async (params = {}) => {
+    const response = await api.get("/students/id-cards/export", { params });
+    return response.data;
+  },
+
+  verifyStudent: async (id) => {
+    const response = await api.post(`/students/${id}/verify`);
+    return response.data;
+  },
+
+  assignMezmur: async (studentIds) => {
+    const response = await api.post("/students/mezmur/assign", {
+      student_ids: studentIds,
+    });
+    return response.data;
+  },
+
+  unassignMezmur: async (studentIds) => {
+    const response = await api.post("/students/mezmur/unassign", {
+      student_ids: studentIds,
+    });
+    return response.data;
+  },
+
+  downloadImportTemplate: async (track = "Regular") => {
     const response = await api.get(`/students/import/template/${track}`, {
       responseType: "blob",
     });
     return response.data;
   },
 
-  /**
-   * Upload a CSV/XLSX file to bulk-import students for a given track.
-   * Returns the server response body (success + error rows).
-   */
-  bulkImport: async (file, track) => {
+  bulkImport: async (file) => {
     const formData = new FormData();
     formData.append("file", file);
-    const response = await api.post(`/students/import/${track}`, formData, {
+    const response = await api.post("/students/import", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
     return response.data;
   },
-};
 
+  flagStudent: async (id, reason) => {
+    const response = await api.post(`/students/${id}/flag`, { reason });
+    return response.data;
+  },
+
+  unflagStudent: async (id) => {
+    const response = await api.post(`/students/${id}/unflag`);
+    return response.data;
+  },
+};
