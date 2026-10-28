@@ -36,10 +36,12 @@ export default function MobileAttendanceScanner() {
   const isYesewHabt = hasRole("yesew_habt") || hasRole("gngnunet_office_admin");
   const canRecordAttendance = isSuperAdmin || isYesewHabt;
 
-  // State
+  // State — empty selection = auto-detect mode (server resolves today's
+  // session for each scanned student).
   const [assignments, setAssignments] = useState([]);
   const [selectedAssignmentId, setSelectedAssignmentId] = useState("");
   const [activeAssignment, setActiveAssignment] = useState(null);
+  const [lastResolvedAssignment, setLastResolvedAssignment] = useState(null);
   const [loadingAssignments, setLoadingAssignments] = useState(true);
 
   // Scanner State
@@ -58,6 +60,10 @@ export default function MobileAttendanceScanner() {
   const [manualQuery, setManualQuery] = useState("");
   const [showManualModal, setShowManualModal] = useState(false);
   const [manualSearching, setManualSearching] = useState(false);
+  // Session picker is collapsed by default — a single operator should be
+  // able to just open the camera and scan; the backend auto-resolves each
+  // student's session for today. Expand only to force a specific session.
+  const [showSessionPicker, setShowSessionPicker] = useState(false);
 
   const html5QrCodeRef = useRef(null);
   const lastScannedCodeRef = useRef("");
@@ -98,10 +104,7 @@ export default function MobileAttendanceScanner() {
         const res = await assignmentService.getAssignments({ per_page: 100 });
         const list = Array.isArray(res) ? res : res?.data || [];
         setAssignments(list);
-        if (list.length > 0) {
-          setSelectedAssignmentId(list[0].id.toString());
-          setActiveAssignment(list[0]);
-        }
+        // Default stays on auto-detect; no forced first pick.
       } catch (err) {
         console.error("Failed loading assignments", err);
       } finally {
@@ -230,11 +233,6 @@ export default function MobileAttendanceScanner() {
       return; // prevent rapid duplicate scans
     }
 
-    if (!selectedAssignmentId) {
-      notify("እባክዎ መጀመሪያ ክፍለ-ጊዜ (Assignment/Session) ይምረጡ።", "warning");
-      return;
-    }
-
     scanLockRef.current = true;
     lastScannedCodeRef.current = decodedText;
     setIsProcessing(true);
@@ -243,8 +241,17 @@ export default function MobileAttendanceScanner() {
       playBeep();
       triggerHaptic();
 
-      const res = await attendanceService.scanAndMark(selectedAssignmentId, decodedText, "Present");
-      const studentData = res.student;
+      const res = await attendanceService.scanAndMark(
+        selectedAssignmentId || null,
+        decodedText,
+        "Present"
+      );
+      const studentData = {
+        ...res.student,
+        assignment_title: res.assignment?.title,
+        assignment_section: res.assignment?.section_name,
+      };
+      if (res.assignment) setLastResolvedAssignment(res.assignment);
 
       setLastScannedStudent(studentData);
       setRecentScans((prev) => [studentData, ...prev.slice(0, 9)]);
@@ -272,12 +279,21 @@ export default function MobileAttendanceScanner() {
   // Manual mark attendance helper
   const handleManualMark = async (e) => {
     e.preventDefault();
-    if (!manualQuery.trim() || !selectedAssignmentId) return;
+    if (!manualQuery.trim()) return;
 
     setManualSearching(true);
     try {
-      const res = await attendanceService.scanAndMark(selectedAssignmentId, manualQuery.trim(), "Present");
-      const studentData = res.student;
+      const res = await attendanceService.scanAndMark(
+        selectedAssignmentId || null,
+        manualQuery.trim(),
+        "Present"
+      );
+      const studentData = {
+        ...res.student,
+        assignment_title: res.assignment?.title,
+        assignment_section: res.assignment?.section_name,
+      };
+      if (res.assignment) setLastResolvedAssignment(res.assignment);
       setLastScannedStudent(studentData);
       setRecentScans((prev) => [studentData, ...prev.slice(0, 9)]);
       setShowManualModal(false);
@@ -333,7 +349,7 @@ export default function MobileAttendanceScanner() {
 
           {/* Quick Roster Link */}
           <Link
-            to={`/attendance/mobile-viewer?assignment_id=${selectedAssignmentId}`}
+            to={`/attendance/mobile-viewer?assignment_id=${selectedAssignmentId || lastResolvedAssignment?.id || ""}`}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-gold-300 font-bold text-xs border border-white/10 transition-colors"
           >
             <ListChecks className="w-4 h-4" />
@@ -341,36 +357,66 @@ export default function MobileAttendanceScanner() {
           </Link>
         </div>
 
-        {/* Assignment / Session Selector */}
+        {/* Session mode: auto-detect by default; manual picker is an optional override */}
         <div className="mt-3.5 space-y-1">
-          <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center justify-between">
-            <span>የዛሬ ክፍለ-ጊዜ (Active Session):</span>
-            <span className="text-gold-400">
-              {activeAssignment?.type === "MezmurTraining" ? "መዝሙር ስልጠና" : "መደበኛ ትምህርት"}
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+              የዛሬ ክፍለ-ጊዜ (Session):
             </span>
-          </label>
-          <div className="relative">
-            <select
-              value={selectedAssignmentId}
-              onChange={(e) => setSelectedAssignmentId(e.target.value)}
-              className="w-full bg-slate-900 border border-white/15 rounded-xl px-3 py-2.5 text-xs font-black text-white appearance-none bg-none pr-8 focus:outline-none focus:ring-2 focus:ring-brand-500"
-            >
-              {assignments.map((a) => {
-                const title =
-                  a.type === "Course"
-                    ? `${a.assignment_courses?.[0]?.course?.name || "ኮርስ"} (${a.section?.name || "ክፍል"})`
-                    : `${a.mezmurs?.[0]?.title || "የመዝሙር ስልጠና"}`;
-                const nightFlag = a.is_night ? " 🌙 [ማታ]" : "";
-                const time = a.start_time ? ` · ${a.start_time.slice(0, 5)}` : "";
-                return (
-                  <option key={a.id} value={a.id}>
-                    {title} {nightFlag} {time}
-                  </option>
-                );
-              })}
-            </select>
-            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <span className="text-[10px] font-black text-gold-400">
+              {selectedAssignmentId
+                ? activeAssignment?.type === "MezmurTraining"
+                  ? "መዝሙር ስልጠና"
+                  : "መደበኛ ትምህርት"
+                : "ራስ-ሰር መለየት (Auto)"}
+            </span>
           </div>
+
+          {!selectedAssignmentId && !showSessionPicker && (
+            <p className="text-[10px] text-slate-500 font-medium leading-snug">
+              ምንም ክፍል/ክፍለ-ጊዜ መምረጥ አያስፈልግም — መታወቂያውን ብቻ ይቃኙ፤ ስርዓቱ የተማሪውን የዛሬ ክፍለ-ጊዜ ራሱ ያገኛል።
+              (No session needed — just scan the ID; the system resolves today's session automatically.)
+            </p>
+          )}
+
+          {showSessionPicker && (
+            <div className="relative">
+              <select
+                value={selectedAssignmentId}
+                onChange={(e) => setSelectedAssignmentId(e.target.value)}
+                className="w-full bg-slate-900 border border-white/15 rounded-xl px-3 py-2.5 text-xs font-black text-white appearance-none bg-none pr-8 focus:outline-none focus:ring-2 focus:ring-brand-500"
+              >
+                <option value="">✨ ራስ-ሰር — የተማሪውን የዛሬ ክፍለ-ጊዜ ያግኝ (Auto-detect)</option>
+                {assignments.map((a) => {
+                  const title =
+                    a.type === "Course"
+                      ? `${a.assignment_courses?.[0]?.course?.name || "ኮርስ"} (${a.section?.name || "ክፍል"})`
+                      : `${a.mezmurs?.[0]?.title || "የመዝሙር ስልጠና"}`;
+                  const nightFlag = a.is_night ? " 🌙 [ማታ]" : "";
+                  const time = a.start_time ? ` · ${a.start_time.slice(0, 5)}` : "";
+                  return (
+                    <option key={a.id} value={a.id}>
+                      {title} {nightFlag} {time}
+                    </option>
+                  );
+                })}
+              </select>
+              <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => {
+              if (showSessionPicker) setSelectedAssignmentId("");
+              setShowSessionPicker((v) => !v);
+            }}
+            className="text-[10px] font-bold text-slate-500 hover:text-gold-300 underline underline-offset-2 transition-colors"
+          >
+            {showSessionPicker
+              ? "ወደ ራስ-ሰር ተመለስ (Back to auto)"
+              : "ክፍለ-ጊዜውን በእጅ መምረጥ ካለብዎት? (Need a specific session?)"}
+          </button>
         </div>
       </div>
 
@@ -548,6 +594,12 @@ export default function MobileAttendanceScanner() {
                         <span className="ml-1 text-amber-400 font-bold">🌙 [ማታ]</span>
                       )}
                     </p>
+                    {lastScannedStudent.assignment_title && (
+                      <p className="text-[10px] text-gold-400/90 font-bold mt-0.5 truncate">
+                        📚 {lastScannedStudent.assignment_title}
+                        {lastScannedStudent.assignment_section ? ` · ${lastScannedStudent.assignment_section}` : ""}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -579,7 +631,7 @@ export default function MobileAttendanceScanner() {
             መታወቂያ የሌለው (Manual Search)
           </button>
           <Link
-            to={`/attendance/mobile-viewer?assignment_id=${selectedAssignmentId}`}
+            to={`/attendance/mobile-viewer?assignment_id=${selectedAssignmentId || lastResolvedAssignment?.id || ""}`}
             className="flex-1 py-3 px-4 rounded-2xl bg-brand-900/60 hover:bg-brand-900 text-brand-200 border border-brand-700/50 font-bold text-xs flex items-center justify-center gap-2 transition-colors"
           >
             <Users className="w-4 h-4 text-brand-300" />

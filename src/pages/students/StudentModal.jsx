@@ -16,6 +16,7 @@ import {
   Flag,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
+import { useTranslation } from "react-i18next";
 import { studentService } from "../../services/studentService";
 import { sectionService } from "../../services/sectionService";
 import { useAuth } from "../../context/AuthContext";
@@ -50,6 +51,7 @@ export default function StudentModal({
 }) {
   const { hasRole } = useAuth();
   const { notify, confirmAction } = useFeedback();
+  const { t } = useTranslation();
 
   const [formData, setFormData] = useState({
     name: "",
@@ -421,14 +423,8 @@ export default function StudentModal({
     return true;
   });
 
-  const qrData = student
-    ? JSON.stringify({
-        sid: student.student_id,
-        name: student.name,
-        sec: student.section?.name,
-        track: student.section?.programType?.name,
-      })
-    : "";
+  // Sparse payload — the scanner resolves the raw student_id directly.
+  const qrData = student?.student_id || "";
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-[fade-in_0.2s_ease-out]">
@@ -442,14 +438,14 @@ export default function StudentModal({
             <div>
               <h2 className="text-2xl font-black text-slate-800 tracking-tight">
                 {isCreate
-                  ? "Register New Student"
+                  ? t("students.modal.createTitle")
                   : mode === "view"
-                    ? "Student Profile"
-                    : "Edit Student Information"}
+                    ? t("students.studentProfile")
+                    : t("students.modal.editTitle")}
               </h2>
               <div className="flex items-center gap-2 mt-0.5">
                 <span className="text-xs font-bold text-brand-600 uppercase tracking-wider">
-                  {formData.track} Program
+                  {formData.track} {t("students.modal.program")}
                 </span>
                 {formData.classification && (
                   <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
@@ -503,7 +499,7 @@ export default function StudentModal({
                   </h3>
                   {student.christian_name && (
                     <p className="text-sm font-semibold text-brand-600 mt-0.5">
-                      Christian Name: {student.christian_name}
+                      {t("students.fields.christianName")}: {student.christian_name}
                     </p>
                   )}
                   <div className="mt-3 flex flex-wrap gap-2 justify-center sm:justify-start">
@@ -511,7 +507,7 @@ export default function StudentModal({
                       ID: {student.student_id}
                     </span>
                     <span className="px-3 py-1 bg-brand-50 border border-brand-100 rounded-xl text-xs font-bold text-brand-700">
-                      Class: {student.section?.name || "Unassigned"}
+                      {t("students.modal.classLabel")}: {student.section?.name || "Unassigned"}
                     </span>
                     {student.grade_level && (
                       <span className="px-3 py-1 bg-indigo-50 border border-indigo-100 rounded-xl text-xs font-bold text-indigo-700">
@@ -522,18 +518,18 @@ export default function StudentModal({
                 </div>
 
                 <div className="shrink-0 flex flex-col items-center p-3 bg-white rounded-2xl border border-slate-200 shadow-sm">
-                  <QRCodeSVG value={qrData} size={90} level="H" />
+                  <QRCodeSVG value={qrData} size={140} level="H" marginSize={2} bgColor="#ffffff" fgColor="#0f172a" />
                   <p className="text-[9px] font-extrabold uppercase text-slate-400 mt-1 flex items-center gap-1">
-                    <QrCode className="w-3 h-3" /> ID Pass
+                    <QrCode className="w-3 h-3" /> {t("students.modal.idPass")}
                   </p>
                 </div>
               </div>
 
               {/* Data Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 pt-2">
-                <ViewData label="Gender / Sex" value={student.sex} />
+                <ViewData label={t("common.sex")} value={student.sex} />
                 <ViewData
-                  label="Birth Date"
+                  label={t("students.fields.birthDate")}
                   value={
                     student.birth_date
                       ? student.birth_date.substring(0, 10)
@@ -541,29 +537,29 @@ export default function StudentModal({
                   }
                 />
                 <ViewData
-                  label="Age"
+                  label={t("students.fields.age")}
                   value={student.age ? `${student.age} yrs` : "-"}
                 />
 
                 <ViewData
-                  label="Education Level"
+                  label={t("students.fields.educationalLevel")}
                   value={student.educational_level}
                 />
                 <ViewData
-                  label="Occupation Status"
+                  label={t("students.modal.activityStatus")}
                   value={
                     student.occupation_type
                       ? student.occupation_type === "working"
-                        ? "Working"
-                        : "Student"
+                        ? t("students.modal.occupationWorking")
+                        : t("students.modal.occupationStudent")
                       : "-"
                   }
                 />
                 <ViewData
                   label={
                     student.occupation_type === "working"
-                      ? "Current Office"
-                      : "Current School"
+                      ? t("students.fields.currentOffice")
+                      : t("students.fields.currentSchool")
                   }
                   value={
                     student.occupation_type === "working"
@@ -572,44 +568,44 @@ export default function StudentModal({
                   }
                 />
 
-                <ViewData label="Student Phone" value={student.phone_number} />
+                <ViewData label={t("students.fields.phone")} value={student.phone_number} />
                 <ViewData
-                  label="Family / Guardian Name"
+                  label={t("students.fields.familyGuardianName")}
                   value={student.family_guardian_name}
                 />
                 <ViewData
-                  label="Guardian Phone"
+                  label={t("students.fields.familyGuardianPhone")}
                   value={student.family_guardian_phone}
                 />
 
                 <ViewData
-                  label="Emergency Contact Name"
+                  label={t("students.fields.emergencyContactName")}
                   value={student.emergency_contact_name}
                 />
                 <ViewData
-                  label="Emergency Contact Phone"
+                  label={t("students.fields.emergencyContactPhone")}
                   value={student.emergency_contact_phone}
                 />
-                <ViewData label="Status" value={student.status || "new"} />
+                <ViewData label={t("students.fields.status")} value={student.status || "new"} />
               </div>
 
               {/* Address Details */}
               <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/70">
                 <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                  <Home className="w-3.5 h-3.5" /> Living Address
+                  <Home className="w-3.5 h-3.5" /> {t("students.modal.livingAddress")}
                 </h4>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   <ViewData
-                    label="City"
+                    label={t("students.fields.city")}
                     value={student.address?.city || "Addis Ababa"}
                   />
-                  <ViewData label="Subcity" value={student.address?.subcity} />
+                  <ViewData label={t("students.fields.subcity")} value={student.address?.subcity} />
                   <ViewData
-                    label="Woreda"
+                    label={t("students.fields.woreda")}
                     value={student.address?.woreda || student.address?.district}
                   />
                   <ViewData
-                    label="Kebele / House No"
+                    label={t("students.modal.kebeleHouseNo")}
                     value={`${student.address?.kebele || "-"} / ${student.address?.house_no || student.address?.house_number || "-"}`}
                   />
                 </div>
@@ -620,13 +616,13 @@ export default function StudentModal({
                 student.educational_certificates_urls?.length > 0) && (
                 <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/70">
                   <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                    <Paperclip className="w-3.5 h-3.5" /> Uploaded Documents
+                    <Paperclip className="w-3.5 h-3.5" /> {t("students.modal.uploadedDocs")}
                   </h4>
                   <div className="space-y-3">
                     {student.birth_certificates_urls?.length > 0 && (
                       <div>
                         <p className="text-xs font-bold text-slate-500 mb-1">
-                          Birth Certificate(s):
+                          {t("students.fields.birthCertificates")}:
                         </p>
                         <div className="flex flex-wrap gap-2">
                           {student.birth_certificates_urls.map((url, i) => (
@@ -637,8 +633,8 @@ export default function StudentModal({
                               rel="noreferrer"
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-brand-700 hover:bg-brand-50"
                             >
-                              <FileText className="w-3.5 h-3.5" /> Certificate #
-                              {i + 1}
+                              <FileText className="w-3.5 h-3.5" />{" "}
+                              {t("students.modal.certificate", { n: i + 1 })}
                               <ExternalLink className="w-3 h-3 ml-0.5" />
                             </a>
                           ))}
@@ -649,7 +645,7 @@ export default function StudentModal({
                     {student.educational_certificates_urls?.length > 0 && (
                       <div className="mt-2">
                         <p className="text-xs font-bold text-slate-500 mb-1">
-                          Educational Certificate(s):
+                          {t("students.fields.educationalCertificates")}:
                         </p>
                         <div className="flex flex-wrap gap-2">
                           {student.educational_certificates_urls.map(
@@ -661,8 +657,8 @@ export default function StudentModal({
                                 rel="noreferrer"
                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-brand-700 hover:bg-brand-50"
                               >
-                                <FileText className="w-3.5 h-3.5" /> Certificate
-                                #{i + 1}
+                                <FileText className="w-3.5 h-3.5" />{" "}
+                                {t("students.modal.certificate", { n: i + 1 })}
                                 <ExternalLink className="w-3 h-3 ml-0.5" />
                               </a>
                             ),
@@ -715,7 +711,7 @@ export default function StudentModal({
                 <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
                   <User className="w-4 h-4 text-brand-600" />
                   <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">
-                    1. Personal Information & Photo
+                    {t("students.modal.section1")}
                   </h3>
                 </div>
 
@@ -732,12 +728,12 @@ export default function StudentModal({
                       <div className="w-24 h-24 rounded-2xl bg-white border border-slate-200 flex flex-col items-center justify-center text-slate-400 mb-2">
                         <Upload className="w-6 h-6 mb-1" />
                         <span className="text-[10px] font-bold">
-                          Upload Photo
+                          {t("students.modal.uploadPhoto")}
                         </span>
                       </div>
                     )}
                     <label className="cursor-pointer text-xs font-black text-brand-600 hover:text-brand-700 bg-white px-3 py-1.5 rounded-xl border border-brand-200 shadow-sm transition-all">
-                      Choose Photo
+                      {t("students.modal.choosePhoto")}
                       <input
                         type="file"
                         accept="image/*"
@@ -750,21 +746,21 @@ export default function StudentModal({
                   {/* Name Fields */}
                   <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <InputField
-                      label="Full Name"
+                      label={t("students.fields.name")}
                       name="name"
                       value={formData.name}
                       onChange={handleChange}
                       required
                     />
                     <InputField
-                      label="Christian (Baptismal) Name"
+                      label={t("students.fields.christianName")}
                       name="christian_name"
                       value={formData.christian_name}
                       onChange={handleChange}
                     />
 
                     <EthiopianDateInput
-                      label="Birth Date"
+                      label={t("students.fields.birthDate")}
                       value={formData.birth_date}
                       onChange={(e) =>
                         handleChange({
@@ -775,7 +771,7 @@ export default function StudentModal({
 
                     <div>
                       <label className="text-xs font-bold text-slate-500 tracking-wide uppercase">
-                        Sex / Gender <span className="text-red-500">*</span>
+                        {t("students.modal.sex")} <span className="text-red-500">*</span>
                       </label>
                       <select
                         name="sex"
@@ -784,8 +780,8 @@ export default function StudentModal({
                         required
                         className="w-full mt-1.5 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-brand-500 focus:bg-white transition-all font-medium text-slate-800"
                       >
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
+                        <option value="Male">{t("common.male")}</option>
+                        <option value="Female">{t("common.female")}</option>
                       </select>
                     </div>
                   </div>
@@ -797,14 +793,14 @@ export default function StudentModal({
                 <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
                   <Briefcase className="w-4 h-4 text-brand-600" />
                   <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">
-                    2. Education & Occupation Status
+                    {t("students.modal.section2")}
                   </h3>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                   <div>
                     <label className="text-xs font-bold text-slate-500 tracking-wide uppercase">
-                      Education Level <span className="text-red-500">*</span>
+                      {t("students.fields.educationalLevel")} <span className="text-red-500">*</span>
                     </label>
                     <select
                       name="educational_level"
@@ -824,7 +820,7 @@ export default function StudentModal({
                   {/* Conditional Exact Grade Level */}
                   {showGradeLevelInput && (
                     <InputField
-                      label="Exact Grade Level (e.g. Grade 4)"
+                      label={t("students.modal.exactGrade")}
                       name="grade_level"
                       placeholder="e.g. Grade 4"
                       value={formData.grade_level}
@@ -835,7 +831,7 @@ export default function StudentModal({
 
                   <div>
                     <label className="text-xs font-bold text-slate-500 tracking-wide uppercase">
-                      Activity Status <span className="text-red-500">*</span>
+                      {t("students.modal.activityStatus")} <span className="text-red-500">*</span>
                     </label>
                     <div className="mt-1.5 flex gap-2">
                       <button
@@ -852,7 +848,7 @@ export default function StudentModal({
                             : "bg-slate-50 text-slate-600 border-slate-200"
                         }`}
                       >
-                        Student
+                        {t("students.modal.occupationStudent")}
                       </button>
                       <button
                         type="button"
@@ -868,14 +864,14 @@ export default function StudentModal({
                             : "bg-slate-50 text-slate-600 border-slate-200"
                         }`}
                       >
-                        Working
+                        {t("students.modal.occupationWorking")}
                       </button>
                     </div>
                   </div>
 
                   {formData.occupation_type === "student" ? (
                     <InputField
-                      label="Current School"
+                      label={t("students.fields.currentSchool")}
                       name="current_school"
                       placeholder="School name"
                       value={formData.current_school}
@@ -883,7 +879,7 @@ export default function StudentModal({
                     />
                   ) : (
                     <InputField
-                      label="Current Office / Employer"
+                      label={t("students.fields.currentOffice")}
                       name="current_office"
                       placeholder="Office / Company name"
                       value={formData.current_office}
@@ -898,48 +894,48 @@ export default function StudentModal({
                 <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
                   <Phone className="w-4 h-4 text-brand-600" />
                   <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">
-                    3. Contacts & Guardian Details
+                    {t("students.modal.section3")}
                   </h3>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
                   <InputField
-                    label="Family / Guardian Name"
+                    label={t("students.fields.familyGuardianName")}
                     name="family_guardian_name"
                     value={formData.family_guardian_name}
                     onChange={handleChange}
                     required
                   />
                   <InputField
-                    label="Guardian Phone Number"
+                    label={t("students.fields.familyGuardianPhone")}
                     name="family_guardian_phone"
                     value={formData.family_guardian_phone}
                     onChange={handleChange}
                     required
                   />
                   <InputField
-                    label="Student Personal Phone"
+                    label={t("students.fields.phone")}
                     name="phone_number"
                     value={formData.phone_number}
                     onChange={handleChange}
                   />
 
                   <InputField
-                    label="Emergency Contact Name"
+                    label={t("students.fields.emergencyContactName")}
                     name="emergency_contact_name"
                     value={formData.emergency_contact_name}
                     onChange={handleChange}
                     required
                   />
                   <InputField
-                    label="Emergency Contact Phone"
+                    label={t("students.fields.emergencyContactPhone")}
                     name="emergency_contact_phone"
                     value={formData.emergency_contact_phone}
                     onChange={handleChange}
                     required
                   />
                   <InputField
-                    label="Telegram Username"
+                    label={t("students.fields.telegram")}
                     name="telegram_user_name"
                     placeholder="@username"
                     value={formData.telegram_user_name}
@@ -953,40 +949,40 @@ export default function StudentModal({
                 <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
                   <Home className="w-4 h-4 text-brand-600" />
                   <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">
-                    4. Living Address
+                    {t("students.modal.section4")}
                   </h3>
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
                   <InputField
-                    label="City"
+                    label={t("students.fields.city")}
                     name="city"
                     value={formData.city}
                     onChange={handleChange}
                     required
                   />
                   <InputField
-                    label="Subcity"
+                    label={t("students.fields.subcity")}
                     name="subcity"
                     value={formData.subcity}
                     onChange={handleChange}
                     required
                   />
                   <InputField
-                    label="Woreda"
+                    label={t("students.fields.woreda")}
                     name="woreda"
                     value={formData.woreda}
                     onChange={handleChange}
                     required
                   />
                   <InputField
-                    label="Kebele"
+                    label={t("students.fields.kebele")}
                     name="kebele"
                     value={formData.kebele}
                     onChange={handleChange}
                   />
                   <InputField
-                    label="House No"
+                    label={t("students.fields.houseNo")}
                     name="house_no"
                     value={formData.house_no}
                     onChange={handleChange}
@@ -999,14 +995,14 @@ export default function StudentModal({
                 <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
                   <CheckCircle2 className="w-4 h-4 text-brand-600" />
                   <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">
-                    5. Classification, Section & Status
+                    {t("students.modal.section5")}
                   </h3>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-5">
                   <div>
                     <label className="text-xs font-bold text-slate-500 tracking-wide uppercase">
-                      Program Track <span className="text-red-500">*</span>
+                      {t("students.modal.programTrack")} <span className="text-red-500">*</span>
                     </label>
                     <select
                       name="track"
@@ -1036,7 +1032,7 @@ export default function StudentModal({
                   {formData.track === "Regular" && (
                     <div>
                       <label className="text-xs font-bold text-slate-500 tracking-wide uppercase">
-                        Regular Classification{" "}
+                        {t("students.modal.regularClassification")}{" "}
                         <span className="text-red-500">*</span>
                       </label>
                       <select
@@ -1058,7 +1054,7 @@ export default function StudentModal({
                   {formData.track === "Regular" && (
                     <div className="flex flex-col justify-end">
                       <label className="text-xs font-bold text-slate-500 tracking-wide uppercase mb-1.5">
-                        የመማሪያ ሰዓት / Shift
+                        {t("students.modal.shift")}
                       </label>
                       <label className="flex items-center gap-2.5 px-4 py-2.5 bg-indigo-50/80 border border-indigo-200 rounded-xl cursor-pointer hover:bg-indigo-100/70 transition-all select-none">
                         <input
@@ -1074,9 +1070,9 @@ export default function StudentModal({
                           className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
                         />
                         <span className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
-                          <span>🌙 የማታ ተማሪ</span>
+                          <span>🌙 {t("students.modal.nightStudent")}</span>
                           <span className="text-[10px] text-indigo-600 font-medium">
-                            (Night Shift)
+                            {t("students.modal.nightShift")}
                           </span>
                         </span>
                       </label>
@@ -1086,8 +1082,8 @@ export default function StudentModal({
                   {formData.track === "Distance" && (
                     <div>
                       <label className="text-xs font-bold text-amber-900 tracking-wide uppercase flex items-center justify-between">
-                        <span>ዙር / Round</span>
-                        <span className="text-red-500 font-black">* ግዴታ</span>
+                        <span>{t("students.modal.round")}</span>
+                        <span className="text-red-500 font-black">* {t("students.modal.roundRequired")}</span>
                       </label>
                       <input
                         type="text"
@@ -1104,7 +1100,7 @@ export default function StudentModal({
 
                   <div>
                     <label className="text-xs font-bold text-slate-500 tracking-wide uppercase">
-                      Assign Section <span className="text-red-500">*</span>
+                      {t("students.modal.assignSection")} <span className="text-red-500">*</span>
                     </label>
                     <select
                       name="section_id"
@@ -1113,7 +1109,7 @@ export default function StudentModal({
                       required
                       className="w-full mt-1.5 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-brand-500 focus:bg-white font-medium text-slate-800"
                     >
-                      <option value="">Select Section</option>
+                      <option value="">{t("students.modal.selectSection")}</option>
                       {filteredSections.map((s) => (
                         <option key={s.id} value={s.id}>
                           {s.name} ({s.program_type?.name || formData.track})
@@ -1124,7 +1120,7 @@ export default function StudentModal({
 
                   <div>
                     <label className="text-xs font-bold text-slate-500 tracking-wide uppercase">
-                      Enrollment Status <span className="text-red-500">*</span>
+                      {t("students.modal.enrollmentStatus")} <span className="text-red-500">*</span>
                     </label>
                     <select
                       name="status"
@@ -1133,8 +1129,8 @@ export default function StudentModal({
                       required
                       className="w-full mt-1.5 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-brand-500 focus:bg-white font-medium text-slate-800"
                     >
-                      <option value="new">New Student</option>
-                      <option value="regular">Regular Student</option>
+                      <option value="new">{t("students.modal.newStudent")}</option>
+                      <option value="regular">{t("students.modal.regularStudent")}</option>
                     </select>
                   </div>
                 </div>
@@ -1145,7 +1141,7 @@ export default function StudentModal({
                 <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
                   <Paperclip className="w-4 h-4 text-brand-600" />
                   <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">
-                    6. Certificates & Documents (Multiple Files Supported)
+                    {t("students.modal.section6")}
                   </h3>
                 </div>
 
@@ -1153,7 +1149,7 @@ export default function StudentModal({
                   {/* Birth Certificates */}
                   <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
                     <label className="text-xs font-bold text-slate-700 block mb-2">
-                      Birth Certificate(s)
+                      {t("students.fields.birthCertificates")}
                     </label>
                     <input
                       type="file"
@@ -1163,7 +1159,7 @@ export default function StudentModal({
                     />
                     {birthCertFiles.length > 0 && (
                       <p className="text-[11px] font-bold text-emerald-600 mt-2">
-                        ✓ {birthCertFiles.length} file(s) selected
+                        ✓ {t("students.modal.filesSelected", { count: birthCertFiles.length })}
                       </p>
                     )}
                   </div>
@@ -1171,7 +1167,7 @@ export default function StudentModal({
                   {/* Educational Certificates */}
                   <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
                     <label className="text-xs font-bold text-slate-700 block mb-2">
-                      Educational Certificate(s)
+                      {t("students.fields.educationalCertificates")}
                     </label>
                     <input
                       type="file"
@@ -1181,7 +1177,7 @@ export default function StudentModal({
                     />
                     {eduCertFiles.length > 0 && (
                       <p className="text-[11px] font-bold text-emerald-600 mt-2">
-                        ✓ {eduCertFiles.length} file(s) selected
+                        ✓ {t("students.modal.filesSelected", { count: eduCertFiles.length })}
                       </p>
                     )}
                   </div>
@@ -1199,7 +1195,7 @@ export default function StudentModal({
               onClick={handleDelete}
               className="flex items-center gap-2 text-red-500 font-bold hover:text-red-700 bg-red-50 hover:bg-red-100 px-4 py-2.5 rounded-xl transition-all"
             >
-              <Trash2 className="w-4 h-4" /> Delete Student
+              <Trash2 className="w-4 h-4" /> {t("students.modal.deleteStudent")}
             </button>
           )}
 
@@ -1209,7 +1205,7 @@ export default function StudentModal({
               onClick={onClose}
               className="px-6 py-2.5 text-slate-600 font-bold hover:text-slate-800 transition-colors"
             >
-              Close
+              {t("common.close")}
             </button>
             {isEdit && (
               <button
@@ -1220,10 +1216,10 @@ export default function StudentModal({
               >
                 <Save className="w-4 h-4" />
                 {isSubmitting
-                  ? "Saving..."
+                  ? t("common.saving")
                   : isCreate
-                    ? "Enroll Student"
-                    : "Save Changes"}
+                    ? t("students.modal.enrollStudent")
+                    : t("common.save")}
               </button>
             )}
           </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { X, Save, UserPlus } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useFeedback } from "../../context/FeedbackContext";
 
 // Canonical 5 system roles only
@@ -19,6 +20,7 @@ export default function UserModal({
   mode = "create",
 }) {
   const { notify } = useFeedback();
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     name: "",
     username: "",
@@ -66,8 +68,8 @@ export default function UserModal({
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!isEdit && formData.password !== formData.password_confirmation) {
-      notify("Passwords do not match", "error");
+    if (formData.password && formData.password !== formData.password_confirmation) {
+      notify(t("users.modal.passwordsMismatch"), "error");
       return;
     }
 
@@ -96,10 +98,10 @@ export default function UserModal({
             </div>
             <div>
               <h2 className="text-xl font-extrabold text-slate-800">
-                {isEdit ? "Edit User" : "Create New User"}
+                {isEdit ? t("users.modal.editTitle") : t("users.modal.createTitle")}
               </h2>
               <p className="text-xs font-semibold text-slate-500 mt-0.5">
-                Manage account access
+                {t("users.modal.manageAccess")}
               </p>
             </div>
           </div>
@@ -120,7 +122,7 @@ export default function UserModal({
           {/* Name */}
           <div>
             <label className="block text-sm font-bold text-slate-700 mb-1.5">
-              Full Name <span className="text-red-500">*</span>
+              {t("users.modal.fullName")} <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -135,24 +137,32 @@ export default function UserModal({
           {/* Username */}
           <div>
             <label className="block text-sm font-medium mb-1">
-              Username <span className="text-red-500">*</span>
+              {t("users.modal.username")} <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               name="username"
               value={formData.username}
               onChange={handleChange}
-              required
-              className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
+              required={!isEdit}
+              readOnly={isEdit}
+              disabled={isEdit}
+              title={isEdit ? t("users.modal.usernameLocked") : undefined}
+              className={`w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 ${
+                isEdit ? "bg-slate-100 text-slate-400 cursor-not-allowed" : ""
+              }`}
             />
+            {isEdit && (
+              <p className="text-[11px] text-slate-400 mt-1">{t("users.modal.usernameLocked")}</p>
+            )}
           </div>
 
-          {/* Password (only create) */}
-          {!isEdit && (
+          {/* Password — required on create; optional reset on edit */}
+          {!isEdit ? (
             <>
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  Password <span className="text-red-500">*</span>
+                  {t("users.modal.password")} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="password"
@@ -166,7 +176,7 @@ export default function UserModal({
 
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  Confirm Password <span className="text-red-500">*</span>
+                  {t("users.modal.confirmPassword")} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="password"
@@ -178,12 +188,40 @@ export default function UserModal({
                 />
               </div>
             </>
+          ) : (
+            <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 space-y-4">
+              <p className="text-xs font-bold text-amber-800 uppercase tracking-wider">
+                {t("users.modal.resetOptional")}
+              </p>
+              <div>
+                <label className="block text-sm font-medium mb-1">{t("users.modal.newPassword")}</label>
+                <input
+                  type="password"
+                  name="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  minLength={8}
+                  placeholder="Min. 8 characters"
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 bg-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">{t("users.modal.confirmNewPassword")}</label>
+                <input
+                  type="password"
+                  name="password_confirmation"
+                  value={formData.password_confirmation}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 bg-white"
+                />
+              </div>
+            </div>
           )}
 
           {/* Role */}
           <div>
             <label className="block text-sm font-medium mb-1">
-              Role <span className="text-red-500">*</span>
+              {t("users.role")} <span className="text-red-500">*</span>
             </label>
             <select
               name="role"
@@ -204,7 +242,7 @@ export default function UserModal({
             <>
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  Security Question <span className="text-red-500">*</span>
+                  {t("users.modal.securityQuestion")} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -218,7 +256,7 @@ export default function UserModal({
 
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  Security Answer <span className="text-red-500">*</span>
+                  {t("users.modal.securityAnswer")} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -239,7 +277,7 @@ export default function UserModal({
             onClick={onClose}
             className="px-4 py-2.5 text-slate-600 hover:bg-white border border-slate-200 rounded-lg font-bold transition-colors"
           >
-            Cancel
+            {t("common.cancel")}
           </button>
 
           <button
@@ -249,10 +287,10 @@ export default function UserModal({
           >
             <Save className="w-5 h-5" />
             {isSubmitting
-              ? "Saving..."
+              ? t("common.saving")
               : isEdit
-                ? "Update User"
-                : "Create User"}
+                ? t("users.modal.updateUser")
+                : t("users.modal.createTitle")}
           </button>
         </div>
       </div>

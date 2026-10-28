@@ -330,9 +330,9 @@ export default function StudentPromotion() {
               ጃቴ ቅድስት ኪዳነ ምሕረት ፍኖተ ሰማዕታት ሰንበት ት/ቤት
             </div>
             <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white flex items-center gap-3">
-              የተማሪዎች ባለ 3-ደረጃ የክፍል እድገት ቧንቧ
+              የተማሪዎች ባለ 3-ደረጃ የክፍል እድገት ሂደት
               <span className="text-lg sm:text-xl font-normal text-brand-300/90 font-mono">
-                / 3-Tier Promotion Pipeline
+                / 3-Stage Promotion Process
               </span>
             </h1>
             <p className="text-sm text-brand-100/80 max-w-3xl font-medium leading-relaxed">

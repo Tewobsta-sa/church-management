@@ -22,8 +22,15 @@ export default defineConfig({
   },
   build: {
     chunkSizeWarningLimit: 1500,
+    // Never ship source maps — keeps the minified bundle opaque in DevTools.
+    sourcemap: false,
     rollupOptions: {
       output: {
+        // Strip all console.* calls from production bundles
+        // (dev server output is unaffected).
+        minify: {
+          compress: { dropConsole: true },
+        },
         manualChunks(id) {
           if (id.includes("node_modules")) {
             if (

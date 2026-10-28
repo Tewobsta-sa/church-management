@@ -1,4 +1,4 @@
-import { Menu, Bell, UserCircle, Globe, Calendar } from "lucide-react";
+import { Menu, UserCircle, Globe, Calendar } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
@@ -68,11 +68,6 @@ export default function Topbar({ onMenuClick }) {
           >
             <Globe className="h-4 w-4" />
             {i18n.language === 'en' ? 'አማርኛ' : 'English'}
-          </button>
-          
-          <button className="relative p-2 text-slate-400 hover:text-brand-600 transition-colors rounded-full hover:bg-brand-50">
-            <Bell className="h-5 w-5" />
-            <span className="absolute top-1.5 right-2 h-2 w-2 rounded-full bg-red-500 border-2 border-white"></span>
           </button>
           
           <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>

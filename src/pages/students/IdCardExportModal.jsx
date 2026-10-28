@@ -4,6 +4,7 @@ import { QRCodeCanvas } from "qrcode.react";
 import jsPDF from "jspdf";
 import { captureElement } from "../../utils/pdfCapture";
 import { useFeedback } from "../../context/FeedbackContext";
+import { toEthiopianDate } from "../../utils/ethiopianDate";
 
 const PREVIEW_BATCH = 45;
 // Large exports: lower raster scale + JPEG quality keep hundreds of pages fast
@@ -404,14 +405,9 @@ function IdCardItem({ st, theme, isExportMode = false }) {
   const isNight = Boolean(st.is_night);
   const [imgFailed, setImgFailed] = useState(false);
 
-  const qrValue = JSON.stringify({
-    id: st.id,
-    sid: st.student_id,
-    name: st.name,
-    class: st.section?.name || st.section_name,
-    night: isNight ? 1 : 0,
-    cat: theme.categoryTitleAm,
-  });
+  // Sparse payload keeps the QR modules large and easy to scan; the backend
+  // resolves the raw student_id (e.g. "REG/001") directly.
+  const qrValue = st.student_id || "";
 
   return (
     <div
@@ -573,9 +569,17 @@ function IdCardItem({ st, theme, isExportMode = false }) {
           </div>
         </div>
 
-        {/* QR Code */}
-        <div className="shrink-0 flex flex-col items-center bg-slate-50 p-1 rounded-xl border border-slate-200">
-          <QRCodeCanvas value={qrValue} size={isExportMode ? 42 : 54} level="M" />
+        {/* QR Code — large enough for reliable phone scanning at print size;
+            marginSize adds the required quiet zone around the modules. */}
+        <div className="shrink-0 flex flex-col items-center bg-white p-1 rounded-xl border border-slate-200">
+          <QRCodeCanvas
+            value={qrValue}
+            size={isExportMode ? 88 : 112}
+            level="H"
+            marginSize={2}
+            bgColor="#ffffff"
+            fgColor="#0f172a"
+          />
           <span
             className={`${
               isExportMode ? "text-[5.5px]" : "text-[6.5px]"
@@ -593,7 +597,7 @@ function IdCardItem({ st, theme, isExportMode = false }) {
         } border-t border-slate-100 flex justify-between items-center text-slate-400 font-bold uppercase`}
       >
         <span className="truncate">ፍኖተ ሰማዕታት ሰንበት ት/ቤት</span>
-        <span className="shrink-0 text-slate-500">2018 E.C.</span>
+        <span className="shrink-0 text-slate-500">{toEthiopianDate().year} E.C.</span>
       </div>
     </div>
   );

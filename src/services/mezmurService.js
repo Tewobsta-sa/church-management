@@ -90,8 +90,9 @@ export const mezmurService = {
     return response.data;
   },
 
-  getExamCandidates: async (search = "") => {
-    const response = await api.get("/mezmur-exams-candidates", { params: { search } });
+  getExamCandidates: async (params = {}) => {
+    if (typeof params === "string") params = { search: params };
+    const response = await api.get("/mezmur-exams-candidates", { params });
     return response.data;
   },
 

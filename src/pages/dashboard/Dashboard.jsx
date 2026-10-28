@@ -349,8 +349,8 @@ export default function Dashboard() {
       >
         <div className="flex justify-between items-center mb-5">
           <h3 className="font-black text-slate-800 uppercase tracking-widest text-xs flex items-center gap-2">
-            <Flag className="w-4 h-4 text-brand-600" /> የክፍል እድገት ፓይፕላይን
-            (Promotion Pipeline)
+            <Flag className="w-4 h-4 text-brand-600" /> የክፍል እድገት ሂደት
+            (Promotion Process)
           </h3>
           <span className="flex items-center gap-1 text-[10px] font-black uppercase text-brand-600 group-hover:translate-x-1 transition-transform">
             Open Promotions <ArrowRight className="w-3.5 h-3.5" />

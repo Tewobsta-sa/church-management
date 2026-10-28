@@ -224,13 +224,30 @@ export default function Sidebar({ onNavClick }) {
               </p>
             </div>
           </div>
-          <button
-            onClick={logout}
-            className="w-full flex items-center justify-center gap-2 p-3 text-sm font-medium rounded-xl bg-red-900/20 text-red-300 border border-red-800/20 hover:bg-red-900/40 hover:text-red-200 transition-all group"
-          >
-            <LogOut className="h-4 w-4 group-hover:scale-110 transition-transform" />
-            {t("nav.Logout")}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={logout}
+              className="flex-1 flex items-center justify-center gap-2 p-3 text-sm font-medium rounded-xl bg-red-900/20 text-red-300 border border-red-800/20 hover:bg-red-900/40 hover:text-red-200 transition-all group"
+            >
+              <LogOut className="h-4 w-4 group-hover:scale-110 transition-transform" />
+              {t("nav.Logout")}
+            </button>
+            <NavLink
+              to="/security"
+              onClick={onNavClick}
+              title={t("nav.Settings")}
+              className={({ isActive }) =>
+                clsx(
+                  "p-3 rounded-xl border transition-all shrink-0",
+                  isActive
+                    ? "bg-amber-400/20 text-amber-300 border-amber-400/40"
+                    : "bg-white/5 text-slate-400 border-white/10 hover:bg-white/10 hover:text-amber-300",
+                )
+              }
+            >
+              <Settings className="h-4 w-4" />
+            </NavLink>
+          </div>
         </div>
       </div>
     </div>

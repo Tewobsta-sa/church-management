@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { adminService } from "../../services/adminService";
-import { Plus, Trash2, Users, Search, Shield, Settings, Activity } from "lucide-react";
+import { Plus, Trash2, Users, Search, Shield, Settings, Activity, KeyRound } from "lucide-react";
 import UserModal from "./UserModal";
 import SystemLogsViewer from "./SystemLogsViewer";
 import { useAuth } from "../../context/AuthContext";
@@ -186,6 +186,9 @@ export default function UsersManagement() {
                          <>
                            <button onClick={() => openModal(user, "edit")} className="p-2 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-colors tooltip" title="Edit Admin">
                               <Settings className="w-4 h-4" />
+                           </button>
+                           <button onClick={() => openModal(user, "edit")} className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors tooltip" title="Reset Password">
+                              <KeyRound className="w-4 h-4" />
                            </button>
                            <button onClick={() => handleDelete(user.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors tooltip" title="Delete User">
                               <Trash2 className="w-4 h-4" />

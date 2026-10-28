@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import jsPDF from "jspdf";
 import { captureElement } from "../../utils/pdfCapture";
+import { toEthiopianDate } from "../../utils/ethiopianDate";
 import { resultsService } from "../../services/resultsService";
 import { sectionService } from "../../services/sectionService";
 import { useFeedback } from "../../context/FeedbackContext";
@@ -382,10 +383,21 @@ export default function BulkReportCardsModal({ isOpen, onClose, initialSectionId
                 </div>
               </div>
 
-              {/* Single Student Card Live Preview */}
+              {/* Single Student Card Live Preview (front + back) */}
               {currentStudent && (
-                <div className="shadow-2xl rounded-2xl overflow-hidden bg-white border border-slate-200 transition-all">
-                  <ReportCardTemplate student={currentStudent} theme={currentTheme} year={currentYear} />
+                <div className="space-y-6">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">
+                    Front Side
+                  </p>
+                  <div className="shadow-2xl rounded-2xl overflow-hidden bg-white border border-slate-200 transition-all">
+                    <ReportCardFront student={currentStudent} theme={currentTheme} />
+                  </div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">
+                    Back Side
+                  </p>
+                  <div className="shadow-2xl rounded-2xl overflow-hidden bg-white border border-slate-200 transition-all">
+                    <ReportCardBack student={currentStudent} theme={currentTheme} />
+                  </div>
                 </div>
               )}
             </div>
@@ -409,19 +421,33 @@ export default function BulkReportCardsModal({ isOpen, onClose, initialSectionId
         >
           <div ref={printContainerRef}>
             {sheetsMounted && reportCards.map((student) => (
-              <div
-                key={student.id}
-                className="report-card-page bg-white"
-                style={{
-                  width: "210mm",
-                  minHeight: "297mm",
-                  boxSizing: "border-box",
-                  padding: "16mm 18mm",
-                  pageBreakAfter: "always",
-                  backgroundColor: "#ffffff",
-                }}
-              >
-                <ReportCardTemplate student={student} theme={currentTheme} year={currentYear} />
+              <div key={student.id}>
+                <div
+                  className="report-card-page bg-white"
+                  style={{
+                    width: "210mm",
+                    minHeight: "297mm",
+                    boxSizing: "border-box",
+                    padding: "12mm 14mm",
+                    pageBreakAfter: "always",
+                    backgroundColor: "#ffffff",
+                  }}
+                >
+                  <ReportCardFront student={student} theme={currentTheme} />
+                </div>
+                <div
+                  className="report-card-page bg-white"
+                  style={{
+                    width: "210mm",
+                    minHeight: "297mm",
+                    boxSizing: "border-box",
+                    padding: "12mm 14mm",
+                    pageBreakAfter: "always",
+                    backgroundColor: "#ffffff",
+                  }}
+                >
+                  <ReportCardBack student={student} theme={currentTheme} />
+                </div>
               </div>
             ))}
           </div>
@@ -431,199 +457,282 @@ export default function BulkReportCardsModal({ isOpen, onClose, initialSectionId
   );
 }
 
+const ETHIOPIC_FONT =
+  '"Noto Sans Ethiopic","Nyala","Ebrima","Abyssinica SIL",serif';
+
+const GRADE_SCALE = [
+  ["ከ100 እስከ 85", "እጅግ በጣም ጥሩ"],
+  ["ከ84 እስከ 75", "በጣም ጥሩ"],
+  ["ከ74 እስከ 65", "ደህና"],
+  ["ከ64 እስከ 50", "መካከለኛ"],
+  ["ከ49 በታች", "ዝቅተኛ"],
+];
+
+const CARD_NOTES = [
+  "ይህ የትምህርት ውጤት መግለጫ ካርድ በዓመት አንዴ በትምህርት ማብቂያ ላይ ለተማሪው/ዋ ይሰጣል።",
+  "ይህ የትምህርት ውጤት መግለጫ ካርድ የደብሩ አስተዳዳሪ ፊርማና ማኅተም፣ የሰንበት ትምህርት ቤት ልዑክ መንበር ፊርማ እንዲሁም የትምህርት ክፍል ተጠሪው ፊርማ ከሌለበት ዋጋ አይኖረውም።",
+];
+
+const underlinedValue = (value, minWidth = 120) => (
+  <span
+    style={{
+      display: "inline-block",
+      minWidth,
+      borderBottom: "1px solid #334155",
+      paddingBottom: 2,
+      textAlign: "center",
+      fontWeight: 700,
+    }}
+  >
+    {value || " "}
+  </span>
+);
+
 /**
- * Report Card Visual Layout
+ * FRONT — cover page: church header, school name, verse, student info fields.
  */
-function ReportCardTemplate({ student, theme, year }) {
-  const isPassing = (student.overall_average || 0) >= 50;
+function ReportCardFront({ student, theme }) {
+  const ethYear = toEthiopianDate().year;
+  const frame = { border: `3px solid ${theme.primary}`, borderRadius: 4 };
 
   return (
-    <div className="p-8 font-sans text-slate-800 relative bg-white">
-      {/* Top Banner Accent */}
-      <div
-        className="h-3.5 w-full rounded-t-lg -mt-8 -mx-8 mb-6"
-        style={{ backgroundColor: theme.primary }}
-      />
-
-      {/* Institutional Header */}
-      <div className="flex items-center justify-between border-b pb-5 mb-6" style={{ borderColor: theme.border }}>
-        <div className="flex items-center gap-4">
-          <div
-            className="w-16 h-16 rounded-2xl flex items-center justify-center p-1.5 shadow-md bg-white border border-slate-200 shrink-0"
-          >
-            <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" />
-          </div>
-          <div>
-            <h1 className="text-xl font-black uppercase tracking-wider text-slate-900">
-              ጃቴ ኪዳነ ምሕረት ፍኖተ ሰማዕታት ሰንበት ት/ቤት
-            </h1>
-            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: theme.secondary }}>
-              Jate Kidane Mehret Fnote Semaetat Sunday School &bull; Academic Report
-            </p>
-            <p className="text-[11px] text-slate-400 font-medium">
-              Academic Year {year} &bull; Section: {student.section_name} ({student.classification})
-            </p>
-          </div>
-        </div>
-
-        <div className="text-right">
-          <div
-            className="inline-block px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest text-white shadow-sm"
-            style={{ backgroundColor: theme.primary }}
-          >
-            Rank #{student.rank} of {student.total_students}
-          </div>
-          <p className="text-[11px] text-slate-400 font-bold mt-1">
-            Generated: {new Date().toLocaleDateString()}
-          </p>
-        </div>
+    <div
+      style={{
+        ...frame,
+        minHeight: "100%",
+        padding: "26px 34px",
+        fontFamily: ETHIOPIC_FONT,
+        color: "#111",
+        display: "flex",
+        flexDirection: "column",
+        backgroundColor: "#fff",
+      }}
+    >
+      {/* Cross + church hierarchy */}
+      <div style={{ textAlign: "center", fontWeight: 800, fontSize: 14, lineHeight: 1.9 }}>
+        <div style={{ fontSize: 26, lineHeight: 1 }}>✝</div>
+        <div>በኢትዮጵያ ኦርቶዶክስ ተዋሕዶ ቤተ ክርስቲያን</div>
+        <div>የሰ/ት/ቤቶች ማደራጃ መምሪያ ሰ/ት/ቤቶች አንድነት</div>
+        <div>የአዲስ አበባ ሀገረ ስብከት</div>
+        <div style={{ fontSize: 16 }}>የጃቴ ኪዳነ ምሕረት ፍኖተ ሰማዕታት ሰ/ት/ቤት</div>
       </div>
 
-      {/* Student Profile Info Box */}
+      {/* Logo */}
+      <div style={{ display: "flex", justifyContent: "center", margin: "22px 0" }}>
+        <img
+          src="/logo.png"
+          alt="School seal"
+          style={{ width: 150, height: 150, objectFit: "contain" }}
+          crossOrigin="anonymous"
+        />
+      </div>
+
+      {/* Verse */}
+      <div style={{ textAlign: "center", fontWeight: 700, fontSize: 13, lineHeight: 1.8, marginBottom: 26 }}>
+        <div>
+          «እንደ ቤተመጽሐፍትና በተረዳህበት ነገር ጸንተህ ኑር፤ ከማን እንደ ተማርክም ታውቃለህና፤»
+        </div>
+        <div style={{ fontSize: 12 }}>2ኛ ጢሞ 3፡14</div>
+      </div>
+
+      {/* Card title */}
       <div
-        className="rounded-2xl p-5 mb-6 flex items-center justify-between border shadow-sm"
-        style={{ backgroundColor: theme.light, borderColor: theme.border }}
+        style={{
+          textAlign: "center",
+          fontWeight: 900,
+          fontSize: 17,
+          marginBottom: 26,
+          letterSpacing: 0.5,
+        }}
       >
-        <div className="flex items-center gap-5">
+        የትምህርት ውጤት መግለጫ
+      </div>
+
+      {/* Student info fields */}
+      <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 3.1, padding: "0 8px" }}>
+        <div>የተማሪው/ዋ ስም ከነ አያት {underlinedValue(student.name, 260)}</div>
+        <div>የክርስትና ስም {underlinedValue(student.christian_name, 320)}</div>
+        <div>
+          ትምህርት የተከታተለበት አጠባበብ{" "}
+          {underlinedValue(
+            [student.track, student.classification].filter(Boolean).join(" • "),
+            210,
+          )}
+        </div>
+        <div>
+          አድራሻ {underlinedValue(null, 110)} ከተማ {underlinedValue(null, 90)} ቀበሌ{" "}
+          {underlinedValue(null, 90)}
+        </div>
+        <div>
+          የትምህርት ዘመን {underlinedValue(`${ethYear} ዓ.ም.`, 110)} ክፍል ደረጃ{" "}
+          {underlinedValue(student.section_name, 140)} መለያ ቁጥር{" "}
+          {underlinedValue(student.student_id, 110)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * BACK — marks table, grading scale, notes, photo box, signatures & seal.
+ */
+function ReportCardBack({ student, theme }) {
+  const frame = { border: `3px solid ${theme.primary}`, borderRadius: 4 };
+  const cell = {
+    border: "1.5px solid #000",
+    padding: "7px 9px",
+    fontSize: 12,
+    fontWeight: 700,
+  };
+
+  return (
+    <div
+      style={{
+        ...frame,
+        minHeight: "100%",
+        padding: "22px 26px",
+        fontFamily: ETHIOPIC_FONT,
+        color: "#111",
+        display: "flex",
+        flexDirection: "column",
+        backgroundColor: "#fff",
+      }}
+    >
+      {/* Photo box + verse */}
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 20, marginBottom: 18 }}>
+        <div style={{ flex: 1, alignSelf: "center", textAlign: "center", fontWeight: 700, fontSize: 13, lineHeight: 1.9 }}>
+          <div>
+            «መልካም ሥራችሁን አይተው በሰማያት ያለውን አባታችሁን እንዲያመሰግኑ፤ ብርሃናችሁ በሰዎች ፊት ይብራ።»
+          </div>
+          <div style={{ fontSize: 12, marginTop: 4 }}>የማቴዎስ 5፡16</div>
+        </div>
+        <div
+          style={{
+            width: 120,
+            height: 140,
+            borderRadius: 8,
+            backgroundColor: "#4b5563",
+            color: "#fff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            textAlign: "center",
+            fontWeight: 800,
+            fontSize: 12,
+            overflow: "hidden",
+            flexShrink: 0,
+          }}
+        >
           {student.picture_url ? (
             <img
               src={student.picture_url}
               alt={student.name}
-              className="w-18 h-18 rounded-2xl object-cover border-2 shadow-sm"
-              style={{ borderColor: theme.primary }}
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
               crossOrigin="anonymous"
             />
           ) : (
-            <div
-              className="w-16 h-16 rounded-2xl flex items-center justify-center font-black text-2xl text-white shadow-sm"
-              style={{ backgroundColor: theme.primary }}
-            >
-              {student.name ? student.name.charAt(0).toUpperCase() : "S"}
-            </div>
+            <span>የተማሪው<br />ፎቶ ግራፍ</span>
           )}
-
-          <div>
-            <h2 className="text-lg font-black text-slate-900">{student.name}</h2>
-            {student.christian_name && (
-              <p className="text-xs font-bold text-slate-600">
-                Christian Name: <span className="font-extrabold">{student.christian_name}</span>
-              </p>
-            )}
-            <p className="text-xs text-slate-500 font-medium mt-0.5">
-              ID: <span className="font-mono font-bold text-slate-700">{student.student_id}</span> &bull; Track:{" "}
-              <span className="font-bold">{student.track}</span>
-            </p>
-          </div>
-        </div>
-
-        {/* Overall Average Display */}
-        <div className="text-right pl-6 border-l" style={{ borderColor: theme.border }}>
-          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-            Overall Average
-          </span>
-          <div
-            className="text-3xl font-black"
-            style={{ color: theme.primary }}
-          >
-            {student.overall_average}%
-          </div>
-          <span
-            className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase mt-1 ${
-              isPassing ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
-            }`}
-          >
-            {isPassing ? "Passed / Promoted" : "Needs Improvement"}
-          </span>
         </div>
       </div>
 
-      {/* Academic Courses & Assessments Table */}
-      <div className="mb-6">
-        <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 mb-3 flex items-center gap-2">
-          <BookOpen className="w-4 h-4" style={{ color: theme.primary }} />
-          Course Assessments & Weighted Grades
-        </h3>
-
-        <div className="overflow-hidden rounded-xl border border-slate-200">
-          <table className="w-full text-xs text-left">
-            <thead>
-              <tr style={{ backgroundColor: theme.primary, color: "#ffffff" }}>
-                <th className="p-3 font-bold uppercase tracking-wider">Course Subject</th>
-                <th className="p-3 font-bold uppercase tracking-wider text-center">Assessments & Scores</th>
-                <th className="p-3 font-bold uppercase tracking-wider text-right">Weighted Final</th>
-                <th className="p-3 font-bold uppercase tracking-wider text-center">Status</th>
+      {/* Marks table */}
+      <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 20 }}>
+        <thead>
+          <tr>
+            <th style={{ ...cell, textAlign: "left", width: "34%" }}>የትምህረት ዓይነት</th>
+            <th style={{ ...cell, textAlign: "center", width: "44%" }}>ምዘና ውጤቶች</th>
+            <th style={{ ...cell, textAlign: "center" }}>አማካይ ውጤት</th>
+          </tr>
+        </thead>
+        <tbody>
+          {student.courses && student.courses.length > 0 ? (
+            student.courses.map((course, idx) => (
+              <tr key={course.course_id || idx}>
+                <td style={cell}>{course.course_name}</td>
+                <td style={{ ...cell, textAlign: "center", fontWeight: 600 }}>
+                  {course.assessments && course.assessments.length > 0
+                    ? course.assessments
+                        .map((a) => `${a.title}: ${a.score}/${a.max_score}`)
+                        .join("  •  ")
+                    : "—"}
+                </td>
+                <td style={{ ...cell, textAlign: "center" }}>
+                  {course.course_percentage}%
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {student.courses && student.courses.length > 0 ? (
-                student.courses.map((course, idx) => {
-                  const coursePass = (course.course_percentage || 0) >= 50;
-                  return (
-                    <tr key={course.course_id || idx} className={idx % 2 === 1 ? "bg-slate-50/50" : "bg-white"}>
-                      <td className="p-3.5 font-bold text-slate-800">
-                        {course.course_name}
-                      </td>
-                      <td className="p-3.5">
-                        <div className="flex flex-wrap gap-2 justify-center">
-                          {course.assessments && course.assessments.length > 0 ? (
-                            course.assessments.map((a, aIdx) => (
-                              <span
-                                key={aIdx}
-                                className="px-2 py-1 rounded-md bg-slate-100 text-slate-700 text-[11px] font-medium border border-slate-200"
-                              >
-                                {a.title}: <strong className="text-slate-900">{a.score}</strong>/{a.max_score}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-slate-400 text-[11px] italic">No individual components</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="p-3.5 font-black text-right text-sm" style={{ color: theme.primary }}>
-                        {course.course_percentage}%
-                      </td>
-                      <td className="p-3.5 text-center">
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
-                            coursePass ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
-                          }`}
-                        >
-                          {coursePass ? "Pass" : "Fail"}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })
-              ) : (
-                <tr>
-                  <td colSpan={4} className="p-6 text-center text-slate-400 italic">
-                    No graded courses recorded for this student in this academic period.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+            ))
+          ) : (
+            <tr>
+              <td colSpan={3} style={{ ...cell, textAlign: "center", color: "#64748b" }}>
+                የተመዘገቡ ውጤቶች የሉም
+              </td>
+            </tr>
+          )}
+          {/* Summary rows */}
+          <tr>
+            <td style={cell}>አማካይ ውጤት</td>
+            <td style={{ ...cell, textAlign: "center" }} colSpan={2}>
+              {student.overall_average ?? "—"}%
+            </td>
+          </tr>
+          <tr>
+            <td style={cell}>ፀባይ</td>
+            <td style={cell} colSpan={2}>&nbsp;</td>
+          </tr>
+          <tr>
+            <td style={cell}>ደረጃ</td>
+            <td style={{ ...cell, textAlign: "center" }} colSpan={2}>
+              {student.rank ? `${student.rank} / ${student.total_students}` : "—"}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* Grading scale + notes */}
+      <div style={{ display: "flex", gap: 22, marginBottom: "auto" }}>
+        <div style={{ width: "42%", fontSize: 11.5, fontWeight: 700 }}>
+          <div style={{ marginBottom: 6, fontSize: 12.5, fontWeight: 900 }}>የነጥብ አያያዝ</div>
+          {GRADE_SCALE.map(([range, label]) => (
+            <div key={range} style={{ lineHeight: 1.9 }}>
+              {range} {label}
+            </div>
+          ))}
+        </div>
+        <div style={{ flex: 1, fontSize: 11.5, fontWeight: 600, lineHeight: 2 }}>
+          <div style={{ marginBottom: 6, fontSize: 12.5, fontWeight: 900 }}>ማስብብያ</div>
+          {CARD_NOTES.map((note, i) => (
+            <div key={i} style={{ display: "flex", gap: 8, marginBottom: 4 }}>
+              <span style={{ fontSize: 14, lineHeight: 1.4 }}>●</span>
+              <span>{note}</span>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Signatures & Accreditation Footer */}
-      <div className="pt-8 border-t border-slate-200 grid grid-cols-3 gap-6 text-center mt-8">
-        <div>
-          <div className="border-b border-slate-300 pb-12 mb-1"></div>
-          <p className="text-[11px] font-black uppercase tracking-wider text-slate-700">Class Instructor</p>
-          <p className="text-[10px] text-slate-400">Signature & Date</p>
+      {/* Signatures */}
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 30, marginTop: 30 }}>
+        <div style={{ flex: 1, textAlign: "center", fontSize: 11.5, fontWeight: 700 }}>
+          <div style={{ borderTop: "1.5px solid #000", paddingTop: 6 }}>
+            የሰንበት ትምህርት ቤት ልዑክ መንበር<br />ስምና ፊርማ
+          </div>
         </div>
-
-        <div>
-          <div className="border-b border-slate-300 pb-12 mb-1"></div>
-          <p className="text-[11px] font-black uppercase tracking-wider text-slate-700">Tmhrt Kfl Head</p>
-          <p className="text-[10px] text-slate-400">Approved & Verified</p>
+        <div style={{ flex: 1, textAlign: "center", fontSize: 11.5, fontWeight: 700 }}>
+          <div style={{ borderTop: "1.5px solid #000", paddingTop: 6 }}>
+            የሰንበት ትምህርት ቤት ትምህርት ክፍል<br />ተጠሪ
+          </div>
         </div>
-
-        <div>
-          <div className="border-b border-slate-300 pb-12 mb-1"></div>
-          <p className="text-[11px] font-black uppercase tracking-wider text-slate-700">Official Church Seal</p>
-          <p className="text-[10px] text-slate-400">Saint Mary / St. Michael Parish</p>
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 30, marginTop: 26 }}>
+        <div style={{ flex: 1, textAlign: "center", fontSize: 11.5, fontWeight: 700 }}>
+          <div style={{ borderTop: "1.5px solid #000", paddingTop: 6 }}>
+            የደብሩ አስተዳዳሪ ስምና ፊርማ
+          </div>
+        </div>
+        <div style={{ flex: 1, textAlign: "center", fontSize: 11.5, fontWeight: 700 }}>
+          <div style={{ borderTop: "1.5px solid #000", paddingTop: 6 }}>
+            የደብሩ ማኅተም
+          </div>
         </div>
       </div>
     </div>

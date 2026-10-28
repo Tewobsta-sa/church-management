@@ -25,6 +25,7 @@ import {
   Download,
 } from "lucide-react";
 import jsPDF from "jspdf";
+import { useTranslation } from "react-i18next";
 import { mezmurService } from "../../services/mezmurService";
 import { useAuth } from "../../context/AuthContext";
 import { useFeedback } from "../../context/FeedbackContext";
@@ -32,9 +33,18 @@ import EthiopianDateInput from "../../components/common/EthiopianDateInput";
 import { formatEthiopianDate } from "../../utils/ethiopianDate";
 import { captureElement } from "../../utils/pdfCapture";
 
+const CLASSIFICATION_LABELS = {
+  prekg: "ቅድመ-ሕፃናት (PreKG)",
+  htsanat: "ሕፃናት (Htsanat)",
+  maekelawyan: "ማዕከላውያን (Maekelawyan)",
+  wetatoch: "ወጣቶች (Wetatoch)",
+  distance: "የርቀት (Distance)",
+};
+
 export default function MezmurMinistry() {
   const { hasRole } = useAuth();
   const { notify, confirmAction } = useFeedback();
+  const { t } = useTranslation();
 
   const isSuperAdmin = hasRole("super_admin");
   const isMezmurAdmin = hasRole("mezmur_kfl") || hasRole("mezmur_office_admin");
@@ -68,6 +78,8 @@ export default function MezmurMinistry() {
 
   // Yesew Habt passed students queue
   const [passedQueue, setPassedQueue] = useState([]);
+  const [eligibleQueue, setEligibleQueue] = useState([]);
+  const [mezmurMinAttendance, setMezmurMinAttendance] = useState(70);
   const [queueLoading, setQueueLoading] = useState(false);
   const [selectedQueueIds, setSelectedQueueIds] = useState([]);
   const [queueTargetMinistryId, setQueueTargetMinistryId] = useState("");
@@ -81,6 +93,7 @@ export default function MezmurMinistry() {
   );
   const [examDesc, setExamDesc] = useState("");
   const [examMinistryId, setExamMinistryId] = useState("");
+  const [examTargetClass, setExamTargetClass] = useState("");
 
   const [createMinistryModal, setCreateMinistryModal] = useState(false);
   const [ministryName, setMinistryName] = useState("");
@@ -283,7 +296,7 @@ export default function MezmurMinistry() {
     try {
       const [fullExam, candidates] = await Promise.all([
         mezmurService.getExam(exam.id),
-        mezmurService.getExamCandidates(),
+        mezmurService.getExamCandidates({ exam_id: exam.id }),
       ]);
 
       // Enforce rule: ONLY regular students (status !== 'new') can take Mezmur exams
@@ -323,6 +336,10 @@ export default function MezmurMinistry() {
         return status === "regular" && status !== "new";
       });
       setPassedQueue(list);
+      setEligibleQueue(res.eligible_students || []);
+      if (res.mezmur_min_attendance) {
+        setMezmurMinAttendance(res.mezmur_min_attendance);
+      }
       if (list.length > 0 && !queueTargetMinistryId && ministries.length > 0) {
         setQueueTargetMinistryId(ministries[0].id);
       }
@@ -379,6 +396,7 @@ export default function MezmurMinistry() {
     try {
       const res = await mezmurService.createExam({
         ministry_id: examMinistryId ? Number(examMinistryId) : null,
+        target_classification: examTargetClass || null,
         title: examTitle,
         exam_date: examDate,
         description: examDesc,
@@ -387,6 +405,7 @@ export default function MezmurMinistry() {
       setExamTitle("");
       setExamDesc("");
       setExamMinistryId("");
+      setExamTargetClass("");
       fetchData();
       loadExamDetails(res);
     } catch (err) {
@@ -667,34 +686,11 @@ export default function MezmurMinistry() {
         <div>
           <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight flex items-center gap-3">
             <Music className="w-8 h-8 text-brand-600" />
-            Mezmur Department &amp; Ministry
+            {t("mezmur.pageTitle")}
           </h1>
           <p className="text-slate-500 font-medium mt-0.5">
-            Choir training, student examinations linked to ministries, and bulk
-            assignments
+            {t("mezmur.pageSubtitle")}
           </p>
-        </div>
-
-        <div className="flex gap-2.5 flex-wrap">
-          {canManageMinistry && (
-            <button
-              onClick={() => setCreateMinistryModal(true)}
-              className="flex items-center gap-2 bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-emerald-500/20 hover:-translate-y-0.5 transition-all text-xs uppercase tracking-wider cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              Create Ministry
-            </button>
-          )}
-
-          {canManageMezmur && (
-            <button
-              onClick={() => setCreateExamModal(true)}
-              className="flex items-center gap-2 bg-linear-to-r from-brand-700 to-brand-500 hover:from-brand-800 hover:to-brand-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-brand-500/30 hover:-translate-y-0.5 transition-all text-xs uppercase tracking-wider cursor-pointer"
-            >
-              <Award className="w-4 h-4" />
-              New Mezmur Exam
-            </button>
-          )}
         </div>
       </div>
 
@@ -709,7 +705,7 @@ export default function MezmurMinistry() {
           }`}
         >
           <Users className="w-4 h-4" />
-          Ministries &amp; Groups ({ministries.length})
+          {t("mezmur.tabs.groups")} ({ministries.length})
         </button>
 
         <button
@@ -721,7 +717,7 @@ export default function MezmurMinistry() {
           }`}
         >
           <Award className="w-4 h-4" />
-          Exams &amp; Evaluations ({exams.length})
+          {t("mezmur.tabs.evaluations")} ({exams.length})
         </button>
 
         {(isYesewHabt || isSuperAdmin) && (
@@ -734,7 +730,7 @@ export default function MezmurMinistry() {
             }`}
           >
             <Send className="w-4 h-4 text-emerald-600" />
-            Passed Queue ({passedQueue.length})
+            {t("mezmur.tabs.passedQueue")} ({passedQueue.length})
           </button>
         )}
       </div>
@@ -750,11 +746,10 @@ export default function MezmurMinistry() {
                 <div>
                   <h3 className="font-black text-slate-800 uppercase tracking-widest text-xs flex items-center gap-2">
                     <Landmark className="w-4 h-4 text-emerald-600" />{" "}
-                    Established Ministries ({ministries.length})
+                    {t("mezmur.ministries.directory")} ({ministries.length})
                   </h3>
                   <p className="text-[11px] font-semibold text-slate-500 mt-0.5">
-                    Ministries and choirs available for examinations and student
-                    assignments
+                    {t("mezmur.ministries.directorySubtitle")}
                   </p>
                 </div>
 
@@ -764,7 +759,7 @@ export default function MezmurMinistry() {
                     className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold transition-colors cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    New Ministry
+                    {t("mezmur.ministries.newMinistry")}
                   </button>
                 )}
               </div>
@@ -774,20 +769,11 @@ export default function MezmurMinistry() {
                   <div className="col-span-full py-10 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
                     <Landmark className="w-10 h-10 text-slate-300 mx-auto mb-2" />
                     <p className="text-slate-500 font-bold text-xs uppercase tracking-wider">
-                      No ministries created yet
+                      {t("mezmur.ministries.empty")}
                     </p>
                     <p className="text-[11px] text-slate-400 mt-1">
-                      Click "Create Ministry" to set up your first church choir
-                      or service ministry.
+                      {t("mezmur.ministries.emptyHint")}
                     </p>
-                    {canManageMinistry && (
-                      <button
-                        onClick={() => setCreateMinistryModal(true)}
-                        className="mt-4 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow transition-all cursor-pointer"
-                      >
-                        + Create Ministry Now
-                      </button>
-                    )}
                   </div>
                 ) : (
                   ministries.map((m) => (
@@ -826,10 +812,10 @@ export default function MezmurMinistry() {
                       <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between text-xs gap-2">
                         <div>
                           <span className="font-bold text-slate-700 block">
-                            {m.total_students_count || 0} assigned
+                            {m.total_students_count || 0} {t("mezmur.ministries.assigned")}
                           </span>
                           <span className="text-[10px] font-bold text-brand-600 bg-brand-50 px-2 py-0.5 rounded inline-block mt-0.5">
-                            {m.exams_count || 0} exam(s)
+                            {m.exams_count || 0} {t("mezmur.ministries.examCount")}
                           </span>
                         </div>
 
@@ -840,7 +826,7 @@ export default function MezmurMinistry() {
                           title="የአገልግሎት ዘርፍ አባላትን በፒዲኤፍ አውርድ"
                         >
                           <Download className="w-3.5 h-3.5 text-emerald-700" />
-                          {exportingPdfId === m.id ? "ፒዲኤፍ..." : "Export PDF"}
+                          {exportingPdfId === m.id ? "ፒዲኤፍ..." : t("mezmur.ministries.exportPdf")}
                         </button>
                       </div>
                     </div>
@@ -853,17 +839,17 @@ export default function MezmurMinistry() {
             <div className="glass-panel overflow-hidden border-slate-200">
               <div className="px-8 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                 <h3 className="font-black text-slate-800 uppercase tracking-widest text-xs flex items-center gap-2">
-                  <Users className="w-4 h-4 text-brand-600" /> Active Ministry
-                  Groups &amp; Squads
+                  <Users className="w-4 h-4 text-brand-600" />{" "}
+                  {t("mezmur.ministries.squadsTitle")}
                 </h3>
               </div>
 
               <table className="w-full text-left">
                 <thead>
                   <tr className="bg-slate-50/50 border-b border-slate-200/60 text-slate-400 text-xs tracking-wider uppercase font-bold">
-                    <th className="px-8 py-4">Ministry Squad</th>
-                    <th className="px-8 py-4">Total Students</th>
-                    <th className="px-8 py-4">Start / End Dates</th>
+                    <th className="px-8 py-4">{t("mezmur.ministries.squad")}</th>
+                    <th className="px-8 py-4">{t("mezmur.ministries.totalStudents")}</th>
+                    <th className="px-8 py-4">{t("mezmur.ministries.dates")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-sm">
@@ -873,7 +859,7 @@ export default function MezmurMinistry() {
                         colSpan="3"
                         className="px-8 py-12 text-center text-slate-400 font-bold text-xs uppercase tracking-widest"
                       >
-                        No active squad assignments established
+                        {t("mezmur.ministries.noSquads")}
                       </td>
                     </tr>
                   ) : (
@@ -916,7 +902,7 @@ export default function MezmurMinistry() {
           <div className="xl:col-span-1 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">
-                Exam Sessions ({exams.length})
+                {t("mezmur.exams.sessions")} ({exams.length})
               </h3>
               {canManageMezmur && (
                 <button
@@ -931,7 +917,7 @@ export default function MezmurMinistry() {
             <div className="space-y-2">
               {exams.length === 0 ? (
                 <div className="p-8 text-center glass-panel text-slate-400 text-xs font-bold uppercase">
-                  No exams created yet
+                  {t("mezmur.exams.none")}
                 </div>
               ) : (
                 exams.map((ex) => {
@@ -955,6 +941,13 @@ export default function MezmurMinistry() {
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded mt-1">
                               <Landmark className="w-2.5 h-2.5" />{" "}
                               {ex.ministry.name}
+                            </span>
+                          )}
+                          {ex.target_classification && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded mt-1 ml-1">
+                              <Users className="w-2.5 h-2.5" />{" "}
+                              {CLASSIFICATION_LABELS[ex.target_classification] ||
+                                ex.target_classification}
                             </span>
                           )}
                         </div>
@@ -998,7 +991,7 @@ export default function MezmurMinistry() {
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-200 text-slate-600 rounded-full font-bold text-[10px]">
-                          Unassigned Ministry
+                          {t("mezmur.exams.unassignedMinistry")}
                         </span>
                       )}
                     </div>
@@ -1366,15 +1359,14 @@ export default function MezmurMinistry() {
             <div>
               <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
                 <Send className="w-5 h-5 text-emerald-600" />
-                Passed Mezmur Students Awaiting Ministry Assignment
+                {t("mezmur.queue.awaitingTitle")}
               </h3>
               <p className="text-xs font-semibold text-slate-500 mt-0.5">
-                Students forwarded from Mezmur examinations ready to be assigned
-                to ministries in bulk
+                {t("mezmur.queue.awaitingSubtitle")}
               </p>
             </div>
             <span className="px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full font-bold text-xs">
-              {passedQueue.length} Qualified Candidates
+              {passedQueue.length} {t("mezmur.queue.qualified")}
             </span>
           </div>
 
@@ -1387,24 +1379,24 @@ export default function MezmurMinistry() {
               >
                 {selectedQueueIds.length === passedQueue.length &&
                 passedQueue.length > 0
-                  ? "Deselect All"
-                  : `Select All (${passedQueue.length})`}
+                  ? t("mezmur.queue.deselectAll")
+                  : `${t("mezmur.queue.selectAll")} (${passedQueue.length})`}
               </button>
               <span className="text-xs font-bold text-slate-600">
-                {selectedQueueIds.length} candidate(s) selected
+                {selectedQueueIds.length} {t("mezmur.queue.selected")}
               </span>
             </div>
 
             <div className="flex items-center gap-2">
               <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
-                Target Ministry:
+                {t("mezmur.queue.targetMinistry")}
               </label>
               <select
                 value={queueTargetMinistryId}
                 onChange={(e) => setQueueTargetMinistryId(e.target.value)}
                 className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none"
               >
-                <option value="">-- Select Target Ministry --</option>
+                <option value="">{t("mezmur.queue.selectTarget")}</option>
                 {ministries
                   .filter(
                     (m) =>
@@ -1429,8 +1421,8 @@ export default function MezmurMinistry() {
               >
                 <UserCheck className="w-4 h-4" />
                 {bulkAssigningQueue
-                  ? "Assigning..."
-                  : "Bulk Assign to Ministry"}
+                  ? t("mezmur.queue.assigning")
+                  : t("mezmur.queue.assign")}
               </button>
             </div>
           </div>
@@ -1450,32 +1442,32 @@ export default function MezmurMinistry() {
                       className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
                     />
                   </th>
-                  <th className="px-6 py-4">Student Name</th>
-                  <th className="px-6 py-4">Exam Passed</th>
-                  <th className="px-6 py-4">Exam's Linked Ministry</th>
-                  <th className="px-6 py-4">Score</th>
-                  <th className="px-6 py-4">Section</th>
-                  <th className="px-6 py-4 text-right">Direct Action</th>
+                  <th className="px-6 py-4">{t("mezmur.queue.studentName")}</th>
+                  <th className="px-6 py-4">{t("mezmur.queue.examPassed")}</th>
+                  <th className="px-6 py-4">{t("mezmur.queue.examMinistry")}</th>
+                  <th className="px-6 py-4">{t("mezmur.queue.score")}</th>
+                  <th className="px-6 py-4">{t("mezmur.queue.mezmurAtt")}</th>
+                  <th className="px-6 py-4">{t("mezmur.queue.section")}</th>
+                  <th className="px-6 py-4 text-right">{t("mezmur.queue.directAction")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
                 {queueLoading ? (
                   <tr>
                     <td
-                      colSpan="7"
+                      colSpan="8"
                       className="px-8 py-12 text-center text-slate-400"
                     >
-                      Loading queue...
+                      {t("mezmur.queue.loading")}
                     </td>
                   </tr>
                 ) : passedQueue.length === 0 ? (
                   <tr>
                     <td
-                      colSpan="7"
+                      colSpan="8"
                       className="px-8 py-16 text-center text-slate-400 font-bold uppercase tracking-widest text-xs"
                     >
-                      No passed candidates awaiting assignment. Candidates
-                      appear here after passing Mezmur exams.
+                      {t("mezmur.queue.empty")}
                     </td>
                   </tr>
                 ) : (
@@ -1530,7 +1522,7 @@ export default function MezmurMinistry() {
                             </span>
                           ) : (
                             <span className="text-[10px] text-slate-400 italic">
-                              General Exam
+                              {t("mezmur.queue.generalExam")}
                             </span>
                           )}
                         </td>
@@ -1539,6 +1531,27 @@ export default function MezmurMinistry() {
                           <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-lg font-black text-xs">
                             {item.score ?? "100"}%
                           </span>
+                        </td>
+
+                        <td className="px-6 py-5">
+                          {item.mezmur_attendance_pct !== null &&
+                          item.mezmur_attendance_pct !== undefined ? (
+                            <span
+                              className={`px-2.5 py-1 rounded-lg font-black text-xs ${
+                                item.mezmur_attendance_pct >=
+                                mezmurMinAttendance
+                                  ? "bg-sky-50 text-sky-700"
+                                  : "bg-amber-50 text-amber-700"
+                              }`}
+                              title={`Mezmur attendance this academic year — required ≥ ${mezmurMinAttendance}%`}
+                            >
+                              {item.mezmur_attendance_pct}%
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-slate-300 font-bold">
+                              --
+                            </span>
+                          )}
                         </td>
 
                         <td className="px-6 py-5 font-semibold text-slate-600">
@@ -1587,7 +1600,7 @@ export default function MezmurMinistry() {
                             }}
                             className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold uppercase tracking-wider text-[10px] shadow cursor-pointer"
                           >
-                            Assign to Ministry
+                            {t("mezmur.queue.assignToMinistry")}
                           </button>
                         </td>
                       </tr>
@@ -1597,6 +1610,45 @@ export default function MezmurMinistry() {
               </tbody>
             </table>
           </div>
+
+          {/* Attendance-Eligible Students (view only) */}
+          {eligibleQueue.length > 0 && (
+            <div className="p-6 border-t border-slate-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
+                  <UserCheck className="w-4 h-4 text-sky-600" />
+                  {t("mezmur.queue.eligibleTitle", { min: mezmurMinAttendance })}
+                </h4>
+                <span className="px-2.5 py-1 bg-sky-50 text-sky-700 rounded-full font-bold text-[10px] uppercase">
+                  {t("mezmur.queue.eligibleCount", { count: eligibleQueue.length })}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 font-medium">
+                {t("mezmur.queue.eligibleHint")}
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                {eligibleQueue.map((item) => (
+                  <div
+                    key={item.student_id}
+                    className="flex items-center justify-between gap-2 p-3 rounded-xl bg-sky-50/50 border border-sky-100"
+                  >
+                    <div>
+                      <p className="font-bold text-slate-800 text-xs">
+                        {item.name}
+                      </p>
+                      <p className="text-[10px] font-semibold text-slate-500">
+                        {item.student_id} •{" "}
+                        {item.section_name || item.section?.name || "Unassigned"}
+                      </p>
+                    </div>
+                    <span className="px-2 py-0.5 bg-sky-100 text-sky-800 rounded-lg font-black text-[10px] shrink-0">
+                      {item.mezmur_attendance_pct}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1607,7 +1659,7 @@ export default function MezmurMinistry() {
             <div className="flex items-center justify-between px-7 py-5 border-b border-slate-100 bg-slate-50/50">
               <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
                 <Landmark className="w-5 h-5 text-emerald-600" />
-                Create New Church Ministry
+                {t("mezmur.ministries.createTitle")}
               </h3>
               <button
                 onClick={() => setCreateMinistryModal(false)}
@@ -1620,11 +1672,11 @@ export default function MezmurMinistry() {
             <form onSubmit={handleCreateMinistry} className="p-7 space-y-5">
               <div>
                 <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1.5">
-                  Ministry Name <span className="text-red-500">*</span>
+                  {t("mezmur.ministries.name")} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. St. Michael Feast Choir Ministry, Youth Outreach..."
+                  placeholder={t("mezmur.ministries.namePlaceholder")}
                   value={ministryName}
                   onChange={(e) => setMinistryName(e.target.value)}
                   required
@@ -1634,7 +1686,7 @@ export default function MezmurMinistry() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <EthiopianDateInput
-                  label="Ministry / Service Date"
+                  label={t("mezmur.ministries.date")}
                   value={ministryDate}
                   onChange={(e) => setMinistryDate(e.target.value)}
                   className="text-xs"
@@ -1642,11 +1694,11 @@ export default function MezmurMinistry() {
 
                 <div>
                   <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1.5">
-                    Location / Parish
+                    {t("mezmur.ministries.location")}
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Main Sanctuary, Parish Hall"
+                    placeholder={t("mezmur.ministries.locationPlaceholder")}
                     value={ministryLocation}
                     onChange={(e) => setMinistryLocation(e.target.value)}
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none focus:border-emerald-500 text-xs"
@@ -1656,10 +1708,10 @@ export default function MezmurMinistry() {
 
               <div>
                 <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1.5">
-                  Description &amp; Notes
+                  {t("mezmur.ministries.notes")}
                 </label>
                 <textarea
-                  placeholder="Purpose of ministry, requirements, choir robes, schedule notes..."
+                  placeholder={t("mezmur.ministries.notesPlaceholder")}
                   value={ministryNotes}
                   onChange={(e) => setMinistryNotes(e.target.value)}
                   rows={3}
@@ -1673,14 +1725,14 @@ export default function MezmurMinistry() {
                   onClick={() => setCreateMinistryModal(false)}
                   className="px-5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </button>
                 <button
                   type="submit"
                   disabled={creatingMinistry}
                   className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow cursor-pointer disabled:opacity-50"
                 >
-                  {creatingMinistry ? "Creating..." : "Save Ministry"}
+                  {creatingMinistry ? t("mezmur.ministries.creating") : t("mezmur.ministries.save")}
                 </button>
               </div>
             </form>
@@ -1695,7 +1747,7 @@ export default function MezmurMinistry() {
             <div className="flex items-center justify-between px-7 py-5 border-b border-slate-100 bg-slate-50/50">
               <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
                 <Award className="w-5 h-5 text-brand-600" />
-                New Mezmur Examination Session
+                {t("mezmur.exams.createTitle")}
               </h3>
               <button
                 onClick={() => setCreateExamModal(false)}
@@ -1708,27 +1760,16 @@ export default function MezmurMinistry() {
             <form onSubmit={handleCreateExam} className="p-7 space-y-5">
               {/* Linked Ministry Selection */}
               <div>
-                <div className="flex justify-between items-center mb-1.5">
-                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
-                    Exam For Ministry:
-                  </label>
-                  {canManageMinistry && (
-                    <button
-                      type="button"
-                      onClick={() => setCreateMinistryModal(true)}
-                      className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 underline cursor-pointer"
-                    >
-                      + New Ministry
-                    </button>
-                  )}
-                </div>
+                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1.5">
+                  {t("mezmur.exams.forMinistry")}
+                </label>
                 <select
                   value={examMinistryId}
                   onChange={(e) => setExamMinistryId(e.target.value)}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 outline-none focus:border-brand-500 text-sm"
                 >
                   <option value="">
-                    -- General Exam (No specific ministry) --
+                    {t("mezmur.exams.generalExam")}
                   </option>
                   {ministries.map((m) => (
                     <option key={m.id} value={m.id}>
@@ -1737,18 +1778,39 @@ export default function MezmurMinistry() {
                   ))}
                 </select>
                 <p className="text-[11px] text-slate-400 mt-1">
-                  Linking this exam to a ministry allows direct bulk assignment
-                  of passed candidates to this ministry.
+                  {t("mezmur.exams.linkHint")}
+                </p>
+              </div>
+
+              {/* Target Student Group */}
+              <div>
+                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1.5">
+                  {t("mezmur.exams.targetGroup")}
+                </label>
+                <select
+                  value={examTargetClass}
+                  onChange={(e) => setExamTargetClass(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 outline-none focus:border-brand-500 text-sm"
+                >
+                  <option value="">{t("mezmur.exams.allStudents")}</option>
+                  <option value="htsanat">ሕፃናት (Htsanat)</option>
+                  <option value="maekelawyan">ማዕከላውያን (Maekelawyan)</option>
+                  <option value="wetatoch">ወጣቶች (Wetatoch)</option>
+                  <option value="prekg">ቅድመ-ሕፃናት (PreKG)</option>
+                  <option value="distance">የርቀት (Distance)</option>
+                </select>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  {t("mezmur.exams.targetGroupHint")}
                 </p>
               </div>
 
               <div>
                 <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1.5">
-                  Exam Title <span className="text-red-500">*</span>
+                  {t("mezmur.exams.titleField")} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Midterm Hymn &amp; Tone Recitation"
+                  placeholder={t("mezmur.exams.titlePlaceholder")}
                   value={examTitle}
                   onChange={(e) => setExamTitle(e.target.value)}
                   required
@@ -1758,7 +1820,7 @@ export default function MezmurMinistry() {
 
               <div>
                 <EthiopianDateInput
-                  label="Examination Date"
+                  label={t("mezmur.exams.date")}
                   value={examDate}
                   onChange={(e) => setExamDate(e.target.value)}
                   required
@@ -1767,10 +1829,10 @@ export default function MezmurMinistry() {
 
               <div>
                 <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1.5">
-                  Description / Focus Mezmurs
+                  {t("mezmur.exams.desc")}
                 </label>
                 <textarea
-                  placeholder="Notes, hymn titles, passing criteria..."
+                  placeholder={t("mezmur.exams.descPlaceholder")}
                   value={examDesc}
                   onChange={(e) => setExamDesc(e.target.value)}
                   rows={3}
@@ -1784,13 +1846,13 @@ export default function MezmurMinistry() {
                   onClick={() => setCreateExamModal(false)}
                   className="px-5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </button>
                 <button
                   type="submit"
                   className="px-6 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow cursor-pointer"
                 >
-                  Create Exam
+                  {t("mezmur.exams.create")}
                 </button>
               </div>
             </form>
